@@ -5,19 +5,27 @@ export default class BootScene extends Phaser.Scene {
     super('BootScene');
   }
 
+  preload(): void {
+    this.createPlaceholderTextures();
+  }
+
   create(): void {
-    this.cameras.main.setBackgroundColor('#0a0a0f');
+    this.scene.start('Level1Scene');
+  }
 
-    this.add.text(400, 280, 'THE WINGLESS CROW', {
-      fontFamily: 'Georgia, serif',
-      fontSize: '32px',
-      color: '#c9a86a',
-    }).setOrigin(0.5);
+  private createPlaceholderTextures(): void {
+    // Player placeholder: 32x48 vörös téglalap
+    const playerGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    playerGfx.fillStyle(0xb33a3a, 1);
+    playerGfx.fillRect(0, 0, 32, 48);
+    playerGfx.generateTexture('player-placeholder', 32, 48);
+    playerGfx.destroy();
 
-    this.add.text(400, 320, 'Phaser project initialized', {
-      fontFamily: 'monospace',
-      fontSize: '14px',
-      color: '#888888',
-    }).setOrigin(0.5);
+    // Ground/platform placeholder: 64x32 szürke téglalap
+    const groundGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    groundGfx.fillStyle(0x3a3a3a, 1);
+    groundGfx.fillRect(0, 0, 64, 32);
+    groundGfx.generateTexture('ground-placeholder', 64, 32);
+    groundGfx.destroy();
   }
 }

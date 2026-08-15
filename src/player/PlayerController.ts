@@ -1,0 +1,41 @@
+import Phaser from 'phaser';
+import Player from './Player';
+
+export default class PlayerController {
+  private player: Player;
+  private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
+  private keys: { [key: string]: Phaser.Input.Keyboard.Key };
+
+  constructor(scene: Phaser.Scene, player: Player) {
+    this.player = player;
+
+    if (!scene.input.keyboard) {
+      throw new Error('Keyboard input plugin nem elérhető.');
+    }
+
+    this.cursors = scene.input.keyboard.createCursorKeys();
+    this.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE') as {
+      [key: string]: Phaser.Input.Keyboard.Key;
+    };
+  }
+
+  update(): void {
+    const left = this.cursors.left.isDown || this.keys.A.isDown;
+    const right = this.cursors.right.isDown || this.keys.D.isDown;
+    const jump = this.cursors.up.isDown || this.keys.W.isDown || this.keys.SPACE.isDown;
+
+    if (left) {
+      this.player.moveLeft();
+    } else if (right) {
+      this.player.moveRight();
+    } else {
+      this.player.stop();
+    }
+
+    if (jump) {
+      this.player.jump();
+    }
+
+    this.player.updateState();
+  }
+}
