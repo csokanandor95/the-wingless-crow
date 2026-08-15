@@ -26,11 +26,17 @@ export default class BootScene extends Phaser.Scene {
     groundGfx.generateTexture('ground-placeholder', 64, 32);
     groundGfx.destroy();
 
-    // Ideiglenes: training dummy teszt-célponthoz (Phase 3 combat teszteléséhez).
     const dummyGfx = this.make.graphics({ x: 0, y: 0 }, false);
     dummyGfx.fillStyle(0x6a4a8a, 1);
     dummyGfx.fillRect(0, 0, 32, 48);
     dummyGfx.generateTexture('dummy-placeholder', 32, 48);
     dummyGfx.destroy();
+
+    // Fireball placeholder: 16x16 narancssárga kör
+    const fireballGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    fireballGfx.fillStyle(0xff7a1a, 1);
+    fireballGfx.fillCircle(8, 8, 8);
+    fireballGfx.generateTexture('fireball-placeholder', 16, 16);
+    fireballGfx.destroy();
   }
 }

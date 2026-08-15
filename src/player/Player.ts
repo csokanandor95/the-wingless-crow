@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { AttackType, ATTACK_CONFIGS, AttackConfig } from '../combat/Attack';
+import { FIREBALL_CONFIG } from '../combat/Projectile';
 import type { Damageable } from '../combat/DamageSystem';
 
 export enum PlayerState {
@@ -16,6 +17,7 @@ export enum PlayerState {
 const MOVE_SPEED = 200;
 const JUMP_VELOCITY = -500;
 const MAX_HP = 100;
+const CAST_DELAY_MS = 120;
 
 export default class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public playerState: PlayerState = PlayerState.IDLE;
@@ -23,8 +25,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   private hp = MAX_HP;
   private isAttacking = false;
   private canAttack = true;
+  private isCasting = false;
+  private canCastFireball = true;
 
-  // Láthatatlan physics zone, ami csak a kardcsapás aktív ablakában van engedélyezve.
   private attackHitbox: Phaser.GameObjects.Zone;
   private attackHitboxBody: Phaser.Physics.Arcade.Body;
   private hitTargetsThisAttack: Set<Phaser.GameObjects.GameObject> = new Set();
@@ -93,7 +96,6 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.hitTargetsThisAttack.clear();
     this.setVelocityX(0);
 
-    // Placeholder "animáció": rövid színvillanás. Valódi sprite animáció Phase 8-ban.
     this.setTint(0xffcc66);
 
     this.scene.time.delayedCall(config.startupDelayMs, () => {
@@ -140,6 +142,37 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.hitTargetsThisAttack.add(target);
   }
 
+  // Fireball castolás: elindítja a CAST state-et, majd egy rövid startup delay után
+  // 'fireball-cast' eventet emittál — a scene ezt figyeli és hozza létre a Fireballt.
+  // A Player így nem függ közvetlenül a Fireball/scene projectile-group implementációtól.
+  castFireball(): void {
+    if (this.isLocked() || !this.canCastFireball) return;
+
+    this.isCasting = true;
+    this.canCastFireball = false;
+    this.playerState = PlayerState.CAST;
+    this.setVelocityX(0);
+    this.setTint(0x66aaff);
+
+    this.scene.time.delayedCall(CAST_DELAY_MS, () => {
+      this.isCasting = false;
+      this.clearTint();
+
+      if (this.playerState === PlayerState.DEAD) return;
+
+      const direction = this.flipX ? -1 : 1;
+      this.emit('fireball-cast', this.x + direction * 20, this.y, direction);
+
+      if (this.playerState === PlayerState.CAST) {
+        this.playerState = this.isGrounded() ? PlayerState.IDLE : PlayerState.FALL;
+      }
+    });
+
+    this.scene.time.delayedCall(FIREBALL_CONFIG.cooldownMs, () => {
+      this.canCastFireball = true;
+    });
+  }
+
   takeDamage(amount: number): void {
     if (this.playerState === PlayerState.DEAD) return;
 
@@ -181,7 +214,8 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     return (
       this.playerState === PlayerState.DEAD ||
       this.playerState === PlayerState.HURT ||
-      this.playerState === PlayerState.ATTACK
+      this.playerState === PlayerState.ATTACK ||
+      this.playerState === PlayerState.CAST
     );
   }
 
@@ -191,7 +225,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   }
 
   updateState(): void {
-    if (this.isLocked() || this.isAttacking) return;
+    if (this.isLocked() || this.isAttacking || this.isCasting) return;
 
     if (!this.isGrounded()) {
       const body = this.body as Phaser.Physics.Arcade.Body;

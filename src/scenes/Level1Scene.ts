@@ -1,13 +1,12 @@
 import Phaser from 'phaser';
 import Player from '../player/Player';
 import PlayerController from '../player/PlayerController';
+import Fireball from '../combat/Projectile';
 import type { Damageable } from '../combat/DamageSystem';
 
 const WORLD_WIDTH = 1600;
 const WORLD_HEIGHT = 450;
 
-// IDEIGLENES teszt-célpont a combat rendszer kipróbálásához.
-// Phase 5-ben (Enemy) lecseréljük a valódi Hollow enemyre — nem része a végleges projektstruktúrának.
 class TrainingDummy extends Phaser.Physics.Arcade.Sprite implements Damageable {
   private hp = 50;
   private readonly maxHp = 50;
@@ -66,6 +65,10 @@ export default class Level1Scene extends Phaser.Scene {
   private dummy!: TrainingDummy;
   private playerHpText!: Phaser.GameObjects.Text;
 
+  // Plain tömb Group helyett — így elkerüljük, hogy a Phaser Arcade Group
+  // automatikusan felülírja a fireball sebességét/gravitációját .add()-nál.
+  private fireballs: Fireball[] = [];
+
   constructor() {
     super('Level1Scene');
   }
@@ -100,16 +103,35 @@ export default class Level1Scene extends Phaser.Scene {
       this
     );
 
+    this.player.on('fireball-cast', (x: number, y: number, direction: number) => {
+      const fireball = new Fireball(this, x, y, direction);
+      this.fireballs.push(fireball);
+    });
+
+    this.physics.add.overlap(
+      this.fireballs,
+      this.dummy,
+      this.handleFireballHitDummy,
+      undefined,
+      this
+    );
+
+    this.physics.add.collider(this.fireballs, ground, (fireballObj) => {
+      const fireball = fireballObj as Fireball;
+      if (fireball.active) fireball.onImpact();
+    });
+    this.physics.add.collider(this.fireballs, platforms, (fireballObj) => {
+      const fireball = fireballObj as Fireball;
+      if (fireball.active) fireball.onImpact();
+    });
+
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.controller = new PlayerController(this, this.player);
 
-    // Ideiglenes debug HP kijelzés — a valódi HUD Phase 8-ban készül.
     this.playerHpText = this.add
       .text(10, 10, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' })
       .setScrollFactor(0);
 
-    // Ideiglenes debug billentyű: player HP/death állapot teszteléséhez,
-    // amíg nincs valódi enemy attack (Phase 5). Törölhető, ha már van sebzésforrás.
     this.input.keyboard?.addKey('H').on('down', () => {
       this.player.takeDamage(20);
     });
@@ -118,6 +140,15 @@ export default class Level1Scene extends Phaser.Scene {
   update(): void {
     this.controller.update();
     this.playerHpText.setText(`HP: ${this.player.getHP()}/${this.player.getMaxHP()}`);
+
+    // FONTOS: helyben módosítjuk a tömböt (splice), nem hozunk létre újat (filter),
+    // mert a physics.add.overlap/collider a tömb REFERENCIÁJÁT tárolja el létrehozáskor.
+    // Egy új tömb visszaírása "leválasztaná" a collidereket az új lövedékekről.
+    for (let i = this.fireballs.length - 1; i >= 0; i--) {
+      if (!this.fireballs[i].active) {
+        this.fireballs.splice(i, 1);
+      }
+    }
   }
 
   private handlePlayerHitDummy(
@@ -130,5 +161,17 @@ export default class Level1Scene extends Phaser.Scene {
     const damage = (hitbox as Phaser.GameObjects.Zone).getData('damage') as number;
     dummy.takeDamage(damage);
     this.player.registerHit(dummy);
+  }
+
+  private handleFireballHitDummy(
+    fireballObj: Phaser.GameObjects.GameObject,
+    dummyObj: Phaser.GameObjects.GameObject
+  ): void {
+    const fireball = fireballObj as Fireball;
+    const dummy = dummyObj as TrainingDummy;
+    if (!fireball.active || fireball.hasAlreadyHit() || dummy.isDead()) return;
+
+    dummy.takeDamage(fireball.getDamage());
+    fireball.onImpact();
   }
 }

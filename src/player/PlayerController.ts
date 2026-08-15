@@ -14,13 +14,13 @@ export default class PlayerController {
     }
 
     this.cursors = scene.input.keyboard.createCursorKeys();
-    this.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,J,K') as {
+    this.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,J,K,F') as {
       [key: string]: Phaser.Input.Keyboard.Key;
     };
 
-    // Left Mouse / J → Light Attack, Right Mouse / K → Heavy Attack (projektterv 9. pont)
     this.keys.J.on('down', () => this.player.attackLight());
     this.keys.K.on('down', () => this.player.attackHeavy());
+    this.keys.F.on('down', () => this.player.castFireball());
 
     scene.input.mouse?.disableContextMenu();
     scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
