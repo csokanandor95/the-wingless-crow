@@ -1,0 +1,18 @@
+{
+  "name": "the-wingless-crow",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.2.0"
+  },
+  "dependencies": {
+    "phaser": "^4.2.1"
+  }
+}
