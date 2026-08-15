@@ -2,72 +2,18 @@ import Phaser from 'phaser';
 import Player from '../player/Player';
 import PlayerController from '../player/PlayerController';
 import Fireball from '../combat/Projectile';
-import type { Damageable } from '../combat/DamageSystem';
+import Hollow from '../enemies/Hollow';
 
 const WORLD_WIDTH = 1600;
 const WORLD_HEIGHT = 450;
 
-class TrainingDummy extends Phaser.Physics.Arcade.Sprite implements Damageable {
-  private hp = 50;
-  private readonly maxHp = 50;
-  private hpText: Phaser.GameObjects.Text;
-
-  constructor(scene: Phaser.Scene, x: number, y: number) {
-    super(scene, x, y, 'dummy-placeholder');
-    scene.add.existing(this);
-    scene.physics.add.existing(this);
-
-    const body = this.body as Phaser.Physics.Arcade.Body;
-    body.setImmovable(true);
-    body.allowGravity = false;
-
-    this.hpText = scene.add
-      .text(x, y - 40, `${this.hp}/${this.maxHp}`, {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-  }
-
-  takeDamage(amount: number): void {
-    if (this.isDead()) return;
-
-    this.hp = Math.max(0, this.hp - amount);
-    this.hpText.setText(`${this.hp}/${this.maxHp}`);
-    this.setTint(0xffffff);
-    this.scene.time.delayedCall(100, () => this.clearTint());
-
-    if (this.hp <= 0) {
-      this.setVisible(false);
-      (this.body as Phaser.Physics.Arcade.Body).enable = false;
-      this.hpText.setVisible(false);
-      this.scene.time.delayedCall(2000, () => this.respawn());
-    }
-  }
-
-  private respawn(): void {
-    this.hp = this.maxHp;
-    this.hpText.setText(`${this.hp}/${this.maxHp}`);
-    this.hpText.setVisible(true);
-    this.setVisible(true);
-    (this.body as Phaser.Physics.Arcade.Body).enable = true;
-  }
-
-  isDead(): boolean {
-    return this.hp <= 0;
-  }
-}
-
 export default class Level1Scene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
-  private dummy!: TrainingDummy;
   private playerHpText!: Phaser.GameObjects.Text;
 
-  // Plain tömb Group helyett — így elkerüljük, hogy a Phaser Arcade Group
-  // automatikusan felülírja a fireball sebességét/gravitációját .add()-nál.
   private fireballs: Fireball[] = [];
+  private enemies: Hollow[] = [];
 
   constructor() {
     super('Level1Scene');
@@ -92,13 +38,17 @@ export default class Level1Scene extends Phaser.Scene {
     this.physics.add.collider(this.player, ground);
     this.physics.add.collider(this.player, platforms);
 
-    this.dummy = new TrainingDummy(this, 400, 386);
-    this.physics.add.collider(this.dummy, ground);
+    // Két Hollow a state machine (patrol / chase / attack) teszteléséhez.
+    this.enemies.push(new Hollow(this, 450, 386));
+    this.enemies.push(new Hollow(this, 900, 386));
+
+    this.physics.add.collider(this.enemies, ground);
+    this.physics.add.collider(this.enemies, platforms);
 
     this.physics.add.overlap(
       this.player.getAttackHitbox(),
-      this.dummy,
-      this.handlePlayerHitDummy,
+      this.enemies,
+      this.handlePlayerHitEnemy,
       undefined,
       this
     );
@@ -110,8 +60,8 @@ export default class Level1Scene extends Phaser.Scene {
 
     this.physics.add.overlap(
       this.fireballs,
-      this.dummy,
-      this.handleFireballHitDummy,
+      this.enemies,
+      this.handleFireballHitEnemy,
       undefined,
       this
     );
@@ -131,19 +81,16 @@ export default class Level1Scene extends Phaser.Scene {
     this.playerHpText = this.add
       .text(10, 10, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' })
       .setScrollFactor(0);
-
-    this.input.keyboard?.addKey('H').on('down', () => {
-      this.player.takeDamage(20);
-    });
   }
 
   update(): void {
     this.controller.update();
     this.playerHpText.setText(`HP: ${this.player.getHP()}/${this.player.getMaxHP()}`);
 
-    // FONTOS: helyben módosítjuk a tömböt (splice), nem hozunk létre újat (filter),
-    // mert a physics.add.overlap/collider a tömb REFERENCIÁJÁT tárolja el létrehozáskor.
-    // Egy új tömb visszaírása "leválasztaná" a collidereket az új lövedékekről.
+    for (const enemy of this.enemies) {
+      enemy.update(this.player);
+    }
+
     for (let i = this.fireballs.length - 1; i >= 0; i--) {
       if (!this.fireballs[i].active) {
         this.fireballs.splice(i, 1);
@@ -151,27 +98,27 @@ export default class Level1Scene extends Phaser.Scene {
     }
   }
 
-  private handlePlayerHitDummy(
+  private handlePlayerHitEnemy(
     hitbox: Phaser.GameObjects.GameObject,
-    dummyObj: Phaser.GameObjects.GameObject
+    enemyObj: Phaser.GameObjects.GameObject
   ): void {
-    const dummy = dummyObj as TrainingDummy;
-    if (this.player.hasHitTarget(dummy)) return;
+    const enemy = enemyObj as Hollow;
+    if (enemy.isDead() || this.player.hasHitTarget(enemy)) return;
 
     const damage = (hitbox as Phaser.GameObjects.Zone).getData('damage') as number;
-    dummy.takeDamage(damage);
-    this.player.registerHit(dummy);
+    enemy.takeDamage(damage);
+    this.player.registerHit(enemy);
   }
 
-  private handleFireballHitDummy(
+  private handleFireballHitEnemy(
     fireballObj: Phaser.GameObjects.GameObject,
-    dummyObj: Phaser.GameObjects.GameObject
+    enemyObj: Phaser.GameObjects.GameObject
   ): void {
     const fireball = fireballObj as Fireball;
-    const dummy = dummyObj as TrainingDummy;
-    if (!fireball.active || fireball.hasAlreadyHit() || dummy.isDead()) return;
+    const enemy = enemyObj as Hollow;
+    if (!fireball.active || fireball.hasAlreadyHit() || enemy.isDead()) return;
 
-    dummy.takeDamage(fireball.getDamage());
+    enemy.takeDamage(fireball.getDamage());
     fireball.onImpact();
   }
 }
