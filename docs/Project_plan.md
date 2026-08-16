@@ -45,7 +45,7 @@ A cél az, hogy ne saját physics/collision/game engine-t kelljen építeni, han
 
 ## Programozási környezet
 
-- VS Code
+- VS Code (Claude Code integráció)
 - Node.js
 - npm
 - Phaser
