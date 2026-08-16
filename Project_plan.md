@@ -161,7 +161,7 @@ A cím később változtatható.
 Inspirációk:
 
 - Dark Souls / Elden Ring – dark fantasy hangulat, lore, bossok
-- Castlevania / Hollow Knight – 2D dark fantasy action platformer jelleg
+- Blasphemous / The Last Faith / Hollow Knight – 2D dark fantasy action platformer jelleg
 - általános Soulslike design philosophy
 
 A cél nem egy meglévő játék lemásolása, hanem 1–2 kedvelt core concept saját, kis scope-ú játékba való átültetése.
@@ -216,7 +216,7 @@ Az első működő verzió:
 
 Ha ez elkészül és játszható, akkor már van egy komplett vertical slice.
 
-Ezután lehet további pályákkal bővíteni.
+Ezután lehet további pályákkal, feature-ökkel és assetekkel (pixelart, zene stb.) bővíteni.
 
 ---
 
@@ -427,7 +427,7 @@ Minden nagyobb pálya végén lehet egy boss.
 
 Első vertical slice-ban elég **1 boss**.
 
-## Boss – The Warden
+## Boss – The Grafted Wing-Breaker
 
 Példa:
 
@@ -450,8 +450,7 @@ Példa:
 50% HP alatt:
 
 - gyorsabb mozgás
-- új attack
-- erősebb támadások
+- új attack pl. ground slam, ami a player által ugrással kivédhető
 
 A cél nem egy Elden Ring szintű boss AI.
 
@@ -498,9 +497,9 @@ A végleges játékhoz például 3–5 rövid pálya készülhet.
 
 Lehetséges pályák:
 
-### Level 1 – The Dying Village
+### Level 1 – Cathedral of the Guardian
 
-Romos falu.
+Félig lerombolt templom.
 
 Főbb elemek:
 
@@ -859,6 +858,10 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 - music
 - sound effects
 - UI
+
+## Döntési pont: 
+
+- Többi Enemy típus, Level és Bossok létrehozása VAGY haladunk tovább a Lore, QA irányba és ha mindez megvan, akkor bővítjük csak a többi Enemy, Level és Boss hozzáadásával.
 
 ## Phase 9 – Lore
 
