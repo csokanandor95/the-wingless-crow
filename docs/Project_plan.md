@@ -268,8 +268,14 @@ Alapvető mozgás:
 - balra
 - jobbra
 - ugrás
+- létrán mászás (fel/le)
 
 Nem cél komplex platforming rendszer készítése.
+
+> **Kiegészítés (Phase 6):** a létra-mászás utólag került be, a pálya végi függőleges
+> átvezetéshez. Szándékosan minimális: a player egy zárt függőleges "sínen" mozog
+> (nincs oldalra mozgás mászás közben, nincs támadás/varázslás létrán), a vízszintes
+> input pedig mindig lelép a létráról. Nem tekintjük "komplex movement ability"-nek.
 
 Nem szükséges első verzióban:
 
@@ -290,6 +296,7 @@ FALL
 ATTACK
 CAST
 HURT
+CLIMB
 DEAD
 ```
 
@@ -383,6 +390,19 @@ COOLDOWN
 CHASE
 ```
 
+**DETECT PLAYER kiváltói** (implementált):
+
+- a player `DETECTION_RANGE`-en belülre kerül (220px), VAGY
+- az enemy sebzést kap PATROL közben (kard vagy tűzgolyó) — így egy távolról
+  indított tűzgolyó is felébreszti, nem csak a közelség
+
+Visszaváltás PATROL-ra `LOSE_RANGE`-en (320px) túl — a két külön határ hiszterézist ad,
+hogy a state ne pattogjon a detektálási határon.
+
+**Platformon álló Hollow** (Phase 6): a patrol range a platform tetejére korlátozható
+(abszolút X-határok), és egy kapcsolóval elérhető, hogy CHASE közben se lépjen ki
+ezekből — így nem sétál le a peremről, hanem ott várakozik, amíg a player a közelben van.
+
 ## Enemy 2 – Archer / Caster
 
 Távolsági ellenfél.
@@ -475,8 +495,14 @@ Alapvető elemek:
 - lépcsős platformok
 - magasabb platformok
 - egyszerű akadályok
+- létra (függőleges átvezetés)
+- egyirányú platform (alulról átjárható, felülről szilárd)
 
 A Phaser physics rendszerét használjuk.
+
+> **Megjegyzés (Phase 6):** a `gap` egyelőre NINCS implementálva a Level 1-ben.
+> Amíg nincs checkpoint/respawn, egy szakadékba esve a player beragadna
+> (a `Player.die()` letiltja a physics bodyt). A gap-ek a checkpoint-tal együtt jönnek.
 
 A játékos rendelkezik:
 

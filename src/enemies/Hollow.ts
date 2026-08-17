@@ -23,6 +23,14 @@ const ATTACK_DAMAGE = 8;
 const ATTACK_STARTUP_MS = 300;
 const ATTACK_COOLDOWN_MS = 900;
 
+export interface HollowConfig {
+  /** Abszolút világ-X határok a patrol mozgáshoz. Ha nincs megadva: spawn ± PATROL_RANGE. */
+  patrolMinX?: number;
+  patrolMaxX?: number;
+  /** Ha true, CHASE közben sem lép ki a határokon (platformon álló enemy nem esik le). */
+  clampChaseToBounds?: boolean;
+}
+
 export default class Hollow extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public hollowState: HollowState = HollowState.PATROL;
 
@@ -30,19 +38,23 @@ export default class Hollow extends Phaser.Physics.Arcade.Sprite implements Dama
   private readonly maxHp = MAX_HP;
   private hpText: Phaser.GameObjects.Text;
 
-  private readonly patrolOriginX: number;
+  private readonly patrolMinX: number;
+  private readonly patrolMaxX: number;
+  private readonly clampChaseToBounds: boolean;
   private patrolDirection: 1 | -1 = 1;
   private isAttackBusy = false;
   private playerRef: Player | null = null;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, config: HollowConfig = {}) {
     super(scene, x, y, 'hollow-placeholder');
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setCollideWorldBounds(true);
 
-    this.patrolOriginX = x;
+    this.patrolMinX = config.patrolMinX ?? x - PATROL_RANGE;
+    this.patrolMaxX = config.patrolMaxX ?? x + PATROL_RANGE;
+    this.clampChaseToBounds = config.clampChaseToBounds ?? false;
 
     this.hpText = scene.add
       .text(x, y - 36, `${this.hp}/${this.maxHp}`, {
@@ -85,11 +97,8 @@ export default class Hollow extends Phaser.Physics.Arcade.Sprite implements Dama
       return;
     }
 
-    const leftBound = this.patrolOriginX - PATROL_RANGE;
-    const rightBound = this.patrolOriginX + PATROL_RANGE;
-
-    if (this.x <= leftBound) this.patrolDirection = 1;
-    if (this.x >= rightBound) this.patrolDirection = -1;
+    if (this.x <= this.patrolMinX) this.patrolDirection = 1;
+    if (this.x >= this.patrolMaxX) this.patrolDirection = -1;
 
     this.setVelocityX(PATROL_SPEED * this.patrolDirection);
     this.setFlipX(this.patrolDirection < 0);
@@ -107,6 +116,18 @@ export default class Hollow extends Phaser.Physics.Arcade.Sprite implements Dama
     }
 
     const direction = player.x < this.x ? -1 : 1;
+
+    // Platformon álló enemy: a peremnél megáll üldözés közben is, nem sétál le.
+    if (
+      this.clampChaseToBounds &&
+      ((direction < 0 && this.x <= this.patrolMinX) ||
+        (direction > 0 && this.x >= this.patrolMaxX))
+    ) {
+      this.setVelocityX(0);
+      this.setFlipX(direction < 0);
+      return;
+    }
+
     this.setVelocityX(CHASE_SPEED * direction);
     this.setFlipX(direction < 0);
   }

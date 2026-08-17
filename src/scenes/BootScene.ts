@@ -38,5 +38,36 @@ export default class BootScene extends Phaser.Scene {
     hollowGfx.fillRect(0, 0, 30, 46);
     hollowGfx.generateTexture('hollow-placeholder', 30, 46);
     hollowGfx.destroy();
+
+    // Lebegő platform: vékonyabb és világosabb, mint a talaj, hogy vizuálisan elváljon.
+    const platformGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    platformGfx.fillStyle(0x4a4a52, 1);
+    platformGfx.fillRect(0, 0, 64, 16);
+    platformGfx.generateTexture('platform-placeholder', 64, 16);
+    platformGfx.destroy();
+
+    // Létra-csempe: két függőleges rúd + egy fok. TileSprite-tal ismételjük függőlegesen.
+    const ladderGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    ladderGfx.fillStyle(0x6b4a2a, 1);
+    ladderGfx.fillRect(0, 0, 5, 32);
+    ladderGfx.fillRect(23, 0, 5, 32);
+    ladderGfx.fillStyle(0x8a6238, 1);
+    ladderGfx.fillRect(0, 12, 28, 6);
+    ladderGfx.generateTexture('ladder-placeholder', 28, 32);
+    ladderGfx.destroy();
+
+    // Háttér-dekoráció (nem ütközik): sötét oszlop.
+    const pillarGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    pillarGfx.fillStyle(0x16161c, 1);
+    pillarGfx.fillRect(0, 0, 40, 160);
+    pillarGfx.generateTexture('pillar-placeholder', 40, 160);
+    pillarGfx.destroy();
+
+    // Pálya végi "kijárat" jelölő — a jövőbeli checkpoint/transition helye, most csak dísz.
+    const doorGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    doorGfx.fillStyle(0x2a1e36, 1);
+    doorGfx.fillRect(0, 0, 48, 72);
+    doorGfx.generateTexture('door-placeholder', 48, 72);
+    doorGfx.destroy();
   }
 }

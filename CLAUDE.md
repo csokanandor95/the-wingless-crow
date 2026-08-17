@@ -18,7 +18,9 @@
 
 ## Tech stack
 
-- Phaser 3 (game engine, Arcade Physics)
+- Phaser 4 (game engine, Arcade Physics) — a `package.json` `phaser: ^4.2.1`-et használ,
+  NEM Phaser 3-at. Phaser 3 doksi/példa keresésekor erre figyelj (pl. a `gravity: { y: 800 }`
+  Phaser 4-ben `Vector2Like`-ot vár, ezért ad típushibát a `main.ts`).
 - Vite (dev szerver / bundler)
 - TypeScript (strict mode)
 - Node.js / npm
@@ -48,26 +50,27 @@ Három opció volt feltéve a usernek:
 
 Készen: Step 1 (Projekt setup), Phase 2 (Player), Phase 3 (Combat), Phase 4 (Magic), Phase 5 (Enemy) részlegesen — Hollow kész.
 
+**Phase 6 (Level) részlegesen kész:** level layout, platforms, environment megvan (3200px hosszú pálya, 9 platform, létra, dekoráció). **Checkpoint és transition még hátra van** — a helyük a pálya végi felső platform (P9) és az ott lévő `door-placeholder` jelölő.
+
 ## Fájlstruktúra (jelenlegi, tényleges állapot)
 
 ```
 the-wingless-crow/
 ├── package.json
 ├── index.html
-├── vite.config.js
-├── tsconfig.json
+├── tsconfig.json                 # megj.: vite.config.js NINCS, a projekt Vite defaultokon fut
 ├── docs/
 │   └── Project_plan.md
 ├── src/
 │   ├── main.ts
 │   ├── scenes/
-│   │   ├── BootScene.ts
-│   │   └── Level1Scene.ts        # jelenleg scratch/teszt pálya, NEM a végleges Level 1 design
+│   │   ├── BootScene.ts          # az összes placeholder textúra kódból generálva
+│   │   └── Level1Scene.ts        # 3200px pálya, PLATFORMS adattömb, létra, 5 Hollow
 │   ├── player/
-│   │   ├── Player.ts
-│   │   └── PlayerController.ts
+│   │   ├── Player.ts             # + CLIMB state és LadderContact interface
+│   │   └── PlayerController.ts   # + létra-input ág
 │   ├── enemies/
-│   │   └── Hollow.ts             # Enemy 1, teljes state machine-nel
+│   │   └── Hollow.ts             # Enemy 1, state machine + HollowConfig (patrol határok)
 │   └── combat/
 │       ├── Attack.ts             # AttackType enum + ATTACK_CONFIGS (light/heavy sebzés, cooldown, hitbox méret)
 │       ├── Projectile.ts         # Fireball osztály + FIREBALL_CONFIG
@@ -80,7 +83,14 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 
 ### Player (`src/player/Player.ts`, `PlayerController.ts`)
 - Mozgás: balra/jobbra (nyilak vagy A/D), ugrás (fel/W/Space)
-- State-ek: IDLE, RUN, JUMP, FALL, ATTACK, CAST, HURT, DEAD
+- State-ek: IDLE, RUN, JUMP, FALL, ATTACK, CAST, HURT, CLIMB, DEAD
+- **Létramászás (CLIMB)**: a scene minden frame-ben átad egy `LadderContact`-ot
+  (`setLadderContact()`), ha a player fedésben van a létra zónájával. Mászás közben:
+  gravitáció ki, `body.checkCollision.down = false` (hogy az egyirányú felső platformon
+  át lehessen mászni), a pozíció pedig a `topY`/`bottomY` közé clampelve — ez a clamp
+  helyettesíti a kikapcsolt talaj-ütközést. Létrán nincs támadás/varázslás; sebzés
+  és halál automatikusan lelöki róla. Vezérlés: Fel/W = fel, Le/S = le, Space = leugrás,
+  Bal/Jobb = lelépés (a vízszintes input MINDIG kilép, hogy ne lehessen beragadni).
 - HP: 100, `takeDamage()`, halálnál lefagy (body disabled, szürke tint)
 - Kard: Light Attack (J / bal klikk) és Heavy Attack (K / jobb klikk), külön cooldown/damage/hitbox méret (`combat/Attack.ts` konfigból)
 - Fireball: F billentyű, `combat/Projectile.ts` Fireball osztályt hoz létre a Level1Scene-ben egy `fireball-cast` eventen keresztül
@@ -89,10 +99,29 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - State machine: PATROL → DETECT PLAYER → CHASE → ATTACK → COOLDOWN → CHASE (Project_plan.md 11. pont szerint)
 - HP: 40, kard és fireball is sebzi
 - Közelharci támadás: nem külön hitbox-zónával, hanem távolság-ellenőrzéssel a támadás windup végén (implementációs egyszerűsítés, nem terveltérés)
-- Patrol range: spawn ponttól ±80px, detection range: 220px, lose range: 320px (hiszterézis)
+- Patrol range: spawn ponttól ±80px (felülírható), detection range: 220px, lose range: 320px (hiszterézis)
+- **DETECT PLAYER kiváltói**: közelség VAGY sebzés PATROL közben — a `takeDamage()` PATROL
+  állapotban azonnal CHASE-re vált, így egy távolról indított tűzgolyó is felébreszti
+- **`HollowConfig`** (opcionális 4. konstruktor-paraméter): `patrolMinX` / `patrolMaxX`
+  abszolút világ-X határok, és `clampChaseToBounds` — utóbbi hatására CHASE közben sem
+  lép ki a határokon. Ez teszi lehetővé a platformon álló enemyt, ami nem sétál le a
+  peremről. A flag nélkül (default false) a földi enemyk szabadon üldöznek — ez fontos,
+  különben ±80px-be szorulnának.
 
 ### Level1Scene (`src/scenes/Level1Scene.ts`)
-- Ideiglenes teszt-pálya: talaj + 2 lebegő platform, 2 Hollow enemy (450px és 900px-nél), kamera követi a playert
+- **3200×450-es pálya** (a magasság szándékosan = canvas magasság, így csak vízszintes kameragörgetés van; a létra is belefér a sávba)
+- **Folyamatos talaj, NINCS szakadék** — amíg nincs checkpoint/respawn, egy pit soft-lockot okozna
+- **9 platform** a modul-szintű `PLATFORMS` tömbben (adatvezérelt: az enemy patrol-határok
+  ugyanebből a forrásból származnak, `platformTop/Left/Right` helper függvényekkel — ne
+  duplikálj magic numbereket). P9 `oneWay: true` → `checkCollision.down = false`, a létra
+  ezen megy át
+- **5 Hollow**: 3 földi (820, 1850, 2700) + 2 platformon álló (P4 tágas, P8 szűk)
+- **Létra** a pálya végén (x=2762): `tileSprite` a vizuál, külön `Zone` statikus bodyval
+  a fizika. A scene `update()`-je **szinkron** `this.physics.overlap(player, ladderZone)`-t
+  használ, NEM `physics.add.overlap` callbacket — utóbbi csak a scene `update()` UTÁN
+  futna le, ami 1 frame késést okozna a mászásban
+- Dekoráció: parallax háttéroszlopok (`scrollFactor 0.6`), létra-hátfal, és egy
+  `door-placeholder` P9 jobb végén (a jövőbeli checkpoint/transition helye)
 - Placeholder grafikák kódból generálva (`BootScene.ts` `createPlaceholderTextures()`), nem valódi sprite-ok
 
 ## Fontos technikai tanulságok (ne ismételd meg ezeket a hibákat!)
@@ -104,10 +133,17 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 
 - Minden grafika kódból generált színes téglalap/kör (`generateTexture`), nincs valódi pixel art
 - Player és Hollow felett lebegő HP szöveg (debug célra, valódi HUD a `ui/` modulban készül majd)
+- A bal felső sarki HUD szöveg a HP mellett a **player state-et is kiírja** (`HP: 100/100 | CLIMB`) — a mászás manuális tesztelését segíti, Phase 8-ban cserélendő
 - Hit-reakció = tint villanás, nincs valódi animáció
+- `pillar-placeholder` és `door-placeholder` dekorációk: puszta színes téglalapok, a `door` egyelőre semmit nem csinál (csak a jövőbeli transition helyét jelöli)
+- `main.ts`-ben `arcade.debug: true` — a physics bodyk és a létra zónája ki van rajzolva
 - A training dummy és a régi 'H' debug billentyű (self-damage teszteléshez) már törölve lett, miután a Hollow valódi sebzésforrássá vált
 
 ## Következő lépés
 
-A projekt fájlok átnézése és a kontextus megértése után:
-- **Phase 6 – Level**: level layout, platforms, environment, checkpoint, transition (Project_plan.md 21. pont)
+**Phase 6 hátralévő része: checkpoint + transition.**
+- Checkpoint rendszer (`systems/CheckpointSystem.ts`) + respawn — jelenleg a `Player.die()` letiltja a physics bodyt, és nincs visszatérés. Ez blokkolja a szakadékok/pit-ek bevezetését is.
+- Level transition a pálya végi felső platformról (P9) a boss rész felé — a `door-placeholder` jelöli a helyét (x≈3040).
+- Ha megvan a respawn, érdemes visszatérni a `PLATFORMS` layouthoz és szakadékokat is beszúrni (Project_plan.md 13. pont `gap` eleme).
+
+Utána: **Phase 7 – Boss**, majd **Phase 8 – Atmosphere**, ahol a Döntési pont következik (lásd fentebb).

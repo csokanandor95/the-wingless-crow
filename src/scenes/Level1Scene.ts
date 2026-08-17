@@ -1,16 +1,70 @@
 import Phaser from 'phaser';
-import Player from '../player/Player';
+import Player, { LadderContact } from '../player/Player';
 import PlayerController from '../player/PlayerController';
 import Fireball from '../combat/Projectile';
 import Hollow from '../enemies/Hollow';
 
-const WORLD_WIDTH = 1600;
+const WORLD_WIDTH = 3200;
+// A WORLD_HEIGHT szándékosan megegyezik a canvas magasságával (main.ts): így a kamera
+// csak vízszintesen görget, és a teljes függőleges sáv (talajtól a felső platformig)
+// mindig látszik. A létra is belefér ebbe a sávba.
 const WORLD_HEIGHT = 450;
+
+const GROUND_CENTER_Y = 434;
+const GROUND_TOP = 418; // ground-placeholder 64x32, origin 0.5 -> 434 - 16
+
+const PLAYER_HALF_HEIGHT = 24; // player-placeholder 32x48
+const HOLLOW_SPAWN_OFFSET = 24; // hollow-placeholder 30x46, félmagasság 23 -> 1px ejtés
+
+interface PlatformDef {
+  id: string;
+  x: number;
+  y: number;
+  tiles: number;
+  /** Alulról átjárható (a létra ezen megy át), felülről szilárd. */
+  oneWay?: boolean;
+}
+
+// A platform-placeholder 64x16, origin 0.5, setScale(tiles, 1).
+// Egyetlen forrás a geometriának: az enemy patrol-határok is ebből származnak.
+const PLATFORMS: PlatformDef[] = [
+  { id: 'P1', x: 380, y: 350, tiles: 3 }, // első ugrás a talajról
+  { id: 'P2', x: 620, y: 292, tiles: 2 }, // magasabb lépés
+  { id: 'P3', x: 1000, y: 322, tiles: 3 }, // átvezetés
+  { id: 'P4', x: 1360, y: 300, tiles: 5 }, // platform-Hollow A (tágas)
+  { id: 'P5', x: 1750, y: 342, tiles: 2 }, // lépcsős emelkedő start
+  { id: 'P6', x: 1980, y: 272, tiles: 2 },
+  { id: 'P7', x: 2200, y: 202, tiles: 2 }, // csúcspont
+  { id: 'P8', x: 2440, y: 272, tiles: 3 }, // platform-Hollow B (szűk)
+  { id: 'P9', x: 2900, y: 140, tiles: 6, oneWay: true }, // létra célja
+];
+
+const platformTop = (p: PlatformDef): number => p.y - 8;
+const platformLeft = (p: PlatformDef): number => p.x - p.tiles * 32;
+const platformRight = (p: PlatformDef): number => p.x + p.tiles * 32;
+
+const platformById = (id: string): PlatformDef => {
+  const found = PLATFORMS.find((p) => p.id === id);
+  if (!found) throw new Error(`Ismeretlen platform id: ${id}`);
+  return found;
+};
+
+// Létra a pálya végén. Az X úgy van megválasztva, hogy P9 (span 2708-3092) fölé essen,
+// így a player alulról átmászik az egyirányú platformon és a tetején köt ki.
+const LADDER_X = 2762;
+const LADDER_ZONE_TOP = 100;
+const LADDER_WIDTH = 28;
+
+// Platformon álló enemy patrol-határainak behúzása a peremtől (Hollow félszélesség 15px).
+const EDGE_INSET = 24;
 
 export default class Level1Scene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
   private playerHpText!: Phaser.GameObjects.Text;
+
+  private ladderZone!: Phaser.GameObjects.Zone;
+  private ladderContact!: LadderContact;
 
   private fireballs: Fireball[] = [];
   private enemies: Hollow[] = [];
@@ -25,23 +79,23 @@ export default class Level1Scene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
+    this.createDecor();
+
+    // Folyamatos talaj végig — szándékosan nincs szakadék, mert még nincs
+    // checkpoint/respawn (Player.die() letiltja a body-t), egy pit soft-lockot okozna.
     const ground = this.physics.add.staticGroup();
-    ground.create(WORLD_WIDTH / 2, 434, 'ground-placeholder')
+    ground.create(WORLD_WIDTH / 2, GROUND_CENTER_Y, 'ground-placeholder')
       .setScale(WORLD_WIDTH / 64, 1)
       .refreshBody();
 
-    const platforms = this.physics.add.staticGroup();
-    platforms.create(600, 320, 'ground-placeholder').setScale(3, 1).refreshBody();
-    platforms.create(1100, 280, 'ground-placeholder').setScale(4, 1).refreshBody();
+    const platforms = this.createPlatforms();
+    this.createLadder();
 
     this.player = new Player(this, 100, 300);
     this.physics.add.collider(this.player, ground);
     this.physics.add.collider(this.player, platforms);
 
-    // Két Hollow a state machine (patrol / chase / attack) teszteléséhez.
-    this.enemies.push(new Hollow(this, 450, 386));
-    this.enemies.push(new Hollow(this, 900, 386));
-
+    this.spawnEnemies();
     this.physics.add.collider(this.enemies, ground);
     this.physics.add.collider(this.enemies, platforms);
 
@@ -83,9 +137,103 @@ export default class Level1Scene extends Phaser.Scene {
       .setScrollFactor(0);
   }
 
+  private createPlatforms(): Phaser.Physics.Arcade.StaticGroup {
+    const platforms = this.physics.add.staticGroup();
+
+    for (const def of PLATFORMS) {
+      const sprite = platforms.create(
+        def.x,
+        def.y,
+        'platform-placeholder'
+      ) as Phaser.Physics.Arcade.Sprite;
+      sprite.setScale(def.tiles, 1).refreshBody();
+
+      if (def.oneWay) {
+        // A lenti oldalon nincs ütközés -> a player a létrán alulról átmászhat rajta.
+        (sprite.body as Phaser.Physics.Arcade.StaticBody).checkCollision.down = false;
+      }
+    }
+
+    return platforms;
+  }
+
+  private createLadder(): void {
+    const upper = platformById('P9');
+    const zoneHeight = GROUND_TOP - LADDER_ZONE_TOP;
+    const zoneCenterY = LADDER_ZONE_TOP + zoneHeight / 2;
+
+    // Hátfal, hogy a létra ne a semmiben lógjon.
+    this.add
+      .image(LADDER_X, zoneCenterY, 'pillar-placeholder')
+      .setDisplaySize(64, zoneHeight)
+      .setDepth(-2);
+
+    this.add
+      .tileSprite(LADDER_X, zoneCenterY, LADDER_WIDTH, zoneHeight, 'ladder-placeholder')
+      .setDepth(-1);
+
+    this.ladderZone = this.add.zone(LADDER_X, zoneCenterY, LADDER_WIDTH, zoneHeight);
+    this.physics.add.existing(this.ladderZone, true);
+
+    // A topY/bottomY a player középpontjának szélsőértékei: fent a lábak pont a felső
+    // platform felszínén állnak meg, lent a talajon.
+    this.ladderContact = {
+      centerX: LADDER_X,
+      topY: platformTop(upper) - PLAYER_HALF_HEIGHT,
+      bottomY: GROUND_TOP - PLAYER_HALF_HEIGHT,
+    };
+  }
+
+  private createDecor(): void {
+    // Parallax háttéroszlopok — nincs fizikájuk, csak mélységet adnak a pályának.
+    for (const x of [250, 900, 1600, 2300, 3000]) {
+      this.add
+        .image(x, 340, 'pillar-placeholder')
+        .setScrollFactor(0.6)
+        .setDepth(-10);
+    }
+
+    // Pálya végi "kijárat" jelölő a felső platform jobb végén.
+    // Itt lesz a következő iterációban a checkpoint és a boss-transition — most csak dísz.
+    const upper = platformById('P9');
+    this.add
+      .image(3040, platformTop(upper) - 36, 'door-placeholder')
+      .setDepth(-1);
+  }
+
+  private spawnEnemies(): void {
+    // Földi Hollow-k: default patrol (spawn ±80px), üldözés közben szabadon mozognak.
+    this.enemies.push(new Hollow(this, 820, 386));
+    this.enemies.push(new Hollow(this, 1850, 386));
+    this.enemies.push(new Hollow(this, 2700, 386));
+
+    // Platform-kötött Hollow-k: a patrol range a platform tetejére szorul, és
+    // clampChaseToBounds miatt üldözés közben sem sétálnak le a peremről.
+    for (const id of ['P4', 'P8']) {
+      const p = platformById(id);
+      this.enemies.push(
+        new Hollow(this, p.x, platformTop(p) - HOLLOW_SPAWN_OFFSET, {
+          patrolMinX: platformLeft(p) + EDGE_INSET,
+          patrolMaxX: platformRight(p) - EDGE_INSET,
+          clampChaseToBounds: true,
+        })
+      );
+    }
+  }
+
   update(): void {
+    // Szinkron overlap-teszt: azonnal ad eredményt, szemben a physics.add.overlap
+    // callbackkel, ami csak a scene update() UTÁN futna le (1 frame késés a mászásban).
+    const touchingLadder =
+      !this.player.isDead() && this.physics.overlap(this.player, this.ladderZone);
+    this.player.setLadderContact(touchingLadder ? this.ladderContact : null);
+
     this.controller.update();
-    this.playerHpText.setText(`HP: ${this.player.getHP()}/${this.player.getMaxHP()}`);
+
+    // Debug kijelzés (Phase 8 / ui modul cseréli le): HP + aktuális player state.
+    this.playerHpText.setText(
+      `HP: ${this.player.getHP()}/${this.player.getMaxHP()} | ${this.player.playerState}`
+    );
 
     for (const enemy of this.enemies) {
       enemy.update(this.player);

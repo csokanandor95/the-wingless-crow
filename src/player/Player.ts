@@ -11,13 +11,25 @@ export enum PlayerState {
   ATTACK = 'ATTACK',
   CAST = 'CAST',
   HURT = 'HURT',
+  CLIMB = 'CLIMB',
   DEAD = 'DEAD',
+}
+
+/**
+ * Egy létra "sínje", amit a scene ad át a playernek minden frame-ben.
+ * A topY/bottomY a player KÖZÉPPONTJÁNAK megengedett szélsőértékei, nem a létra grafikájáé.
+ */
+export interface LadderContact {
+  centerX: number;
+  topY: number;
+  bottomY: number;
 }
 
 const MOVE_SPEED = 200;
 const JUMP_VELOCITY = -500;
 const MAX_HP = 100;
 const CAST_DELAY_MS = 120;
+const CLIMB_SPEED = 130;
 
 export default class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public playerState: PlayerState = PlayerState.IDLE;
@@ -27,6 +39,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   private canAttack = true;
   private isCasting = false;
   private canCastFireball = true;
+
+  private ladder: LadderContact | null = null;
+  private climbing = false;
 
   private attackHitbox: Phaser.GameObjects.Zone;
   private attackHitboxBody: Phaser.Physics.Arcade.Body;
@@ -78,6 +93,81 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     }
   }
 
+  // --- Létra / mászás ---------------------------------------------------
+  // A scene minden frame-ben átadja, hogy a player épp létrával fedésben van-e.
+  // A mászás egy zárt "sín": a topY/bottomY közé clampeljük a pozíciót, mert
+  // climb közben a body.checkCollision.down ki van kapcsolva (hogy az egyirányú
+  // felső platformon át lehessen mászni), így a talaj sem fogná meg lefelé.
+
+  setLadderContact(contact: LadderContact | null): void {
+    this.ladder = contact;
+    if (!contact && this.climbing) this.exitLadder();
+  }
+
+  isOnLadder(): boolean {
+    return this.ladder !== null;
+  }
+
+  isClimbing(): boolean {
+    return this.climbing;
+  }
+
+  climb(direction: -1 | 1): void {
+    if (this.isLocked() || !this.ladder) return;
+
+    const body = this.body as Phaser.Physics.Arcade.Body;
+
+    if (!this.climbing) {
+      this.climbing = true;
+      body.setAllowGravity(false);
+      body.checkCollision.down = false;
+    }
+
+    this.playerState = PlayerState.CLIMB;
+    this.setVelocityX(0);
+    // Lágy rásnapelés a létra közepére, hogy ne lógjon félig mellette.
+    this.x = Phaser.Math.Linear(this.x, this.ladder.centerX, 0.4);
+
+    this.setVelocityY(direction * CLIMB_SPEED);
+
+    if (direction < 0 && this.y <= this.ladder.topY) {
+      this.y = this.ladder.topY;
+      this.setVelocityY(0);
+    } else if (direction > 0 && this.y >= this.ladder.bottomY) {
+      this.y = this.ladder.bottomY;
+      this.setVelocityY(0);
+    }
+  }
+
+  /** Létrán lógás: nincs függőleges input, de a gravitáció továbbra is ki van kapcsolva. */
+  climbIdle(): void {
+    if (!this.climbing) return;
+    this.setVelocity(0, 0);
+    this.playerState = PlayerState.CLIMB;
+  }
+
+  exitLadder(): void {
+    if (!this.climbing) return;
+
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    this.climbing = false;
+    body.setAllowGravity(true);
+    body.checkCollision.down = true;
+
+    if (this.playerState === PlayerState.CLIMB) {
+      this.playerState = this.isGrounded() ? PlayerState.IDLE : PlayerState.FALL;
+    }
+  }
+
+  jumpOffLadder(): void {
+    if (!this.climbing) return;
+    this.exitLadder();
+    this.setVelocityY(JUMP_VELOCITY);
+    this.playerState = PlayerState.JUMP;
+  }
+
+  // ----------------------------------------------------------------------
+
   attackLight(): void {
     this.performAttack(AttackType.LIGHT);
   }
@@ -87,7 +177,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   }
 
   private performAttack(type: AttackType): void {
-    if (this.isLocked() || !this.canAttack) return;
+    if (this.isLocked() || this.climbing || !this.canAttack) return;
 
     const config = ATTACK_CONFIGS[type];
     this.isAttacking = true;
@@ -146,7 +236,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   // 'fireball-cast' eventet emittál — a scene ezt figyeli és hozza létre a Fireballt.
   // A Player így nem függ közvetlenül a Fireball/scene projectile-group implementációtól.
   castFireball(): void {
-    if (this.isLocked() || !this.canCastFireball) return;
+    if (this.isLocked() || this.climbing || !this.canCastFireball) return;
 
     this.isCasting = true;
     this.canCastFireball = false;
@@ -176,6 +266,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   takeDamage(amount: number): void {
     if (this.playerState === PlayerState.DEAD) return;
 
+    // Sebzés lelöki a létráról — különben HURT után kikapcsolt gravitációval lebegne.
+    this.exitLadder();
+
     this.hp = Math.max(0, this.hp - amount);
     this.playerState = PlayerState.HURT;
     this.setTint(0xff0000);
@@ -191,6 +284,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   }
 
   private die(): void {
+    this.exitLadder();
     this.playerState = PlayerState.DEAD;
     this.setVelocity(0, 0);
     this.disableHitbox();
@@ -225,6 +319,8 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   }
 
   updateState(): void {
+    // Mászás közben nem szabad JUMP/FALL-ra váltani — a CLIMB state-et a climb() vezérli.
+    if (this.climbing) return;
     if (this.isLocked() || this.isAttacking || this.isCasting) return;
 
     if (!this.isGrounded()) {
