@@ -149,6 +149,12 @@ export default class Hollow extends Phaser.Physics.Arcade.Sprite implements Dama
   takeDamage(amount: number): void {
     if (this.hollowState === HollowState.DEAD) return;
 
+    // Bármilyen sebzés (pl. tűzgolyó) PATROL alatt azonnali észlelést vált ki,
+    // akkor is, ha a player még a DETECTION_RANGE-en kívül van.
+    if (this.hollowState === HollowState.PATROL) {
+      this.hollowState = HollowState.CHASE;
+    }
+
     this.hp = Math.max(0, this.hp - amount);
     this.hpText.setText(`${this.hp}/${this.maxHp}`);
     this.setTint(0xffffff);
