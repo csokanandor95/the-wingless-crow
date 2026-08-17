@@ -5,12 +5,12 @@
 // systems/CheckpointSystem.ts, a Player.die() csak letiltja a physics bodyt).
 // Pótlandó, ha a checkpoint rendszer elkészül (Phase 6 hátralévő része).
 //
-// Izoláció: a 'phaser' modult TELJESEN önálló fake névtérre cseréljük — a valódi
-// csomag már betöltéskor (window global hiányában) elszáll Node alatt, tehát nem
-// hívható rá `importOriginal()` sem. A fake csak azt a felületet adja, amit a
-// Player.ts ténylegesen használ: Physics.Arcade.Sprite (a Player ebből örököl) és
-// Math.Linear (a climb() lágy rásnapelése). Semmilyen valódi Phaser kód nem fut le.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// A 'phaser' modult a megosztott fake-re cseréljük (tests/unit/helpers/fakePhaser.ts).
+// A vi.mock() hívást a vitest a fájl saját importjai FÖLÉ hoisztolja — ezért a factory
+// nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Dinamikus import()-tal
+// a factory TESTÉN belül ez elkerülhető, mert az csak akkor fut le, amikor a mock
+// ténylegesen kell, nem a hoisztolt helyen.
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type Phaser from 'phaser';
 import Player, {
   PlayerState,
@@ -20,131 +20,24 @@ import Player, {
   CLIMB_SPEED,
   type LadderContact,
 } from '../../src/player/Player';
+import {
+  createMockScene,
+  getBody,
+  flushAllDelayedCalls,
+  type MockScene,
+} from './helpers/phaserTestUtils';
 
-vi.mock('phaser', () => {
-  class EventEmitter {
-    private listeners = new Map<string, Array<(...args: unknown[]) => void>>();
-
-    on(event: string, cb: (...args: unknown[]) => void) {
-      const list = this.listeners.get(event) ?? [];
-      list.push(cb);
-      this.listeners.set(event, list);
-      return this;
-    }
-
-    emit(event: string, ...args: unknown[]) {
-      for (const cb of this.listeners.get(event) ?? []) cb(...args);
-      return true;
-    }
-  }
-
-  class MockSprite extends EventEmitter {
-    scene: unknown;
-    x: number;
-    y: number;
-    texture: string;
-    flipX = false;
-    active = true;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    body: any = null;
-
-    constructor(scene: unknown, x: number, y: number, texture: string) {
-      super();
-      this.scene = scene;
-      this.x = x;
-      this.y = y;
-      this.texture = texture;
-    }
-
-    setCollideWorldBounds() {
-      return this;
-    }
-    setVelocityX(x: number) {
-      this.body.velocity.x = x;
-      return this;
-    }
-    setVelocityY(y: number) {
-      this.body.velocity.y = y;
-      return this;
-    }
-    setVelocity(x: number, y: number) {
-      this.body.velocity.x = x;
-      this.body.velocity.y = y;
-      return this;
-    }
-    setFlipX(v: boolean) {
-      this.flipX = v;
-      return this;
-    }
-    setTint(_color: number) {
-      return this;
-    }
-    clearTint() {
-      return this;
-    }
-  }
-
-  const FakePhaser = {
-    Physics: { Arcade: { Sprite: MockSprite } },
-    Events: { EventEmitter },
-    // Ugyanaz a lerp-képlet, mint a valódi Phaser.Math.Linear: p0 + (p1 - p0) * t.
-    Math: { Linear: (p0: number, p1: number, t: number) => p0 + (p1 - p0) * t },
-  };
-
-  return { default: FakePhaser };
+vi.mock('phaser', async () => {
+  const { createFakePhaserModule } = await import('./helpers/fakePhaser');
+  return createFakePhaserModule();
 });
-
-function createMockBody() {
-  return {
-    velocity: { x: 0, y: 0 },
-    blocked: { down: false },
-    touching: { down: false },
-    checkCollision: { down: true },
-    enable: true,
-    setAllowGravity: vi.fn(),
-    setSize: vi.fn(),
-    reset: vi.fn(),
-  };
-}
-
-function createMockScene() {
-  return {
-    add: {
-      existing: vi.fn(),
-      zone: vi.fn(() => ({ setData: vi.fn(), getData: vi.fn(), body: null })),
-    },
-    physics: {
-      add: {
-        existing: vi.fn((obj: { body: unknown }) => {
-          obj.body = createMockBody();
-        }),
-      },
-    },
-    // NEM fut le automatikusan — a teszt dönti el, mikor "telik el" az idő
-    // a felvett callback manuális meghívásával.
-    time: { delayedCall: vi.fn() },
-  };
-}
-
-// A `player.body` deklarált típusa `Body | StaticBody | null` (lásd Player.ts saját
-// `as Phaser.Physics.Arcade.Body` castjait) — a teszt ugyanígy leszűkíti, hogy a mock
-// bodyn beállított mezőket (velocity, blocked, ...) típushelyesen tudja olvasni.
-function getBody(player: Player): Phaser.Physics.Arcade.Body {
-  return player.body as Phaser.Physics.Arcade.Body;
-}
 
 function setGrounded(player: Player, grounded: boolean): void {
   getBody(player).blocked.down = grounded;
 }
 
-function flushLastDelayedCall(scene: ReturnType<typeof createMockScene>): void {
-  const calls = scene.time.delayedCall.mock.calls;
-  const [, callback] = calls[calls.length - 1] as [number, () => void];
-  callback();
-}
-
 describe('Player', () => {
-  let scene: ReturnType<typeof createMockScene>;
+  let scene: MockScene;
   let player: Player;
 
   beforeEach(() => {
@@ -309,7 +202,7 @@ describe('Player', () => {
 
     it('takeDamage: DEAD állapotban nem csinál semmit', () => {
       player.takeDamage(MAX_HP);
-      flushLastDelayedCall(scene);
+      flushAllDelayedCalls(scene);
       expect(player.isDead()).toBe(true);
 
       const callsBefore = scene.time.delayedCall.mock.calls.length;
@@ -335,7 +228,7 @@ describe('Player', () => {
   describe('death', () => {
     it('takeDamage(MAX_HP) után a delayedCall lefutva: DEAD state, isDead() true', () => {
       player.takeDamage(MAX_HP);
-      flushLastDelayedCall(scene);
+      flushAllDelayedCalls(scene);
 
       expect(player.isDead()).toBe(true);
       expect(player.playerState).toBe(PlayerState.DEAD);
@@ -346,7 +239,7 @@ describe('Player', () => {
 
     it('DEAD állapotban a mozgás-parancsok nem csinálnak semmit', () => {
       player.takeDamage(MAX_HP);
-      flushLastDelayedCall(scene);
+      flushAllDelayedCalls(scene);
 
       setGrounded(player, true);
       player.moveLeft();

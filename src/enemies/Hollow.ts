@@ -12,18 +12,18 @@ export enum HollowState {
   DEAD = 'DEAD',
 }
 
-const MAX_HP = 40;
-const PATROL_SPEED = 50;
-const CHASE_SPEED = 100;
-const PATROL_RANGE = 80;
-const DETECTION_RANGE = 220;
-const LOSE_RANGE = 320; // hiszterézis, hogy ne pattogjon PATROL/CHASE között
-const ATTACK_RANGE = 42;
-const ATTACK_DAMAGE = 8;
-const ATTACK_STARTUP_MS = 300;
-const ATTACK_COOLDOWN_MS = 900;
-const VERTICAL_DETECTION_RANGE = 50; // csak nagyjából azonos szinten lévő playert észlel PATROL-ból
-const DIRECTION_DEADZONE = 4; // ha vízszintesen szinte egy vonalban van, ne pattogjon az irány
+export const MAX_HP = 40;
+export const PATROL_SPEED = 50;
+export const CHASE_SPEED = 100;
+export const PATROL_RANGE = 80;
+export const DETECTION_RANGE = 220;
+export const LOSE_RANGE = 320; // hiszterézis, hogy ne pattogjon PATROL/CHASE között
+export const ATTACK_RANGE = 42;
+export const ATTACK_DAMAGE = 8;
+export const ATTACK_STARTUP_MS = 300;
+export const ATTACK_COOLDOWN_MS = 900;
+export const VERTICAL_DETECTION_RANGE = 50; // csak nagyjából azonos szinten lévő playert észlel PATROL-ból
+export const DIRECTION_DEADZONE = 4; // ha vízszintesen szinte egy vonalban van, ne pattogjon az irány
 
 export interface HollowConfig {
   /** Abszolút világ-X határok a patrol mozgáshoz. Ha nincs megadva: spawn ± PATROL_RANGE. */
@@ -215,5 +215,13 @@ export default class Hollow extends Phaser.Physics.Arcade.Sprite implements Dama
 
   isDead(): boolean {
     return this.hollowState === HollowState.DEAD;
+  }
+
+  getHP(): number {
+    return this.hp;
+  }
+
+  getMaxHP(): number {
+    return MAX_HP;
   }
 }

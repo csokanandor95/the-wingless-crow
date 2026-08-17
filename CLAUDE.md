@@ -52,7 +52,10 @@ Készen: Step 1 (Projekt setup), Phase 2 (Player), Phase 3 (Combat), Phase 4 (Ma
 
 **Phase 6 (Level) részlegesen kész:** level layout, platforms, environment megvan (3200px hosszú pálya, 9 platform, létra, dekoráció). **Checkpoint és transition még hátra van** — a helyük a pálya végi felső platform (P9) és az ott lévő `door-placeholder` jelölő.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`), egyelőre csak a `Player` van lefedve a Project_plan.md §23 bontása szerint (movement calculation, health, damage, death — a `respawn` a checkpoint rendszer hiánya miatt még nem tesztelhető). Combat/Enemy/Boss/Game state/Utility logic unit tesztek még hátravannak. A `Player.ts` tuning-konstansai (`MOVE_SPEED`, `JUMP_VELOCITY`, `MAX_HP`, `CLIMB_SPEED`, `CAST_DELAY_MS`) exportáltak, hogy a tesztek ne nyers számokat égessenek be. A tesztek a `'phaser'` modult egy teljesen önálló fake névtérre cserélik (`vi.mock('phaser', ...)`, `importOriginal` NÉLKÜL) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt, ezért nem hívható rá `importOriginal()` sem.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (Hollow) le van fedve a Project_plan.md §23 bontása szerint. Boss/Game state/Utility logic unit tesztek még hátravannak. A `Player.ts` és `Hollow.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `Hollow`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`), és mindkettőnek van `getHP()`/`getMaxHP()`-ja.
+- A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
+- **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
+- A `Hollow`/`Player` `scene.time.delayedCall`-jai **interleave-elhetnek** (pl. `Hollow.resolveAttackHit()` a `Player.takeDamage()`-en keresztül saját delayedCallt ütemez ugyanazon a mock scene-en) — ezért a `createDelayedCallStepper` helper (`tests/unit/helpers/phaserTestUtils.ts`) `.next()` (egy lépés) ÉS `.flushRemaining()` (a kurzortól a végéig, újra-tüzelés nélkül) metódust is ad.
 
 ## Fájlstruktúra (jelenlegi, tényleges állapot)
 
@@ -65,7 +68,12 @@ the-wingless-crow/
 │   └── Project_plan.md
 ├── tests/
 │   └── unit/
-│       └── player.test.ts       # Phase 10 (QA) első lába: Project_plan.md §23 Player scope
+│       ├── player.test.ts       # Project_plan.md §23 Player scope
+│       ├── combat.test.ts       # §23 Combat scope (ATTACK_CONFIGS, Player attack, Fireball)
+│       ├── hollow.test.ts       # §23 Enemy scope (Hollow HP/damage/death/state transitions)
+│       └── helpers/
+│           ├── fakePhaser.ts        # a 'phaser' modul önálló fake névtere (createFakePhaserModule)
+│           └── phaserTestUtils.ts   # megosztott mock scene/body/delayedCall-stepper helperek
 ├── src/
 │   ├── main.ts
 │   ├── scenes/
