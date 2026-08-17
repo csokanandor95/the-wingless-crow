@@ -52,6 +52,8 @@ Készen: Step 1 (Projekt setup), Phase 2 (Player), Phase 3 (Combat), Phase 4 (Ma
 
 **Phase 6 (Level) részlegesen kész:** level layout, platforms, environment megvan (3200px hosszú pálya, 9 platform, létra, dekoráció). **Checkpoint és transition még hátra van** — a helyük a pálya végi felső platform (P9) és az ott lévő `door-placeholder` jelölő.
 
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`), egyelőre csak a `Player` van lefedve a Project_plan.md §23 bontása szerint (movement calculation, health, damage, death — a `respawn` a checkpoint rendszer hiánya miatt még nem tesztelhető). Combat/Enemy/Boss/Game state/Utility logic unit tesztek még hátravannak. A `Player.ts` tuning-konstansai (`MOVE_SPEED`, `JUMP_VELOCITY`, `MAX_HP`, `CLIMB_SPEED`, `CAST_DELAY_MS`) exportáltak, hogy a tesztek ne nyers számokat égessenek be. A tesztek a `'phaser'` modult egy teljesen önálló fake névtérre cserélik (`vi.mock('phaser', ...)`, `importOriginal` NÉLKÜL) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt, ezért nem hívható rá `importOriginal()` sem.
+
 ## Fájlstruktúra (jelenlegi, tényleges állapot)
 
 ```
@@ -61,6 +63,9 @@ the-wingless-crow/
 ├── tsconfig.json                 # megj.: vite.config.js NINCS, a projekt Vite defaultokon fut
 ├── docs/
 │   └── Project_plan.md
+├── tests/
+│   └── unit/
+│       └── player.test.ts       # Phase 10 (QA) első lába: Project_plan.md §23 Player scope
 ├── src/
 │   ├── main.ts
 │   ├── scenes/

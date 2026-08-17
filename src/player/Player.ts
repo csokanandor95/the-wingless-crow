@@ -25,11 +25,11 @@ export interface LadderContact {
   bottomY: number;
 }
 
-const MOVE_SPEED = 200;
-const JUMP_VELOCITY = -500;
-const MAX_HP = 100;
-const CAST_DELAY_MS = 120;
-const CLIMB_SPEED = 130;
+export const MOVE_SPEED = 200;
+export const JUMP_VELOCITY = -500;
+export const MAX_HP = 100;
+export const CAST_DELAY_MS = 120;
+export const CLIMB_SPEED = 130;
 
 export default class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public playerState: PlayerState = PlayerState.IDLE;
