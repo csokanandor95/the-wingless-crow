@@ -50,7 +50,7 @@ Három opció volt feltéve a usernek:
 
 Készen: Step 1 (Projekt setup), Phase 2 (Player), Phase 3 (Combat), Phase 4 (Magic), Phase 5 (Enemy) részlegesen — Hollow kész.
 
-**Phase 6 (Level) részlegesen kész:** level layout, platforms, environment megvan (3200px hosszú pálya, 9 platform, létra, dekoráció). **Checkpoint és transition még hátra van** — a helyük a pálya végi felső platform (P9) és az ott lévő `door-placeholder` jelölő.
+**Phase 6 (Level) KÉSZ:** level layout, platforms, environment, checkpoint, transition mind megvan. A pálya végi ajtónál (`door-placeholder`, P9 platform) **E** billentyűvel aktiválható a checkpoint, ami egyben fade-out után átvált a (stub) `BossScene`-re.
 
 **Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (Hollow) le van fedve a Project_plan.md §23 bontása szerint. Boss/Game state/Utility logic unit tesztek még hátravannak. A `Player.ts` és `Hollow.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `Hollow`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`), és mindkettőnek van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
@@ -78,19 +78,22 @@ the-wingless-crow/
 │   ├── main.ts
 │   ├── scenes/
 │   │   ├── BootScene.ts          # az összes placeholder textúra kódból generálva
-│   │   └── Level1Scene.ts        # 3200px pálya, PLATFORMS adattömb, létra, 5 Hollow
+│   │   ├── Level1Scene.ts        # 3200px pálya, PLATFORMS adattömb, létra, 5 Hollow, checkpoint-ajtó
+│   │   └── BossScene.ts          # minimális stub — Phase 7-ben kap valódi tartalmat
 │   ├── player/
-│   │   ├── Player.ts             # + CLIMB state és LadderContact interface
+│   │   ├── Player.ts             # + CLIMB state, LadderContact interface, respawn()
 │   │   └── PlayerController.ts   # + létra-input ág
 │   ├── enemies/
 │   │   └── Hollow.ts             # Enemy 1, state machine + HollowConfig (patrol határok)
+│   ├── systems/
+│   │   └── CheckpointSystem.ts   # egyetlen aktív respawn-pont tárolása
 │   └── combat/
 │       ├── Attack.ts             # AttackType enum + ATTACK_CONFIGS (light/heavy sebzés, cooldown, hitbox méret)
 │       ├── Projectile.ts         # Fireball osztály + FIREBALL_CONFIG
 │       └── DamageSystem.ts       # Damageable interface (takeDamage/isDead)
 ```
 
-Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `Level2Scene`, `BossScene`, `EndingScene`, `enemies/Archer.ts`, `enemies/Beast.ts`, `bosses/Warden.ts`, `systems/` mappa (GameState, CheckpointSystem, AudioManager), `ui/` mappa (HUD, Menu, Dialogue), `assets/` tartalommal, `tests/` mappa tartalommal.
+Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `Level2Scene`, `EndingScene`, `enemies/Archer.ts`, `enemies/Beast.ts`, `bosses/Warden.ts`, `systems/GameState.ts`, `systems/AudioManager.ts`, `ui/` mappa (HUD, Menu, Dialogue), `assets/` tartalommal.
 
 ## Implementált gameplay
 
@@ -104,7 +107,10 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   helyettesíti a kikapcsolt talaj-ütközést. Létrán nincs támadás/varázslás; sebzés
   és halál automatikusan lelöki róla. Vezérlés: Fel/W = fel, Le/S = le, Space = leugrás,
   Bal/Jobb = lelépés (a vízszintes input MINDIG kilép, hogy ne lehessen beragadni).
-- HP: 100, `takeDamage()`, halálnál lefagy (body disabled, szürke tint)
+- HP: 100, `takeDamage()`, halálnál lefagy (body disabled, szürke tint). `respawn(x, y)` a
+  `die()` ellentéte: HP-t, pozíciót, minden lock-flaget (attack/cast cooldown, mászás,
+  ladder-kontaktus) és a physics bodyt visszaállítja — a `Level1Scene` hívja a
+  `CheckpointSystem`-től kapott ponttal
 - Kard: Light Attack (J / bal klikk) és Heavy Attack (K / jobb klikk), külön cooldown/damage/hitbox méret (`combat/Attack.ts` konfigból)
 - Fireball: F billentyű, `combat/Projectile.ts` Fireball osztályt hoz létre a Level1Scene-ben egy `fireball-cast` eventen keresztül
 
@@ -144,14 +150,31 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   a fizika. A scene `update()`-je **szinkron** `this.physics.overlap(player, ladderZone)`-t
   használ, NEM `physics.add.overlap` callbacket — utóbbi csak a scene `update()` UTÁN
   futna le, ami 1 frame késést okozna a mászásban
-- Dekoráció: parallax háttéroszlopok (`scrollFactor 0.6`), létra-hátfal, és egy
-  `door-placeholder` P9 jobb végén (a jövőbeli checkpoint/transition helye)
+- **Checkpoint-ajtó** (x=3040, P9 jobb vége): ugyanaz a szinkron `physics.overlap()` minta,
+  mint a létránál (`doorZone`). Közelben **E**-re: `checkpoint.activate()` + 500ms
+  `cameras.main.fadeOut()` + `scene.start('BossScene')`. A prompt-szöveg ("E: Checkpoint")
+  csak akkor látszik, ha a player a zónában van és még nincs folyamatban a transition
+  (`isTransitioning` flag)
+- **Respawn**: az `update()` minden frame-ben nézi `player.isDead()`-et; ha igen és még
+  nincs ütemezve respawn (`respawnScheduled` flag), `RESPAWN_DELAY_MS` (1200ms) után
+  lekéri a `CheckpointSystem`-től az aktuális respawn-pontot és meghívja `player.respawn(x,y)`-t.
+  **Csak a playert állítja vissza** — az enemyk HP/állapota változatlan marad (szándékos
+  scope-döntés, nem terveltérés: az egyszerűbb, "ne büntesd duplán a playert" viselkedést
+  választottuk a teljes pálya-reset helyett)
+- **A `checkpoint` a Phaser `registry`-ben perzisztál** (`this.registry.get/set('checkpoint', ...)`),
+  NEM sima `Level1Scene` mezőként — mivel az ajtónál az E lenyomása egyszerre aktiválja a
+  checkpointot ÉS azonnal átvált a `BossScene`-re, egy sima mezőben tárolt checkpoint minden
+  `create()` újrafutáskor (pl. `BossScene`-ből visszatéréskor) nulláról jönne létre és
+  elveszne. A registry ezt túléli, mert Game-szintű, nem scene-szintű adattár.
+- Dekoráció: parallax háttéroszlopok (`scrollFactor 0.6`), létra-hátfal
 - Placeholder grafikák kódból generálva (`BootScene.ts` `createPlaceholderTextures()`), nem valódi sprite-ok
 
 ## Fontos technikai tanulságok (ne ismételd meg ezeket a hibákat!)
 
 1. **Phaser Arcade Physics Group `.add()` felülírja a body sebességét/gravitációját.** Ha egy már konfigurált (velocity/gravity beállított) physics objektumot egy `Phaser.Physics.Arcade.Group`-hoz adsz hozzá, a group visszaállítja azokat az alapértékekre. Ezért a fireballokat és enemyket **plain TypeScript tömbben** tároljuk (`Fireball[]`, `Hollow[]`), nem Phaser Group-ban.
 2. **Ne rendelj hozzá ÚJ tömböt egy már `physics.add.overlap`/`collider`-hez kötött referenciához.** A `filter()` új tömböt hoz létre — ha ezt visszaírod a property-be, a collider a régi (elavult) tömbre marad kötve. Élő elemek eltávolításához mindig `splice()`-t használj helyben (lásd `Level1Scene.update()` a fireballok takarításánál).
+3. **Scene-restart (`scene.start(kulcsSajátMaga)`) NEM hívja újra a class field initializereket.** A Phaser Scene példány egyszer jön létre; `scene.start()` csak a lifecycle-t (init/preload/create) futtatja újra UGYANAZON a példányon. A `private enemies: Hollow[] = [];`-szerű mezők csak a LEGELSŐ konstruáláskor inicializálódnak — ha a `create()` nem üríti ki őket explicit módon, a régi (a scene leállásakor Phaser által már megsemmisített body-jú) objektumok bennmaradnak, és az `update()` rajtuk hívott metódusai (`setVelocityX` stb.) `undefined`-on szállnak el. Ez okozta, hogy a `BossScene` "R: vissza Level1Scene-re" debug-gombja "nem csinált semmit" — valójában lefutott a scene-váltás, csak utána azonnal crashelt. **Minden scene, aminek van saját magára mutató restart-útja, a `create()` elején explicit nullázza a class-field tömbjeit/flag-jeit** (lásd `Level1Scene.create()` teteje: `this.fireballs = []; this.enemies = []; this.isTransitioning = false; this.respawnScheduled = false;`).
+4. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
@@ -159,15 +182,19 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - Player és Hollow felett lebegő HP szöveg (debug célra, valódi HUD a `ui/` modulban készül majd)
 - A bal felső sarki HUD szöveg a HP mellett a **player state-et is kiírja** (`HP: 100/100 | CLIMB`) — a mászás manuális tesztelését segíti, Phase 8-ban cserélendő
 - Hit-reakció = tint villanás, nincs valódi animáció
-- `pillar-placeholder` és `door-placeholder` dekorációk: puszta színes téglalapok, a `door` egyelőre semmit nem csinál (csak a jövőbeli transition helyét jelöli)
+- `pillar-placeholder` és `door-placeholder` dekorációk: puszta színes téglalapok
+- A checkpoint-prompt szöveg ("E: Checkpoint" / "Checkpoint mentve...") debug-stílusú `add.text`, a `playerHpText`-hez hasonlóan — valódi UI a `ui/` modulban készül majd
+- `BossScene` szövegesen jelzi, hogy stub ("Boss Arena (Phase 7 – hamarosan)") — nincs benne semmilyen valódi gameplay, ez a Phase 7 első lépéseként cserélendő
+- `BossScene`-ben az **R billentyű** visszavisz a `Level1Scene`-re — kizárólag a checkpoint/respawn lánc manuális tesztelhetőségéhez kell (a valódi boss nem fog így visszaküldeni), Phase 7-ben törlendő
 - `main.ts`-ben `arcade.debug: true` — a physics bodyk és a létra zónája ki van rajzolva
 - A training dummy és a régi 'H' debug billentyű (self-damage teszteléshez) már törölve lett, miután a Hollow valódi sebzésforrássá vált
 
 ## Következő lépés
 
-**Phase 6 hátralévő része: checkpoint + transition.**
-- Checkpoint rendszer (`systems/CheckpointSystem.ts`) + respawn — jelenleg a `Player.die()` letiltja a physics bodyt, és nincs visszatérés. Ez blokkolja a szakadékok/pit-ek bevezetését is.
-- Level transition a pálya végi felső platformról (P9) a boss rész felé — a `door-placeholder` jelöli a helyét (x≈3040).
-- Ha megvan a respawn, érdemes visszatérni a `PLATFORMS` layouthoz és szakadékokat is beszúrni (Project_plan.md 13. pont `gap` eleme).
+**Phase 6 kész.** Most jöhet a **Phase 7 – Boss**:
+- Valódi `BossScene` tartalom a jelenlegi stub helyett (jelenleg csak egy szöveges placeholder + fade-in).
+- `bosses/Warden.ts` — a boss enemy state machine-je (Project_plan.md 15. pont: boss arénák, fázisváltás).
+- A `BossScene`-ből jelenleg nincs visszaút Level1Scene-be (a boss halálakor/vereség esetén ez kellhet majd).
+- Megfontolandó, hogy a respawn most már megvan-e olyan szinten, hogy visszatérjünk a `PLATFORMS` layouthoz és szakadékokat (gap) is beszúrjunk (Project_plan.md 13. pont) — ez opcionális polish, nem blokkolja a Phase 7-et.
 
-Utána: **Phase 7 – Boss**, majd **Phase 8 – Atmosphere**, ahol a Döntési pont következik (lásd fentebb).
+Utána: **Phase 8 – Atmosphere**, ahol a Döntési pont következik (lásd fentebb).

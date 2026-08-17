@@ -3,6 +3,7 @@ import Player, { LadderContact } from '../player/Player';
 import PlayerController from '../player/PlayerController';
 import Fireball from '../combat/Projectile';
 import Hollow from '../enemies/Hollow';
+import CheckpointSystem from '../systems/CheckpointSystem';
 
 const WORLD_WIDTH = 3200;
 // A WORLD_HEIGHT szándékosan megegyezik a canvas magasságával (main.ts): így a kamera
@@ -58,6 +59,14 @@ const LADDER_WIDTH = 28;
 // Platformon álló enemy patrol-határainak behúzása a peremtől (Hollow félszélesség 15px).
 const EDGE_INSET = 24;
 
+// Ajtó (checkpoint + boss-transition) a P9 felső platformon, a door-placeholder helyén.
+const DOOR_X = 3040;
+const DOOR_WIDTH = 48;
+const DOOR_HEIGHT = 72;
+const CHECKPOINT_X = 3010; // az ajtótól kicsit balra, hogy ne a grafikájában jelenjen meg
+const CHECKPOINT_Y = platformTop(platformById('P9')) - PLAYER_HALF_HEIGHT;
+const RESPAWN_DELAY_MS = 1200; // rövid szünet a halál-tint után, mielőtt visszatér a checkpointra
+
 export default class Level1Scene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
@@ -65,6 +74,13 @@ export default class Level1Scene extends Phaser.Scene {
 
   private ladderZone!: Phaser.GameObjects.Zone;
   private ladderContact!: LadderContact;
+
+  private checkpoint!: CheckpointSystem;
+  private doorZone!: Phaser.GameObjects.Zone;
+  private interactKey!: Phaser.Input.Keyboard.Key;
+  private checkpointPromptText!: Phaser.GameObjects.Text;
+  private isTransitioning = false;
+  private respawnScheduled = false;
 
   private fireballs: Fireball[] = [];
   private enemies: Hollow[] = [];
@@ -74,6 +90,16 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   create(): void {
+    // A fireballs/enemies mezők class field initializerek — csak a Scene ELSŐ
+    // létrehozásakor futnak le. Egy scene-restart (pl. BossScene "R"-je) újra meghívja
+    // a create()-et ugyanazon a Scene példányon, ezért itt explicit ki kell üríteni
+    // őket — különben a régi, már megsemmisített (destroyed body-jú) Hollow/Fireball
+    // objektumok bennmaradnának, és az update() rajtuk hívott setVelocityX stb. elszállna.
+    this.fireballs = [];
+    this.enemies = [];
+    this.isTransitioning = false;
+    this.respawnScheduled = false;
+
     this.cameras.main.setBackgroundColor('#0a0a0f');
 
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
@@ -81,8 +107,8 @@ export default class Level1Scene extends Phaser.Scene {
 
     this.createDecor();
 
-    // Folyamatos talaj végig — szándékosan nincs szakadék, mert még nincs
-    // checkpoint/respawn (Player.die() letiltja a body-t), egy pit soft-lockot okozna.
+    // Folyamatos talaj végig — a respawn megvan, de a PLATFORMS layout még nincs
+    // szakadékokra tervezve; a gap bevezetése külön polish-feladat (lásd CLAUDE.md).
     const ground = this.physics.add.staticGroup();
     ground.create(WORLD_WIDTH / 2, GROUND_CENTER_Y, 'ground-placeholder')
       .setScale(WORLD_WIDTH / 64, 1)
@@ -90,6 +116,14 @@ export default class Level1Scene extends Phaser.Scene {
 
     const platforms = this.createPlatforms();
     this.createLadder();
+    this.createDoorZone();
+
+    // A checkpoint a registry-ben perzisztál a scene-váltásokon át (pl. BossScene ->
+    // vissza Level1Scene-be) — enélkül minden create() nulláról hozná létre, és egy
+    // már aktivált checkpoint elveszne, mihelyt visszatérünk a pályára.
+    const existingCheckpoint = this.registry.get('checkpoint') as CheckpointSystem | undefined;
+    this.checkpoint = existingCheckpoint ?? new CheckpointSystem(100, 300);
+    if (!existingCheckpoint) this.registry.set('checkpoint', this.checkpoint);
 
     this.player = new Player(this, 100, 300);
     this.physics.add.collider(this.player, ground);
@@ -135,6 +169,17 @@ export default class Level1Scene extends Phaser.Scene {
     this.playerHpText = this.add
       .text(10, 10, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' })
       .setScrollFactor(0);
+
+    this.interactKey = this.input.keyboard!.addKey('E');
+    this.checkpointPromptText = this.add
+      .text(400, 400, 'E: Checkpoint', {
+        fontFamily: 'monospace',
+        fontSize: '16px',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setVisible(false);
   }
 
   private createPlatforms(): Phaser.Physics.Arcade.StaticGroup {
@@ -193,12 +238,19 @@ export default class Level1Scene extends Phaser.Scene {
         .setDepth(-10);
     }
 
-    // Pálya végi "kijárat" jelölő a felső platform jobb végén.
-    // Itt lesz a következő iterációban a checkpoint és a boss-transition — most csak dísz.
+    // Pálya végi ajtó a felső platform jobb végén — a checkpoint + boss-transition trigger.
     const upper = platformById('P9');
     this.add
-      .image(3040, platformTop(upper) - 36, 'door-placeholder')
+      .image(DOOR_X, platformTop(upper) - DOOR_HEIGHT / 2, 'door-placeholder')
       .setDepth(-1);
+  }
+
+  private createDoorZone(): void {
+    const upper = platformById('P9');
+    const zoneY = platformTop(upper) - DOOR_HEIGHT / 2;
+
+    this.doorZone = this.add.zone(DOOR_X, zoneY, DOOR_WIDTH, DOOR_HEIGHT);
+    this.physics.add.existing(this.doorZone, true);
   }
 
   private spawnEnemies(): void {
@@ -244,6 +296,32 @@ export default class Level1Scene extends Phaser.Scene {
         this.fireballs.splice(i, 1);
       }
     }
+
+    const nearDoor = !this.player.isDead() && this.physics.overlap(this.player, this.doorZone);
+    this.checkpointPromptText.setVisible(nearDoor && !this.isTransitioning);
+
+    if (nearDoor && !this.isTransitioning && Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+      this.activateCheckpointAndTransition();
+    }
+
+    if (this.player.isDead() && !this.respawnScheduled) {
+      this.respawnScheduled = true;
+      this.time.delayedCall(RESPAWN_DELAY_MS, () => {
+        const { x, y } = this.checkpoint.getRespawnPoint();
+        this.player.respawn(x, y);
+        this.respawnScheduled = false;
+      });
+    }
+  }
+
+  private activateCheckpointAndTransition(): void {
+    this.isTransitioning = true;
+    this.checkpoint.activate(CHECKPOINT_X, CHECKPOINT_Y);
+    this.checkpointPromptText.setText('Checkpoint mentve...').setVisible(true);
+
+    this.cameras.main.fadeOut(500, 0, 0, 0, () => {
+      this.scene.start('BossScene');
+    });
   }
 
   private handlePlayerHitEnemy(

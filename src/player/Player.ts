@@ -292,6 +292,33 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     (this.body as Phaser.Physics.Arcade.Body).enable = false;
   }
 
+  // A die() ellentéte: visszaállítja a playert élő, harcra kész állapotba a megadott
+  // pozíción. Minden olyan flaget visszaállít, amit a die() "befagyaszt", vagy ami a
+  // halál pillanatában épp mászás/támadás-cooldown közben ragadhatott volna.
+  respawn(x: number, y: number): void {
+    this.hp = MAX_HP;
+    this.x = x;
+    this.y = y;
+    this.setVelocity(0, 0);
+    this.clearTint();
+
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.enable = true;
+    body.setAllowGravity(true);
+    body.checkCollision.down = true;
+
+    this.isAttacking = false;
+    this.canAttack = true;
+    this.isCasting = false;
+    this.canCastFireball = true;
+    this.climbing = false;
+    this.ladder = null;
+    this.hitTargetsThisAttack.clear();
+    this.disableHitbox();
+
+    this.playerState = PlayerState.IDLE;
+  }
+
   isDead(): boolean {
     return this.playerState === PlayerState.DEAD;
   }
