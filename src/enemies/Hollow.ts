@@ -22,6 +22,8 @@ const ATTACK_RANGE = 42;
 const ATTACK_DAMAGE = 8;
 const ATTACK_STARTUP_MS = 300;
 const ATTACK_COOLDOWN_MS = 900;
+const VERTICAL_DETECTION_RANGE = 50; // csak nagyjából azonos szinten lévő playert észlel PATROL-ból
+const DIRECTION_DEADZONE = 4; // ha vízszintesen szinte egy vonalban van, ne pattogjon az irány
 
 export interface HollowConfig {
   /** Abszolút világ-X határok a patrol mozgáshoz. Ha nincs megadva: spawn ± PATROL_RANGE. */
@@ -72,14 +74,21 @@ export default class Hollow extends Phaser.Physics.Arcade.Sprite implements Dama
     this.playerRef = player;
     this.hpText.setPosition(this.x, this.y - 36);
 
+    // A passzív detektálás (PATROL -> CHASE) vízszintes ÉS vertikális küszöböt is megkövetel —
+    // enélkül egy közvetlenül fent/lent (más platformon) álló player is "közelinek" számítana,
+    // hiszen ilyenkor pont a vízszintes távolság a kicsi. A közelharci támadás (ATTACK_RANGE,
+    // resolveAttackHit) viszont marad teljes 2D távolság, hogy ne lehessen "a padlón át"
+    // eltalálni egy másik platformon álló playert.
+    const horizontalDistance = Math.abs(this.x - player.x);
+    const verticalDistance = Math.abs(this.y - player.y);
     const distanceToPlayer = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
 
     switch (this.hollowState) {
       case HollowState.PATROL:
-        this.updatePatrol(distanceToPlayer);
+        this.updatePatrol(horizontalDistance, verticalDistance);
         break;
       case HollowState.CHASE:
-        this.updateChase(player, distanceToPlayer);
+        this.updateChase(player, horizontalDistance, distanceToPlayer);
         break;
       case HollowState.ATTACK:
       case HollowState.COOLDOWN:
@@ -90,9 +99,9 @@ export default class Hollow extends Phaser.Physics.Arcade.Sprite implements Dama
     }
   }
 
-  private updatePatrol(distanceToPlayer: number): void {
-    // DETECT PLAYER esemény: azonnali átváltás CHASE-re.
-    if (distanceToPlayer <= DETECTION_RANGE) {
+  private updatePatrol(horizontalDistance: number, verticalDistance: number): void {
+    // DETECT PLAYER: csak akkor, ha vízszintesen ÉS nagyjából azonos magasságban van a player.
+    if (horizontalDistance <= DETECTION_RANGE && verticalDistance <= VERTICAL_DETECTION_RANGE) {
       this.hollowState = HollowState.CHASE;
       return;
     }
@@ -104,14 +113,22 @@ export default class Hollow extends Phaser.Physics.Arcade.Sprite implements Dama
     this.setFlipX(this.patrolDirection < 0);
   }
 
-  private updateChase(player: Player, distanceToPlayer: number): void {
-    if (distanceToPlayer > LOSE_RANGE) {
+  private updateChase(player: Player, horizontalDistance: number, distanceToPlayer: number): void {
+    if (horizontalDistance > LOSE_RANGE) {
       this.hollowState = HollowState.PATROL;
       return;
     }
 
     if (distanceToPlayer <= ATTACK_RANGE) {
       this.startAttack();
+      return;
+    }
+
+    // Ha (majdnem) pontosan egy vonalban van vízszintesen, de nem érhető el (pl. vertikálisan
+    // elválasztva egy tűzgolyós ébresztés után), ne villogjon az irány — egyszerűen megáll,
+    // ahelyett hogy 1px-enként balra-jobbra pattogna a célpont X-koordinátája körül.
+    if (horizontalDistance <= DIRECTION_DEADZONE) {
+      this.setVelocityX(0);
       return;
     }
 

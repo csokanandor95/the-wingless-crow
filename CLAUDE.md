@@ -102,6 +102,17 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - Patrol range: spawn ponttól ±80px (felülírható), detection range: 220px, lose range: 320px (hiszterézis)
 - **DETECT PLAYER kiváltói**: közelség VAGY sebzés PATROL közben — a `takeDamage()` PATROL
   állapotban azonnal CHASE-re vált, így egy távolról indított tűzgolyó is felébreszti
+- **A passzív detektálás (PATROL→CHASE) vízszintes ÉS vertikális küszöböt is megkövetel**
+  (`DETECTION_RANGE` 220px vízszintesen, `VERTICAL_DETECTION_RANGE` 50px függőlegesen) —
+  enélkül egy közvetlenül fent/lent, más platformon álló player is "közelinek" számítana,
+  hiszen ilyenkor pont a vízszintes távolság kicsi. A `LOSE_RANGE` (CHASE→PATROL) szándékosan
+  **marad vízszintes-only**: ez tartja meg a tűzgolyós cross-level ébresztést (lásd fent) —
+  ha itt is vertikális kaput tennénk, a sebzés-alapú kényszerített CHASE azonnal
+  visszaváltana PATROL-ra egy magasan lévő platform-enemy esetén. Az `ATTACK_RANGE` és a
+  tényleges találat (`resolveAttackHit`) **teljes 2D távolságot** használ, hogy ne lehessen
+  "a padlón át" eltalálni egy másik platformon álló playert. A `DIRECTION_DEADZONE` (4px)
+  megakadályozza, hogy egy vertikálisan elérhetetlen, de vízszintesen majdnem egy vonalban
+  lévő cél felé az enemy balra-jobbra pörögjön (irány-flip minden frame-ben nulla körül)
 - **`HollowConfig`** (opcionális 4. konstruktor-paraméter): `patrolMinX` / `patrolMaxX`
   abszolút világ-X határok, és `clampChaseToBounds` — utóbbi hatására CHASE közben sem
   lép ki a határokon. Ez teszi lehetővé a platformon álló enemyt, ami nem sétál le a
