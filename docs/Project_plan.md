@@ -462,7 +462,7 @@ Példa:
 ### Phase 1
 
 - sword slash
-- heavy attack
+- távoli projectile attack, amit a player át tud ugrani
 - basic movement
 
 ### Phase 2
@@ -470,7 +470,7 @@ Példa:
 50% HP alatt:
 
 - gyorsabb mozgás
-- új attack pl. ground slam, ami a player által ugrással kivédhető
+- új attack pl. charge támadás egyenes vonalban. Egy piros villanás jelzi, minimális windup-fázis kb. 1 másodperc. A player át tudja ugrani. A támadás után 3 mp cooldown idő, amíg a boss nem támad.
 
 A cél nem egy Elden Ring szintű boss AI.
 
@@ -480,6 +480,19 @@ A cél egy olyan boss, amely:
 - kihívást jelent
 - látványos
 - jó zenével és arénával emlékezetes
+
+> **Implementációs megjegyzés (Phase 7):** a boss state machine-je
+> `DORMANT → APPROACH → SLASH / PROJECTILE / CHARGE_WINDUP → CHARGE → COOLDOWN → DEAD`.
+> A `DORMANT` a boss entrance (15. pont) alatt aktív: a boss ilyenkor nem mozog, nem támad
+> és **nem is sebezhető**, csak a belépő-animáció végén kapcsol be.
+>
+> A támadás-választás **szándékosan determinisztikus** (nincs véletlen): távolság + saját
+> cooldown-kapuk döntenek. Ez egyszerre szolgálja a tesztelhetőséget (nem flaky unit teszt)
+> és a játékélményt — a player fel tudja ismerni a boss mintáit.
+>
+> A közelharci találat — a Hollow-hoz hasonlóan — nem külön hitbox-zóna, hanem
+> távolság-ellenőrzés a windup végén. A charge roham közben legfeljebb **egyszer** sebez,
+> és a pálya falának ütközve idő előtt véget ér.
 
 ---
 
@@ -587,6 +600,22 @@ Victory
 ```
 
 A boss belépése és a zene fontos része a játékélménynek.
+
+> **Kiegészítés (Phase 7) — a lánc implementált állapota:**
+>
+> - **Boss aréna:** fix **800×450**, egy képernyős pálya, nincs kameragörgetés. Így a boss,
+>   a player és a boss HP-bar mindig egyszerre látszik, a charge/projectile telegraph mindig
+>   olvasható, és a visual regression baseline (26. pont) determinisztikus.
+> - **Vereség az arénában:** a player NEM az arénában éled újra, hanem visszatér a
+>   `Level1Scene`-re, a `CheckpointSystem` pontjára (a boss-ajtóhoz), és onnan **E**-vel
+>   léphet be ismét. Emiatt a `Level1Scene` a playert mindig a checkpointról indítja, nem a
+>   pálya elejéről.
+> - **Győzelem után:** boss halál → szöveges átvezető (`NarrationScene`) → `Level2Scene`.
+> - **Progression:** a `bossDefeated` flag egyelőre a Phaser `registry`-ben él (mint a
+>   `checkpoint`), így a legyőzött boss után a Level 1 ajtaja már a Level 2-re visz, nem
+>   ismét az arénába. A teljes `systems/GameState.ts` továbbra is későbbi fázis.
+> - **Zene:** a boss theme és az átvezető zenéje a Phase 8 – Atmosphere része; a kódban
+>   jelenleg csak dokumentált beakasztási pontok (`TODO (Phase 8)`) vannak.
 
 ---
 
@@ -753,6 +782,7 @@ the-wingless-crow/
 │   │   ├── Level1Scene.ts
 │   │   ├── Level2Scene.ts
 │   │   ├── BossScene.ts
+│   │   ├── NarrationScene.ts
 │   │   └── EndingScene.ts
 │   │
 │   ├── player/
@@ -765,7 +795,7 @@ the-wingless-crow/
 │   │   └── Beast.ts
 │   │
 │   ├── bosses/
-│   │   └── Warden.ts
+│   │   └── GraftedWingBreaker.ts
 │   │
 │   ├── combat/
 │   │   ├── Attack.ts
@@ -801,6 +831,16 @@ the-wingless-crow/
 Nem szükséges ezt az egész struktúrát az első napon létrehozni.
 
 A struktúrát a projekt fejlődésével együtt alakítjuk.
+
+> **Pontosítások (Phase 7):**
+>
+> - A boss fájlneve `bosses/GraftedWingBreaker.ts` (nem `TheGraftedWingBreaker.ts`) —
+>   a névelő a megjelenített címben marad, a fájlnévben nem.
+> - Új, eredetileg nem tervezett scene: **`scenes/NarrationScene.ts`** — adatvezérelt
+>   szöveges átvezető (`{ lines, nextScene, title? }`), typewriter megjelenítéssel. Nem
+>   "boss utáni" scene: ugyanez fogja kiszolgálni a 9. pont introját és a tervezett
+>   `EndingScene.ts` / `ui/Dialogue.ts` szerepét is, ezért azok külön fájlként valószínűleg
+>   már nem lesznek szükségesek.
 
 ---
 

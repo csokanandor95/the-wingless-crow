@@ -8,7 +8,8 @@ import type Phaser from 'phaser';
 export function createMockBody() {
   return {
     velocity: { x: 0, y: 0 },
-    blocked: { down: false },
+    // left/right: a boss charge-ja ebből olvassa ki, hogy falnak ütközött-e.
+    blocked: { down: false, left: false, right: false },
     touching: { down: false },
     checkCollision: { down: true },
     enable: true,
@@ -79,9 +80,13 @@ export function getBody(obj: { body: unknown }): Phaser.Physics.Arcade.Body {
  * EGYMÁSBA ÁGYAZOTT delayedCall-láncokhoz, mint a Hollow.startAttack() (startup →
  * a callbackjén belül cooldown) — csak így figyelhető meg a köztes állapot
  * (pl. COOLDOWN a CHASE előtt).
+ *
+ * `skipExisting: true` esetén a kurzor a MÁR ütemezett hívások mögé áll — ez kell, ha a
+ * teszt előkészítése (pl. a boss Phase 2-be sebzése) maga is ütemez callbackeket, amiket
+ * nem akarunk beleszámolni a megfigyelt lépésekbe.
  */
-export function createDelayedCallStepper(scene: MockScene) {
-  let cursor = 0;
+export function createDelayedCallStepper(scene: MockScene, skipExisting = false) {
+  let cursor = skipExisting ? scene.time.delayedCall.mock.calls.length : 0;
   return {
     next(): void {
       const calls = scene.time.delayedCall.mock.calls;

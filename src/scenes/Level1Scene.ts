@@ -4,6 +4,7 @@ import PlayerController from '../player/PlayerController';
 import Fireball from '../combat/Projectile';
 import Hollow from '../enemies/Hollow';
 import CheckpointSystem from '../systems/CheckpointSystem';
+import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 
 const WORLD_WIDTH = 3200;
 // A WORLD_HEIGHT szándékosan megegyezik a canvas magasságával (main.ts): így a kamera
@@ -15,6 +16,8 @@ const GROUND_CENTER_Y = 434;
 const GROUND_TOP = 418; // ground-placeholder 64x32, origin 0.5 -> 434 - 16
 
 const PLAYER_HALF_HEIGHT = 24; // player-placeholder 32x48
+const START_X = 100; // pálya eleji kezdőpont = a CheckpointSystem default-ja
+const START_Y = 300;
 const HOLLOW_SPAWN_OFFSET = 24; // hollow-placeholder 30x46, félmagasság 23 -> 1px ejtés
 
 interface PlatformDef {
@@ -122,10 +125,15 @@ export default class Level1Scene extends Phaser.Scene {
     // vissza Level1Scene-be) — enélkül minden create() nulláról hozná létre, és egy
     // már aktivált checkpoint elveszne, mihelyt visszatérünk a pályára.
     const existingCheckpoint = this.registry.get('checkpoint') as CheckpointSystem | undefined;
-    this.checkpoint = existingCheckpoint ?? new CheckpointSystem(100, 300);
+    this.checkpoint = existingCheckpoint ?? new CheckpointSystem(START_X, START_Y);
     if (!existingCheckpoint) this.registry.set('checkpoint', this.checkpoint);
 
-    this.player = new Player(this, 100, 300);
+    // A player MINDIG a checkpointról indul, nem a pálya elejéről: a boss-arénában
+    // elhalálozva ide térünk vissza, és ilyenkor a már aktivált checkpoint (az ajtó)
+    // a helyes belépőpont. Friss játékban a CheckpointSystem default-ja a pálya eleje,
+    // így az első indítás viselkedése változatlan.
+    const spawn = this.checkpoint.getRespawnPoint();
+    this.player = new Player(this, spawn.x, spawn.y);
     this.physics.add.collider(this.player, ground);
     this.physics.add.collider(this.player, platforms);
 
@@ -171,8 +179,11 @@ export default class Level1Scene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.interactKey = this.input.keyboard!.addKey('E');
+    const doorPrompt = this.registry.get('bossDefeated')
+      ? 'E: Tovább — The Crowless Forest'
+      : 'E: Checkpoint';
     this.checkpointPromptText = this.add
-      .text(400, 400, 'E: Checkpoint', {
+      .text(400, 400, doorPrompt, {
         fontFamily: 'monospace',
         fontSize: '16px',
         color: '#ffffff',
@@ -319,14 +330,21 @@ export default class Level1Scene extends Phaser.Scene {
     this.checkpoint.activate(CHECKPOINT_X, CHECKPOINT_Y);
     this.checkpointPromptText.setText('Checkpoint mentve...').setVisible(true);
 
-    this.cameras.main.fadeOut(500, 0, 0, 0, () => {
-      this.scene.start('BossScene');
+    // A legyőzött boss után az ajtó már nem az arénába, hanem a következő pályára visz —
+    // különben a Level1-re visszatérve újra a (már teljesített) boss fight indulna.
+    const nextScene = this.registry.get('bossDefeated') ? 'Level2Scene' : 'BossScene';
+
+    // FADE_OUT_COMPLETE, nem a fadeOut() callbackje: utóbbi a fade MINDEN frame-jén
+    // lefutna (camera, progress paraméterekkel), tehát frame-enként újraindítaná a scene-t.
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      this.scene.start(nextScene);
     });
+    this.cameras.main.fadeOut(500, 0, 0, 0);
   }
 
   private handlePlayerHitEnemy(
-    hitbox: Phaser.GameObjects.GameObject,
-    enemyObj: Phaser.GameObjects.GameObject
+    hitbox: PhysicsOverlapObject,
+    enemyObj: PhysicsOverlapObject
   ): void {
     const enemy = enemyObj as Hollow;
     if (enemy.isDead() || this.player.hasHitTarget(enemy)) return;
@@ -337,8 +355,8 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   private handleFireballHitEnemy(
-    fireballObj: Phaser.GameObjects.GameObject,
-    enemyObj: Phaser.GameObjects.GameObject
+    fireballObj: PhysicsOverlapObject,
+    enemyObj: PhysicsOverlapObject
   ): void {
     const fireball = fireballObj as Fireball;
     const enemy = enemyObj as Hollow;

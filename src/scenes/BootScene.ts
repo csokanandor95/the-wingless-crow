@@ -69,5 +69,23 @@ export default class BootScene extends Phaser.Scene {
     doorGfx.fillRect(0, 0, 48, 72);
     doorGfx.generateTexture('door-placeholder', 48, 72);
     doorGfx.destroy();
+
+    // Boss (The Grafted Wing-Breaker) placeholder: 64x96, a Hollow-nál jóval nagyobb.
+    // A vállnál lévő sötétvörös sáv adja a "hozzávarrt szárnyak" utalást, és egyben
+    // láthatóvá teszi a tintelést (támadás-windup, charge telegraph).
+    const bossGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    bossGfx.fillStyle(0x53304f, 1);
+    bossGfx.fillRect(0, 0, 64, 96);
+    bossGfx.fillStyle(0x7a2233, 1);
+    bossGfx.fillRect(0, 18, 64, 12);
+    bossGfx.generateTexture('boss-placeholder', 64, 96);
+    bossGfx.destroy();
+
+    // Boss lövedék: nagyobb és lilás, hogy egyértelműen elváljon a player tűzgolyójától.
+    const bossProjectileGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    bossProjectileGfx.fillStyle(0xa855f7, 1);
+    bossProjectileGfx.fillCircle(10, 10, 10);
+    bossProjectileGfx.generateTexture('boss-projectile-placeholder', 20, 20);
+    bossProjectileGfx.destroy();
   }
 }

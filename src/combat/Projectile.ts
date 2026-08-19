@@ -8,25 +8,51 @@ export const FIREBALL_CONFIG = {
   lifespanMs: 3000,
 };
 
+const DEFAULT_TEXTURE = 'fireball-placeholder';
+const DEFAULT_SIZE = 16;
+
+/**
+ * A boss lövedéke ugyanez a mechanika (sebesség, lifespan, onImpact villanás+tween,
+ * egyszeri-találat gate), csak más textúrával/számokkal — ezért nem külön osztály,
+ * hanem ez az opcionális felülírás. Minden mező elhagyható: a default-ok a
+ * FIREBALL_CONFIG-ból jönnek, így a meglévő `new Fireball(scene, x, y, dir)` hívások
+ * viselkedése változatlan.
+ */
+export interface ProjectileOptions {
+  texture?: string;
+  damage?: number;
+  speed?: number;
+  lifespanMs?: number;
+  /** A négyzetes physics body oldalhossza. */
+  size?: number;
+}
+
 export default class Fireball extends Phaser.Physics.Arcade.Sprite {
   private damage: number;
   private hasHit = false;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, direction: number) {
-    super(scene, x, y, 'fireball-placeholder');
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    direction: number,
+    options: ProjectileOptions = {}
+  ) {
+    super(scene, x, y, options.texture ?? DEFAULT_TEXTURE);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
+    const size = options.size ?? DEFAULT_SIZE;
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
-    body.setSize(16, 16);
+    body.setSize(size, size);
 
-    this.damage = FIREBALL_CONFIG.damage;
-    this.setVelocityX(FIREBALL_CONFIG.speed * direction);
+    this.damage = options.damage ?? FIREBALL_CONFIG.damage;
+    this.setVelocityX((options.speed ?? FIREBALL_CONFIG.speed) * direction);
     this.setFlipX(direction < 0);
 
-    scene.time.delayedCall(FIREBALL_CONFIG.lifespanMs, () => {
+    scene.time.delayedCall(options.lifespanMs ?? FIREBALL_CONFIG.lifespanMs, () => {
       this.destroyProjectile();
     });
   }

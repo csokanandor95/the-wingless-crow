@@ -135,3 +135,34 @@ describe('Fireball damage', () => {
     expect(fireball.active).toBe(false);
   });
 });
+
+// A boss lövedéke ugyanez az osztály, csak felülírt konfigurációval — ez a blokk védi a
+// visszafelé-kompatibilitást (az options nélküli hívás viselkedése nem változhat).
+describe('Fireball — ProjectileOptions felülírás', () => {
+  let scene: MockScene;
+
+  beforeEach(() => {
+    scene = createMockScene();
+  });
+
+  it('az options felülírja a damage-et és a speed-et', () => {
+    const projectile = new Fireball(scene as unknown as Phaser.Scene, 0, 0, 1, {
+      texture: 'boss-projectile-placeholder',
+      damage: 42,
+      speed: 260,
+      size: 20,
+    });
+
+    expect(projectile.getDamage()).toBe(42);
+    expect(getBody(projectile).velocity.x).toBe(260);
+    expect(getBody(projectile).setSize).toHaveBeenCalledWith(20, 20);
+  });
+
+  it('hiányzó options esetén a FIREBALL_CONFIG default-jai érvényesek', () => {
+    const projectile = new Fireball(scene as unknown as Phaser.Scene, 0, 0, 1, {});
+
+    expect(projectile.getDamage()).toBe(FIREBALL_CONFIG.damage);
+    expect(getBody(projectile).velocity.x).toBe(FIREBALL_CONFIG.speed);
+    expect(getBody(projectile).setSize).toHaveBeenCalledWith(16, 16);
+  });
+});

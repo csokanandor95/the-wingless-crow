@@ -79,10 +79,15 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     if (this.isGrounded()) this.playerState = PlayerState.RUN;
   }
 
-  stop(): void {
-    if (this.isLocked()) return;
+  // A visszatérési típus `this`, mert ez FELÜLÍRJA a Phaser Sprite.stop()-ját (ami az
+  // animációt állítja meg, és `this`-t ad vissza) — `void`-dal a strict typecheck elszáll.
+  // Phase 8-ban, valódi animációkkal érdemes lesz átnevezni (pl. stopMoving()), hogy ne
+  // fedje el az ősosztály metódusát.
+  stop(): this {
+    if (this.isLocked()) return this;
     this.setVelocityX(0);
     if (this.isGrounded()) this.playerState = PlayerState.IDLE;
+    return this;
   }
 
   jump(): void {
