@@ -32,6 +32,58 @@ function createMockZone() {
   };
 }
 
+export interface MockSound {
+  key: string;
+  volume: number;
+  isPlaying: boolean;
+  play: ReturnType<typeof vi.fn>;
+  stop: ReturnType<typeof vi.fn>;
+  destroy: ReturnType<typeof vi.fn>;
+}
+
+// A Phaser hangobjektumának minimális mása: annyit tud, amennyit az AudioManager használ.
+// A `volume` sima mező, mert a fade-et tween írja (`targets: sound, volume: ...`).
+export function createMockSound(key: string): MockSound {
+  const sound: MockSound = {
+    key,
+    volume: 0,
+    isPlaying: false,
+    play: vi.fn(),
+    stop: vi.fn(),
+    destroy: vi.fn(),
+  };
+
+  sound.play.mockImplementation(() => {
+    sound.isPlaying = true;
+    return true;
+  });
+  sound.stop.mockImplementation(() => {
+    sound.isPlaying = false;
+    return true;
+  });
+  sound.destroy.mockImplementation(() => {
+    sound.isPlaying = false;
+  });
+
+  return sound;
+}
+
+/**
+ * Laza tween-konfig típus a mockhoz. Azért kell explicit paramétertípus a `tweens.add`
+ * mockon, mert paraméter nélküli `vi.fn()` esetén a `mock.calls` üres tuple-ként (`[]`)
+ * tipizálódik, és a tesztek nem tudják kiolvasni belőle a konfigot.
+ */
+export interface MockTweenConfig {
+  targets?: unknown;
+  duration?: number;
+  onComplete?: () => void;
+  [key: string]: unknown;
+}
+
+function createMockTween() {
+  return { stop: vi.fn() };
+}
+
 function createMockText() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const text: any = {
@@ -60,7 +112,20 @@ export function createMockScene() {
     // NEM fut le automatikusan — a teszt dönti el, mikor "telik el" az idő
     // a felvett callback(ok) manuális meghívásával (lásd a helperek lentebb).
     time: { delayedCall: vi.fn() },
-    tweens: { add: vi.fn() },
+    // A tween mock tweent AD VISSZA (nem undefined-ot), mert az AudioManager eltárolja és
+    // `stop()`-olja a futó fade-et. A `flushLastTween()` a hívás ARGUMENTUMAIBÓL olvas,
+    // ezért ez a többi tesztet nem érinti.
+    tweens: { add: vi.fn((_config: MockTweenConfig) => createMockTween()) },
+    // A Phaser SoundManager game-szintű; az AudioManager innen kér hangot, és a scene
+    // `events`-én keresztül iratkozik fel a shutdownra.
+    sound: {
+      locked: false,
+      add: vi.fn((key: string, _config?: { loop?: boolean; volume?: number }) =>
+        createMockSound(key)
+      ),
+      once: vi.fn((_event: string, _callback: () => void) => undefined),
+    },
+    events: { once: vi.fn((_event: string, _callback: () => void) => undefined) },
   };
 }
 

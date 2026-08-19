@@ -1,4 +1,12 @@
 import Phaser from 'phaser';
+import { MUSIC_KEYS } from '../systems/AudioManager';
+// Vite-on át importálva (nem `public/`-ból): így az asset hash-elve bekerül a buildbe,
+// a base path (GitHub Pages) magától helyes lesz, és HIÁNYZÓ fájl esetén a build elszáll
+// ahelyett, hogy néma 404 lenne futásidőben.
+import bossThemeUrl from '../../assets/audio/boss-theme.mp3';
+
+const LOADING_BAR_WIDTH = 320;
+const LOADING_BAR_HEIGHT = 14;
 
 export default class BootScene extends Phaser.Scene {
   constructor() {
@@ -7,10 +15,40 @@ export default class BootScene extends Phaser.Scene {
 
   preload(): void {
     this.createPlaceholderTextures();
+    this.createLoadingIndicator();
+
+    this.load.audio(MUSIC_KEYS.BOSS_THEME, bossThemeUrl);
   }
 
   create(): void {
     this.scene.start('Level1Scene');
+  }
+
+  // Ideiglenes, minimális betöltésjelző — a boss theme ~2 MB, ami első betöltéskor
+  // (főleg deployolva) látható szünet. Phase 8 további iterációiban, több asset mellett
+  // ez kaphat valódi UI-t a `ui/` modulban.
+  private createLoadingIndicator(): void {
+    const centerX = this.scale.width / 2;
+    const centerY = this.scale.height / 2;
+
+    this.add
+      .text(centerX, centerY - 30, 'Betöltés...', {
+        fontFamily: 'monospace',
+        fontSize: '16px',
+        color: '#8a7a8a',
+      })
+      .setOrigin(0.5);
+
+    const barX = centerX - LOADING_BAR_WIDTH / 2;
+    const bar = this.add.graphics();
+
+    this.load.on('progress', (progress: number) => {
+      bar.clear();
+      bar.fillStyle(0x2a1e2a, 1);
+      bar.fillRect(barX, centerY, LOADING_BAR_WIDTH, LOADING_BAR_HEIGHT);
+      bar.fillStyle(0xa02020, 1);
+      bar.fillRect(barX, centerY, LOADING_BAR_WIDTH * progress, LOADING_BAR_HEIGHT);
+    });
   }
 
   private createPlaceholderTextures(): void {

@@ -7,6 +7,7 @@ import GraftedWingBreaker, {
   PROJECTILE_SPEED,
 } from '../bosses/GraftedWingBreaker';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
+import AudioManager, { MUSIC_KEYS } from '../systems/AudioManager';
 
 // Boss aréna (Project_plan.md 15. pont): fix, egy képernyős pálya — nincs kameragörgetés,
 // így a boss, a player és a HP-bar mindig egyszerre látszik, és a charge/projectile
@@ -57,6 +58,7 @@ export default class BossScene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
   private boss!: GraftedWingBreaker;
+  private audio!: AudioManager;
 
   private playerHpText!: Phaser.GameObjects.Text;
   private bossHpBar!: Phaser.GameObjects.Graphics;
@@ -80,6 +82,10 @@ export default class BossScene extends Phaser.Scene {
     this.bossProjectiles = [];
     this.fightStarted = false;
     this.outcomeScheduled = false;
+
+    // Nem kell kézzel takarítani: az AudioManager maga iratkozik fel a scene SHUTDOWN-jára,
+    // és fade nélkül elvágja a zenét — enélkül a scene-be újra belépve két loop szólna.
+    this.audio = new AudioManager(this);
 
     this.cameras.main.setBackgroundColor('#100810');
     this.physics.world.setBounds(0, 0, ARENA_WIDTH, ARENA_HEIGHT);
@@ -252,7 +258,9 @@ export default class BossScene extends Phaser.Scene {
       .setAlpha(0)
       .setDepth(100);
 
-    // TODO (Phase 8): boss music cue — itt indul majd az AudioManager boss theme-je.
+    // Music transition (Project_plan.md 15. pont): a zene a belépőt KÍSÉRI, nem utána indul.
+    this.audio.playMusic(MUSIC_KEYS.BOSS_THEME);
+
     this.tweens.add({
       targets: [title, subtitle],
       alpha: 1,
@@ -320,7 +328,8 @@ export default class BossScene extends Phaser.Scene {
   private scheduleVictory(): void {
     this.outcomeScheduled = true;
     this.registry.set('bossDefeated', true);
-    // TODO (Phase 8): boss theme leállítása + victory sting.
+    this.audio.stopMusic();
+    // TODO (Phase 8, később): victory sting a zene elhalkulása fölé.
 
     this.time.delayedCall(VICTORY_DELAY_MS, () => {
       this.fadeToScene('NarrationScene', {
@@ -334,6 +343,7 @@ export default class BossScene extends Phaser.Scene {
   // éled újra, és E-vel léphet be ismét — a boss ilyenkor friss HP-val indul.
   private scheduleDefeat(): void {
     this.outcomeScheduled = true;
+    this.audio.stopMusic();
 
     this.time.delayedCall(DEFEAT_DELAY_MS, () => {
       this.fadeToScene('Level1Scene');

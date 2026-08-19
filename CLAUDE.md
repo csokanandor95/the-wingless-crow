@@ -66,6 +66,11 @@ boss entrance, HP-bar, két fázis, boss victory. A győzelem után egy adatvez�
 átvezető (`NarrationScene`) következik, onnan a (placeholder) `Level2Scene`.
 **A teljes lánc végigjátszható:** `Level1 → ajtó (E) → BossScene → NarrationScene → Level2Scene`.
 
+**Phase 8 (Atmosphere) ELINDULT — 1. iteráció: boss music kész.** `systems/AudioManager.ts`
+(egy zenesáv, loop, fade-in/fade-out) + `assets/audio/boss-theme.mp3` (2 MB). A zene a boss
+belépőjénél indul, a harc alatt loopol, és elhalkulva leáll, ha a player VAGY a boss meghal.
+A Phase 8 többi része (sprite-ok, SFX, particles, level ambient, `ui/` modul) még hátravan.
+
 **Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (Hollow) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (4 fájl, 72 teszt). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `Hollow.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `Hollow`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -80,19 +85,24 @@ the-wingless-crow/
 ├── tsconfig.json                 # megj.: vite.config.js NINCS, a projekt Vite defaultokon fut
 ├── docs/
 │   └── Project_plan.md
+├── assets/
+│   └── audio/
+│       └── boss-theme.mp3        # Vite-importtal jön be (nem public/), lásd lentebb
 ├── tests/
 │   └── unit/
 │       ├── player.test.ts       # Project_plan.md §23 Player scope
 │       ├── combat.test.ts       # §23 Combat scope (ATTACK_CONFIGS, Player attack, Fireball + ProjectileOptions)
 │       ├── hollow.test.ts       # §23 Enemy scope (Hollow HP/damage/death/state transitions)
 │       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, attack state, death)
+│       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown)
 │       └── helpers/
 │           ├── fakePhaser.ts        # a 'phaser' modul önálló fake névtere (createFakePhaserModule)
 │           └── phaserTestUtils.ts   # megosztott mock scene/body/delayedCall-stepper helperek
 ├── src/
 │   ├── main.ts
+│   ├── vite-env.d.ts             # /// <reference types="vite/client" /> — az *.mp3 import típusa
 │   ├── scenes/
-│   │   ├── BootScene.ts          # az összes placeholder textúra kódból generálva
+│   │   ├── BootScene.ts          # placeholder textúrák + audio betöltés + loading kijelzés
 │   │   ├── Level1Scene.ts        # 3200px pálya, PLATFORMS adattömb, létra, 5 Hollow, checkpoint-ajtó
 │   │   ├── BossScene.ts          # 800x450 fix aréna, boss entrance, HP-bar, victory/defeat ágak
 │   │   ├── NarrationScene.ts     # adatvezérelt szöveges átvezető (typewriter), újrahasználható
@@ -105,14 +115,15 @@ the-wingless-crow/
 │   ├── bosses/
 │   │   └── GraftedWingBreaker.ts # Boss 1, két fázis, slash / projectile / charge
 │   ├── systems/
-│   │   └── CheckpointSystem.ts   # egyetlen aktív respawn-pont tárolása
+│   │   ├── CheckpointSystem.ts   # egyetlen aktív respawn-pont tárolása
+│   │   └── AudioManager.ts       # egy zenesáv: loop + fade-in/out, scene-shutdown hookkal
 │   └── combat/
 │       ├── Attack.ts             # AttackType enum + ATTACK_CONFIGS (light/heavy sebzés, cooldown, hitbox méret)
 │       ├── Projectile.ts         # Fireball osztály + FIREBALL_CONFIG + ProjectileOptions (boss lövedék)
 │       └── DamageSystem.ts       # Damageable interface + PhysicsOverlapObject típus-alias
 ```
 
-Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `EndingScene`, `enemies/Archer.ts`, `enemies/Beast.ts`, `systems/GameState.ts`, `systems/AudioManager.ts`, `ui/` mappa (HUD, Menu, Dialogue), `assets/` tartalommal.
+Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `EndingScene`, `enemies/Archer.ts`, `enemies/Beast.ts`, `systems/GameState.ts`, `ui/` mappa (HUD, Menu, Dialogue), és az `assets/` alatt a `sprites/ backgrounds/ tiles/ effects/` mappák (egyelőre csak `audio/` van).
 
 > A tervezett `EndingScene.ts` és `ui/Dialogue.ts` szerepét várhatóan a `NarrationScene`
 > fogja betölteni (adatvezérelt: `{ lines, nextScene, title? }`), ezért azok külön fájlként
@@ -249,6 +260,24 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - A narrációs szöveg placeholder (a `BossScene.ts` tetején, `BOSS_VICTORY_NARRATION`) —
   a végleges lore a Phase 9-ben készül, a csere egy tömb-szerkesztés
 
+### Audio (`src/systems/AudioManager.ts`)
+- **Egyetlen zenesáv** kezelése: `playMusic(key, { volume?, fadeInMs? })`, `stopMusic(fadeOutMs?)`,
+  `getCurrentMusicKey()`, `destroy()`. Exportált konstansok: `MUSIC_KEYS`,
+  `DEFAULT_MUSIC_VOLUME` (0.45), `DEFAULT_FADE_IN_MS` (800), `DEFAULT_FADE_OUT_MS` (1500)
+- A hang **némán** jön létre (`volume: 0`), a hangerőt egy tween viszi fel — a `stopMusic()`
+  a futó fade-in tweent leállítja, hogy a kifadelés az AKTUÁLIS hangerőről induljon
+- `playMusic()` mindig hard-stoppolja az előző sávot → **nem lehet két loop egyszerre**
+- `stopMusic()` kétszer hívva no-op (`isStopping` flag)
+- **Autoplay policy**: ha `scene.sound.locked`, a lejátszás a `Phaser.Sound.Events.UNLOCKED`
+  eseményre halasztódik. A gyakorlatban ez sosem kell — a Phaser `WebAudioSoundManager`
+  **`keydown`-ra is felold**, a player pedig végigjátssza a Level 1-et, mire ide ér
+- **Az asset Vite-importtal jön** (`import bossThemeUrl from '../../assets/audio/boss-theme.mp3'`),
+  NEM a `public/` mappából. Így a build hash-eli, a GitHub Pages base path magától jó lesz,
+  és **hiányzó fájlnál a build elszáll** néma 404 helyett. Ehhez kell a `src/vite-env.d.ts`
+- Bekötés a `BossScene`-ben: `create()` → `new AudioManager(this)`, `startEntrance()` →
+  `playMusic(MUSIC_KEYS.BOSS_THEME)`, `scheduleVictory()`/`scheduleDefeat()` → `stopMusic()`.
+  Kézi takarítás **nincs** — az `AudioManager` maga iratkozik fel a scene shutdownjára
+
 ## Fontos technikai tanulságok (ne ismételd meg ezeket a hibákat!)
 
 1. **Phaser Arcade Physics Group `.add()` felülírja a body sebességét/gravitációját.** Ha egy már konfigurált (velocity/gravity beállított) physics objektumot egy `Phaser.Physics.Arcade.Group`-hoz adsz hozzá, a group visszaállítja azokat az alapértékekre. Ezért a fireballokat és enemyket **plain TypeScript tömbben** tároljuk (`Fireball[]`, `Hollow[]`), nem Phaser Group-ban.
@@ -261,7 +290,14 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
    ```
    (A `Level1Scene.activateCheckpointAndTransition()` eredetileg a callback-es formát használta; Phase 7-ben át lett írva erre.)
 5. **A `Phaser.Scene`-nek már van `data` property-je** (a `DataManager`). Ha egy saját scene-ben `private data: ValamiSajat`-ot deklarálsz, a strict typecheck elszáll. Nevezd el másnak (lásd `NarrationScene.narration`).
-6. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
+6. **A Phaser `SoundManager` GAME-szintű, nem scene-szintű.** Egy scene-ben elindított loop **túléli a scene leállását**, és a scene-be újra belépve két példány szól egymáson. Minden hangot indító osztálynak fel KELL iratkoznia a scene shutdownjára:
+   ```ts
+   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.destroy());
+   ```
+   (Az `AudioManager` ezt megteszi, ezért a scene-eknek nem kell kézzel takarítaniuk.)
+7. **A `Phaser.Sound.BaseSound` típusán NINCS `volume`/`setVolume`** — csak a konkrét implementációkon (`WebAudioSound`, `HTML5AudioSound`, `NoAudioSound`). Mivel `sound.add()` `BaseSound`-ot ad vissza, a volume-tweeneléshez (fade) szűkíteni kell rá — lásd a `PlayableSound` uniót az `AudioManager.ts`-ben.
+8. **A `vi.fn()` paramétertípus nélkül üres tuple-ként (`[]`) tipizálja a `mock.calls`-t.** Ha a teszt ki akarja olvasni a hívás argumentumait (pl. a tween konfigját), a mocknak explicit paramétertípust kell adni: `vi.fn((_config: MockTweenConfig) => ...)`. A tesztek futottak, de a `tsc --noEmit` elszállt tőle.
+9. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
@@ -274,19 +310,24 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - A `BossScene` HP-barja nyers `Graphics`-szal rajzolt téglalap (`drawBossHealthBar()`), és a player HP-ja ott is a debug `add.text` — mindkettő a `ui/` modulba költözik Phase 8-ban
 - `Level2Scene` teljes egészében placeholder ("Level 2 — The Crowless Forest / tervezés alatt"), és benne az **R billentyű** visszavisz a `Level1Scene`-re — kizárólag azért, hogy a `Level1 → Boss → átvezető → Level2` lánc manuálisan körbejárható legyen. A valódi Level 2 elkészültekor törlendő
 - A `BOSS_VICTORY_NARRATION` szövege placeholder lore — a végleges a Phase 9 – Lore-ban készül
+- A `BootScene` "Betöltés..." szövege + progress-sávja nyers `add.text` / `Graphics` — a `ui/` modulba költözik, amint több asset (sprite-ok) is betöltendő lesz
 - `main.ts`-ben `arcade.debug: true` — a physics bodyk és a létra zónája ki van rajzolva
 - A training dummy és a régi 'H' debug billentyű (self-damage teszteléshez) már törölve lett, miután a Hollow valódi sebzésforrássá vált
 
 ## Következő lépés
 
-**Phase 7 kész.** Most jöhet a **Phase 8 – Atmosphere** (sprites, backgrounds, particles,
-lighting-like effects, music, sound effects, UI):
-- A kódból generált placeholder téglalapok cseréje valódi (AI-generált) pixel art sprite-okra —
-  ekkor kell az `assets/` mappa tényleges tartalommal.
-- `systems/AudioManager.ts` + zene/SFX. A kódban már ki vannak jelölve a beakasztási pontok:
-  keresd a `TODO (Phase 8)` kommenteket (boss music cue, fázisváltás sting, narration ambient).
+**Phase 8 – Atmosphere folyamatban.** Az 1. iteráció (boss music) kész; ami még hátravan:
+- **Sound effectek** (Project_plan.md 18. pont listája: sword swing/hit, fireball, hurt,
+  death, jump, checkpoint stb.). Az `AudioManager` jelenleg csak zenét kezel — SFX-hez
+  kap majd egy `playSfx(key)`-t, ami nem exkluzív (több hang egyszerre).
+- **Level / menü ambient.** Figyelem: az `AudioManager` most **scene-hatókörű** (a scene
+  shutdownja elvágja) — scene-eken átívelő zenéhez game-szintűvé kell emelni.
+- Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),
+  narration ambient (`NarrationScene.create()`), victory sting (`BossScene.scheduleVictory()`).
+- A kódból generált placeholder téglalapok cseréje valódi (AI-generált) pixel art sprite-okra
+  (`assets/sprites/`, `assets/backgrounds/`, `assets/tiles/`, `assets/effects/`).
 - `ui/` modul: valódi HUD a debug `add.text`-ek helyett, és a boss HP-bar átköltöztetése
-  a `BossScene.drawBossHealthBar()`-ból.
+  a `BossScene.drawBossHealthBar()`-ból. Ide kerülhet a `BootScene` betöltésjelzője is.
 - A `main.ts` `arcade.debug: true` kikapcsolása.
 
 **Phase 8 után jön a Döntési pont** (lásd fentebb és a Project_plan.md 21. pontjában):

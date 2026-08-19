@@ -719,6 +719,24 @@ A hangokat és zenéket lehetőség szerint AI segítségével generáljuk vagy 
 
 A cél, hogy lehetőleg ne kelljen manuálisan asseteket vadászni és szerkeszteni.
 
+> **Implementációs állapot (Phase 8, 1. iteráció) — boss music:**
+>
+> - **Kész:** `systems/AudioManager.ts` (egy zenesáv, loop, fade-in/fade-out) + a boss theme
+>   (`assets/audio/boss-theme.mp3`). A zene a boss belépőjénél indul, a harc alatt loopol, és
+>   elhalkulva leáll, ha a player VAGY a boss meghal.
+> - **Még nincs:** sound effectek (a fenti lista), level/menü ambient, fázisváltás-sting,
+>   narráció alatti zene, globális hangerő/némítás vezérlő.
+> - **Betöltés:** a `BootScene.preload()` tölt be minden audiót, egy minimális
+>   "Betöltés…" + progress kijelzéssel. Az assetet Vite-import hozza be
+>   (nem a `public/` mappából), így a build hash-eli, a base path (32. pont, GitHub Pages)
+>   magától helyes lesz, és **hiányzó fájl esetén a build elszáll** néma 404 helyett — ez a
+>   30. pont (asset testing) egy szeletét ingyen adja.
+> - **Fontos korlát:** a Phaser `SoundManager` **game-szintű**, nem scene-szintű, ezért az
+>   `AudioManager` a scene `SHUTDOWN`-jára feliratkozva mindig elvágja a zenét — enélkül a
+>   boss arénába újra belépve két loop szólna egymáson. Emiatt az `AudioManager` jelenleg
+>   **scene-hatókörű**. Ha később kell scene-eken átívelő zene (pl. folyamatos level-ambient
+>   a Level 1 és a boss aréna között), game-szintűvé kell emelni.
+
 ---
 
 # 19. Asset stratégia

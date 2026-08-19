@@ -77,6 +77,11 @@ export function createFakePhaserModule() {
   const FakePhaser = {
     Physics: { Arcade: { Sprite: MockSprite } },
     Events: { EventEmitter },
+    // Az AudioManager ezekre az esemény-konstansokra iratkozik fel; a valódi értékük
+    // közömbös, csak stabil stringnek kell lenniük, hogy a teszt ugyanazzal keresse ki
+    // a regisztrált callbacket.
+    Scenes: { Events: { SHUTDOWN: 'shutdown' } },
+    Sound: { Events: { UNLOCKED: 'unlocked' } },
     Math: {
       // Ugyanaz a lerp-képlet, mint a valódi Phaser.Math.Linear: p0 + (p1 - p0) * t.
       Linear: (p0: number, p1: number, t: number) => p0 + (p1 - p0) * t,
