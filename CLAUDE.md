@@ -91,8 +91,15 @@ dekor-oszlop törölve, a szerepüket a rétegek vették át. A `BossScene` hát
 szándékosan változatlan (külön asset lesz hozzá). Részletek lentebb, a "Level1Scene"
 és a "Fontos technikai tanulságok" alatt.
 
+**Phase 8 — 5. iteráció: BOSS ARÉNA HÁTTÉR kész.** A `BossScene` egyetlen álló, teljes
+képernyős festményt kapott (`assets/backgrounds/cathedral/boss-arena.png`): egy romos
+gótikus katedrális, ami palettában pontosan illik a Level 1 hátteréhez. **Nem**
+`ParallaxBackground` — a kamera fix, nincs mit eltolni. A 3 `pillar-placeholder` +
+1 `door-placeholder` dekoráció törölve, a szürke talaj-téglalap pedig láthatatlanná téve
+(a fizikája megmarad). Részletek lentebb, a "BossScene" szakaszban.
+
 A Phase 8 többi része (boss/environment sprite-ok, SFX, particles, level ambient,
-boss aréna háttér, `ui/` modul) még hátravan.
+`ui/` modul) még hátravan.
 
 **Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (8 fájl, 123 teszt — ebből 3 az animáció-/háttér-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
@@ -112,10 +119,12 @@ the-wingless-crow/
 │   ├── audio/
 │   │   └── boss-theme.mp3        # Vite-importtal jön be (nem public/), lásd lentebb
 │   ├── backgrounds/
-│   │   └── ruined-city/          # Level 1 parallax rétegek, mind 426x384
-│   │       ├── 01-sky.png        # RGB, átlátszatlan ég (#673838 -> #724141)
-│   │       ├── 02-mountains.png  # RGBA sziluett, teteje a forrás y=163..201-nél
-│   │       └── 03-ruins.png      # RGBA sziluett, teteje a forrás y=193..227-nél
+│   │   ├── ruined-city/          # Level 1 parallax rétegek, mind 426x384
+│   │   │   ├── 01-sky.png        # RGB, átlátszatlan ég (#673838 -> #724141)
+│   │   │   ├── 02-mountains.png  # RGBA sziluett, teteje a forrás y=163..201-nél
+│   │   │   └── 03-ruins.png      # RGBA sziluett, teteje a forrás y=193..227-nél
+│   │   └── cathedral/
+│   │       └── boss-arena.png    # 800x450, ÁTMÉRETEZETT/KIVÁGOTT — lásd BossScene alább
 │   └── sprites/
 │       ├── knight/               # player sprite sheetek, mind 128x64-es blokkokra vágva
 │       │   ├── Idle.png Run.png Jump.png Attacks.png
@@ -369,6 +378,30 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - **Fix 800×450-es aréna, NINCS kameragörgetés** (`startFollow` sincs): a boss, a player és a
   HP-bar mindig egyszerre látszik, a telegraph mindig olvasható, és a jövőbeli visual
   regression baseline determinisztikus
+- **Háttér (Phase 8)**: egyetlen `add.image(400, 225, 'bg-boss-arena').setDepth(-30)`,
+  romos gótikus katedrális. **Szándékosan NEM `ParallaxBackground`**: a kamera fix,
+  nincs mit eltolni, és a kép pontosan 800×450, tehát skálázni sem kell.
+  - **A PNG származtatott asset, nem másolat.** A forrás
+    `2D helper/level/Bossbackground_1.png` (1672×941). A rajzolt padló fényes felső pereme
+    a forráson `y=767`-nél van; egy sima arányos 800×450-re kicsinyítés ezt `y=367`-re
+    tenné, tehát a player 51px-szel a rajzolt perem ALATT, a sötét falban állna. Ezért a
+    kép egy **1467×825-ös kivágásból** (bal-felső sarok `103, 0`) lett 800×450-re
+    kicsinyítve — így a padlóél pontosan a `GROUND_TOP = 418`-ra esik. Ára: oldalanként
+    103px levágva a szimmetrikus képből (a szélső romos ívekből), és alul 116px (az amúgy
+    is talaj mögé eső fal). **Ha a `GROUND_TOP` valaha változik, a képet ÚJRA kell
+    generálni** — a képlet: `cropW = FLOOR_SRC_Y * 800 / GROUND_TOP`, `cropY = 0`.
+  - `setTint(BACKGROUND_TINT)` = `0xb0b0b0` (69%-os sötétítés). A nyers festmény olyan
+    világos és részletgazdag, hogy elnyomná a bosst és különösen a charge **piros**
+    telegraph-ját — ami korábban egy majdnem fekete (`#100810`) háttéren villant.
+    Ez az egyetlen hangolópont, ha világosabb/sötétebb kell.
+  - **A talaj (`ground-placeholder`) `setVisible(false)`** — a body aktív marad, csak nem
+    rajzolódik. A háttéren 418 alatt a rajzolt kőfal-homlokzat van, ami pont ezt a szerepet
+    tölti be; a szürke téglalap kitakarná.
+  - A 3 `pillar-placeholder` + 1 `door-placeholder` dekoráció **törölve** (a festményen
+    valódi oszlopok és oltár van). A `createDecor()` helyére `createBackground()` lépett.
+  - **A két aréna-platform (y=290) továbbra is szürke placeholder** — gameplay-kritikusak
+    (kitérés a charge elől), ezért olvashatóságuk fontosabb, mint a stílus-egység;
+    valódi tile-t a `assets/tiles/` iterációban kapnak.
 - Folyamatos talaj + 2 alacsony oldalsó platform (kitérés a charge elől, magaslat a leugró
   támadáshoz)
 - **Player és boss között SZÁNDÉKOSAN nincs collider**: a sebzés a támadás-hitboxokon megy,
@@ -447,10 +480,9 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
-- **A player, a CrowHarvester és a Level 1 háttere KIVÉTELÉVEL** minden grafika kódból
-  generált színes téglalap/kör (`generateTexture`) — a boss, a talaj/platformok, a létra,
-  az ajtó és mindkét lövedék még placeholder. A **boss aréna** háttere is az (oda külön
-  asset jön egy későbbi iterációban)
+- **A player, a CrowHarvester és MINDKÉT háttér (Level 1 + boss aréna) KIVÉTELÉVEL**
+  minden grafika kódból generált színes téglalap/kör (`generateTexture`) — a boss, a
+  talaj/platformok, a létra, a Level 1 ajtaja és mindkét lövedék még placeholder
 - CrowHarvester felett lebegő HP szöveg (debug célra, valódi HUD a `ui/` modulban készül majd)
 - A bal felső sarki HUD szöveg a HP mellett a **player state-et is kiírja** (`HP: 100/100 | CLIMB`) — a mászás manuális tesztelését segíti, Phase 8-ban cserélendő
 - Hit-reakció **a bossnál** = tint villanás, nincs valódi animáció (a playernél és a
@@ -467,10 +499,17 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   gyűjti, és a projekt végén másolja be őket — ezért nem került licenc fájl a
   `assets/backgrounds/ruined-city/` mellé, a forráscsomagot a `BootScene` importjainál
   lévő komment köti vissza.
+- **A boss aréna hátterének (`assets/backgrounds/cathedral/boss-arena.png`) licence
+  szintén nincs tisztázva** — a forrás a `2D helper/level/Bossbackground_1.png`, ami
+  önálló fájlként, licenc nélkül érkezett. A user gyűjtésébe ez is bekerül; publikálás
+  előtt ellenőrizni kell. **Megjegyzés:** a `Bossbackground_2.png` (ugyanott, angyal-
+  szobros katedrális, nyitott égbolttal) NEM ennek a fázis-variánsa, hanem egy külön
+  aréna — jó jelölt egy jövőbeli Boss #2-höz.
 - `pillar-placeholder` (már csak a létra mögötti hátfal) és `door-placeholder`
   dekorációk: puszta színes téglalapok
 - A checkpoint-prompt szöveg ("E: Checkpoint" / "Checkpoint mentve...") debug-stílusú `add.text`, a `playerHpText`-hez hasonlóan — valódi UI a `ui/` modulban készül majd
 - A `BossScene` HP-barja nyers `Graphics`-szal rajzolt téglalap (`drawBossHealthBar()`), és a player HP-ja ott is a debug `add.text` — mindkettő a `ui/` modulba költözik Phase 8-ban
+- A `BossScene` két aréna-platformja szürke `platform-placeholder` a valódi festett háttér előtt — szándékos: az olvashatóság most fontosabb a stílus-egységnél, valódi tile-t a `assets/tiles/` iterációban kap
 - `Level2Scene` teljes egészében placeholder ("Level 2 — The Crowless Forest / tervezés alatt"), és benne az **R billentyű** visszavisz a `Level1Scene`-re — kizárólag azért, hogy a `Level1 → Boss → átvezető → Level2` lánc manuálisan körbejárható legyen. A valódi Level 2 elkészültekor törlendő
 - A `BOSS_VICTORY_NARRATION` szövege placeholder lore — a végleges a Phase 9 – Lore-ban készül
 - A `BootScene` "Betöltés..." szövege + progress-sávja nyers `add.text` / `Graphics` — a `ui/` modulba költözik, amint több asset (sprite-ok) is betöltendő lesz
@@ -495,9 +534,9 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),
   narration ambient (`NarrationScene.create()`), victory sting (`BossScene.scheduleVictory()`).
 - A maradék kódból generált placeholder téglalapok cseréje valódi pixel art sprite-okra
-  (`assets/tiles/`, `assets/effects/`), és a **boss aréna háttere**. Utóbbihoz a
-  `ParallaxBackground` már újrahasználható: elég egy új `ParallaxLayerDef[]` tömb
-  (a `BossScene` nem görget, tehát ott akár egyetlen álló réteg is elég).
+  (`assets/tiles/`, `assets/effects/`): a talaj/platform tile-ok, a létra, a Level 1
+  ajtaja és a két lövedék. **Mindkét háttér kész** (Level 1: 4. iteráció, boss aréna:
+  5. iteráció).
 - `ui/` modul: valódi HUD a debug `add.text`-ek helyett, és a boss HP-bar átköltöztetése
   a `BossScene.drawBossHealthBar()`-ból. Ide kerülhet a `BootScene` betöltésjelzője is.
 - A `main.ts` `arcade.debug: true` kikapcsolása.

@@ -20,6 +20,12 @@ export const BACKGROUND_TEXTURES = {
   SKY: 'bg-sky',
   MOUNTAINS: 'bg-mountains',
   RUINS: 'bg-ruins',
+  /**
+   * A boss aréna háttere — NEM parallax réteg, hanem egyetlen álló, teljes képernyős kép
+   * (a BossScene kamerája fix, nincs mit eltolni). Csak azért él itt, hogy a háttér-textúra
+   * kulcsoknak egyetlen forrása legyen, amit a BootScene betölthet.
+   */
+  BOSS_ARENA: 'bg-boss-arena',
 } as const;
 
 // --- Réteg-definíció --------------------------------------------------------

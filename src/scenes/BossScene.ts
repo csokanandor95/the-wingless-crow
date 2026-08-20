@@ -8,6 +8,7 @@ import GraftedWingBreaker, {
 } from '../bosses/GraftedWingBreaker';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 import AudioManager, { MUSIC_KEYS } from '../systems/AudioManager';
+import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 
 // Boss aréna (Project_plan.md 15. pont): fix, egy képernyős pálya — nincs kameragörgetés,
 // így a boss, a player és a HP-bar mindig egyszerre látszik, és a charge/projectile
@@ -33,6 +34,12 @@ const ARENA_PLATFORMS = [
   { x: 190, y: 290, tiles: 2 },
   { x: 610, y: 290, tiles: 2 },
 ];
+
+// A háttér 800x450-es, tehát 1:1-ben, skálázás nélkül fedi az arénát. A tint egy enyhe
+// sötétítés (0xb0 = 69%): a nyers festmény olyan világos és részletgazdag, hogy elnyomná
+// a bosst és különösen a charge PIROS telegraph-ját — ami korábban egy majdnem fekete
+// (#100810) háttéren villant. Ez az egyetlen hangolópont, ha világosabb/sötétebb kell.
+const BACKGROUND_TINT = 0xb0b0b0;
 
 const BOSS_NAME = 'The Grafted Wing-Breaker';
 
@@ -92,12 +99,16 @@ export default class BossScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, ARENA_WIDTH, ARENA_HEIGHT);
     this.cameras.main.fadeIn(600);
 
-    this.createDecor();
+    this.createBackground();
 
     const ground = this.physics.add.staticGroup();
-    ground.create(ARENA_WIDTH / 2, GROUND_CENTER_Y, 'ground-placeholder')
+    const groundSprite = ground.create(ARENA_WIDTH / 2, GROUND_CENTER_Y, 'ground-placeholder')
       .setScale(ARENA_WIDTH / 64, 1)
-      .refreshBody();
+      .refreshBody() as Phaser.Physics.Arcade.Sprite;
+    // A talaj csak ÜTKÖZŐ, nem grafika: a háttéren 418 alatt a rajzolt kőfal-homlokzat
+    // van, ami pont ezt a szerepet tölti be. A szürke placeholder téglalap kitakarná.
+    // A body aktív marad, csak a rajzolás marad el.
+    groundSprite.setVisible(false);
 
     const platforms = this.createPlatforms();
 
@@ -134,12 +145,18 @@ export default class BossScene extends Phaser.Scene {
     return platforms;
   }
 
-  private createDecor(): void {
-    for (const x of [80, 400, 720]) {
-      this.add.image(x, 300, 'pillar-placeholder').setDepth(-10);
-    }
-    // Az aréna hátsó "kapuja" — a Level1 ajtajának párja, csak dísz.
-    this.add.image(ARENA_WIDTH / 2, GROUND_TOP - 36, 'door-placeholder').setDepth(-5);
+  /**
+   * Álló, teljes képernyős háttér — NEM ParallaxBackground: a kamera fix, nincs mit
+   * eltolni, és a kép pontosan 800x450, tehát skálázni sem kell.
+   *
+   * A korábbi 3 `pillar-placeholder` + 1 `door-placeholder` dekoráció törölve: a festményen
+   * valódi oszlopok és egy valódi oltár/kapu van, a placeholderek csak kitakarnák őket.
+   */
+  private createBackground(): void {
+    this.add
+      .image(ARENA_WIDTH / 2, ARENA_HEIGHT / 2, BACKGROUND_TEXTURES.BOSS_ARENA)
+      .setDepth(-30)
+      .setTint(BACKGROUND_TINT);
   }
 
   private registerCombatOverlaps(

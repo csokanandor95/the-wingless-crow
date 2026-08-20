@@ -34,6 +34,11 @@ import crowHarvesterSheetUrl from '../../assets/sprites/crow-harvester/enemy04_s
 import bgSkyUrl from '../../assets/backgrounds/ruined-city/01-sky.png';
 import bgMountainsUrl from '../../assets/backgrounds/ruined-city/02-mountains.png';
 import bgRuinsUrl from '../../assets/backgrounds/ruined-city/03-ruins.png';
+// Boss aréna háttere: egyetlen álló, teljes képernyős kép. SZÁRMAZTATOTT asset — a forrás
+// a `2D helper/level/Bossbackground_1.png` (1672x941), amiből egy 1467x825-ös kivágás
+// (bal-felső sarok: 103, 0) lett 800x450-re kicsinyítve. A kivágás nem esztétikai döntés:
+// ez teszi a rajzolt padlóélt PONTOSAN a BossScene GROUND_TOP-jára (418). Lásd CLAUDE.md.
+import bossArenaUrl from '../../assets/backgrounds/cathedral/boss-arena.png';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 
 const LOADING_BAR_WIDTH = 320;
@@ -52,11 +57,12 @@ const PLAYER_SHEETS: Array<{ key: string; url: string }> = [
   { key: PLAYER_TEXTURES.CAST, url: knightCastUrl },
 ];
 
-// Sima képek (nem sprite sheetek): a ParallaxBackground tileSprite-jainak textúrái.
+// Sima képek (nem sprite sheetek): a Level 1 parallax rétegei + a boss aréna álló háttere.
 const BACKGROUND_IMAGES: Array<{ key: string; url: string }> = [
   { key: BACKGROUND_TEXTURES.SKY, url: bgSkyUrl },
   { key: BACKGROUND_TEXTURES.MOUNTAINS, url: bgMountainsUrl },
   { key: BACKGROUND_TEXTURES.RUINS, url: bgRuinsUrl },
+  { key: BACKGROUND_TEXTURES.BOSS_ARENA, url: bossArenaUrl },
 ];
 
 export default class BootScene extends Phaser.Scene {

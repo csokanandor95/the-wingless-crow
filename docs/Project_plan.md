@@ -862,8 +862,38 @@ Ez önmagában is érdekes QA feladat.
 >   eltolás leképezés itt is **pure függvény** (`tilePositionForScroll`), a réteg-terv
 >   pedig exportált adattömb — így Phaser GameObject-ek mockolása nélkül unit-tesztelhető
 >   (`tests/unit/parallaxBackground.test.ts`).
-> - **Ami tudatosan kimaradt:** a `BossScene` háttere továbbra is placeholder — oda külön
->   asset kerül egy későbbi iterációban.
+> - **Ami tudatosan kimaradt:** a `BossScene` háttere ekkor még placeholder maradt —
+>   lásd az 5. iterációt lentebb.
+
+> **Implementációs állapot (Phase 8, 5. iteráció) — boss aréna háttér:**
+>
+> - A `BossScene` egyetlen álló, teljes képernyős festményt kapott (romos gótikus
+>   katedrális), `assets/backgrounds/cathedral/boss-arena.png`. **Nem parallax:** a boss
+>   aréna kamerája fix (15. pont), tehát nincs mit eltolni — egy `add.image` elég.
+> - **Licenc: nyitott tétel.** A forrás (`2D helper/level/Bossbackground_1.png`) önálló
+>   fájlként, licenc nélkül érkezett. Bekerül a user licenc-gyűjtésébe; publikálás előtt
+>   tisztázni kell. Ugyanott van egy `Bossbackground_2.png` is — külön aréna, nem fázis-
+>   variáns; jó jelölt egy jövőbeli Boss #2-höz.
+> - A fenti hibalistából itt **kettő** jött elő, mindkettő betöltés előtt:
+>   - *rossz sprite méret / pozíció (a legfontosabb tanulság):* a forrás 1672×941, és a
+>     rajzolt padló fényes felső pereme `y=767`-nél van. Egy sima arányos 800×450-re
+>     kicsinyítés ezt `y=367`-re tenné — a player 51px-szel a rajzolt perem ALATT, a sötét
+>     falban állna. Megoldás: **célzott kivágás** (1467×825 a `103, 0` saroktól), ami a
+>     padlóélt pontosan a `GROUND_TOP = 418`-ra teszi. **A háttér geometriáját a pálya
+>     geometriájához igazítottuk, nem fordítva** — a boss/platform/spawn koordináták
+>     változatlanok.
+>   - *túl nagy fájlméret:* a forrás 1.71 MB. A kivágott/kicsinyített 800×450-es változat
+>     596 KB, és 1:1-ben rajzolódik, tehát `pixelArt: true` mellett sem mosódik el
+>     (nincs futásidejű átméretezés).
+> - **Olvashatósági döntés:** a festmény `setTint(0xb0b0b0)`-nal 69%-ra sötétítve. A nyers
+>   kép elnyomta volna a bosst és különösen a charge **piros** telegraph-ját, ami korábban
+>   egy majdnem fekete háttéren villant. Ez gameplay-olvashatóság, nem esztétika.
+> - Két placeholder tudatosan MARADT: a két aréna-platform (gameplay-kritikus kitérési
+>   pont, az olvashatóság most fontosabb a stílus-egységnél), és a boss maga. A talaj
+>   viszont láthatatlanná lett téve — a festményen ott valódi kőfal-homlokzat van.
+> - **Nincs hozzá unit teszt**, szándékosan: egyetlen `add.image` hívás, nincs benne
+>   logika. (Szemben a 4. iteráció `ParallaxBackground`-jával, ahol a scroll → textúra-
+>   eltolás leképezés valódi, elronthatóan viselkedő kód.)
 
 ---
 
@@ -1026,8 +1056,8 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 - sprites — *részben kész: a **player** (2. iteráció) és a **CrowHarvester** (3. iteráció)
   valódi pixel artot és animációkat kapott, lásd 19. pont. A boss és az environment
   (tile-ok, lövedékek) még placeholder.*
-- backgrounds — *részben kész: a **Level 1** háromrétegű parallax hátteret kapott
-  (4. iteráció, lásd 19. pont). A **boss aréna** háttere még placeholder.*
+- backgrounds — ***kész**: a **Level 1** háromrétegű parallax hátteret (4. iteráció), a
+  **boss aréna** pedig egy álló festményt kapott (5. iteráció). Lásd 19. pont.*
 - particles
 - lighting-like effects
 - music — *kész: boss theme (1. iteráció, lásd 18. pont)*
