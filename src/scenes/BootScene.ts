@@ -27,6 +27,14 @@ import knightClimbUrl from '../../assets/sprites/knight/Climb.png';
 import knightCastUrl from '../../assets/sprites/knight/Health.png';
 // CrowHarvester (Enemy 1): egyetlen 1792x64-es csík, 28 db 64x64-es frame.
 import crowHarvesterSheetUrl from '../../assets/sprites/crow-harvester/enemy04_sheet.png';
+// Level 1 parallax háttér-rétegek. Forrás: PixelPlatformerSet1 v1.1 (Szadi art) —
+// "License for Everyone / public domain, personal or commercial". A fájlok át lettek
+// nevezve (`01 background.png` -> `01-sky.png` stb.), mert a Vite-import szóközös
+// útvonallal törékeny; a forráscsomagot ez a komment köti vissza.
+import bgSkyUrl from '../../assets/backgrounds/ruined-city/01-sky.png';
+import bgMountainsUrl from '../../assets/backgrounds/ruined-city/02-mountains.png';
+import bgRuinsUrl from '../../assets/backgrounds/ruined-city/03-ruins.png';
+import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 
 const LOADING_BAR_WIDTH = 320;
 const LOADING_BAR_HEIGHT = 14;
@@ -42,6 +50,13 @@ const PLAYER_SHEETS: Array<{ key: string; url: string }> = [
   // A Health.png a cast animáció forrása — a csomagban nincs magic anim, ez áll
   // legközelebb hozzá (felemelt piros izzó gömb + szikrák).
   { key: PLAYER_TEXTURES.CAST, url: knightCastUrl },
+];
+
+// Sima képek (nem sprite sheetek): a ParallaxBackground tileSprite-jainak textúrái.
+const BACKGROUND_IMAGES: Array<{ key: string; url: string }> = [
+  { key: BACKGROUND_TEXTURES.SKY, url: bgSkyUrl },
+  { key: BACKGROUND_TEXTURES.MOUNTAINS, url: bgMountainsUrl },
+  { key: BACKGROUND_TEXTURES.RUINS, url: bgRuinsUrl },
 ];
 
 export default class BootScene extends Phaser.Scene {
@@ -66,6 +81,10 @@ export default class BootScene extends Phaser.Scene {
       frameWidth: HARVESTER_FRAME_SIZE,
       frameHeight: HARVESTER_FRAME_SIZE,
     });
+
+    for (const image of BACKGROUND_IMAGES) {
+      this.load.image(image.key, image.url);
+    }
   }
 
   create(): void {

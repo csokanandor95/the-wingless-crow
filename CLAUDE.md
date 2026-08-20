@@ -83,10 +83,18 @@ neve **`CrowHarvester`** lett, és az átnevezés végigfut a kódon, a teszteke
 dokumentumon. A gameplay-paraméterek és a state machine változatlanok. Új modul:
 `enemies/CrowHarvesterAnimations.ts`. Részletek lentebb.
 
-A Phase 8 többi része (boss/environment sprite-ok, SFX, particles, level ambient,
-`ui/` modul) még hátravan.
+**Phase 8 — 4. iteráció: LEVEL 1 PARALLAX HÁTTÉR kész.** A `Level1Scene` három valódi
+háttérrétegű parallaxot kapott (`assets/backgrounds/ruined-city/`, a *PixelPlatformerSet1
+v1.1* csomagból — Szadi art, **public domain**, kereskedelmi használat is engedélyezett).
+Új modul: `systems/ParallaxBackground.ts`. Az öt korábbi `pillar-placeholder`
+dekor-oszlop törölve, a szerepüket a rétegek vették át. A `BossScene` háttere
+szándékosan változatlan (külön asset lesz hozzá). Részletek lentebb, a "Level1Scene"
+és a "Fontos technikai tanulságok" alatt.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (7 fájl, 114 teszt — ebből 2 az animáció-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
+A Phase 8 többi része (boss/environment sprite-ok, SFX, particles, level ambient,
+boss aréna háttér, `ui/` modul) még hátravan.
+
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (8 fájl, 123 teszt — ebből 3 az animáció-/háttér-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
 - A `CrowHarvester`/`Player`/`GraftedWingBreaker` `scene.time.delayedCall`-jai **interleave-elhetnek** (pl. `CrowHarvester.resolveAttackHit()` a `Player.takeDamage()`-en keresztül saját delayedCallt ütemez ugyanazon a mock scene-en) — ezért a `createDelayedCallStepper` helper (`tests/unit/helpers/phaserTestUtils.ts`) `.next()` (egy lépés) ÉS `.flushRemaining()` (a kurzortól a végéig, újra-tüzelés nélkül) metódust is ad. A `createDelayedCallStepper(scene, true)` (`skipExisting`) a kurzort a MÁR ütemezett hívások mögé állítja — ez kell, ha a teszt előkészítése maga is ütemez callbackeket (pl. a bosst Phase 2-be sebezzük, ami hit-villanást ütemez).
@@ -103,6 +111,11 @@ the-wingless-crow/
 ├── assets/
 │   ├── audio/
 │   │   └── boss-theme.mp3        # Vite-importtal jön be (nem public/), lásd lentebb
+│   ├── backgrounds/
+│   │   └── ruined-city/          # Level 1 parallax rétegek, mind 426x384
+│   │       ├── 01-sky.png        # RGB, átlátszatlan ég (#673838 -> #724141)
+│   │       ├── 02-mountains.png  # RGBA sziluett, teteje a forrás y=163..201-nél
+│   │       └── 03-ruins.png      # RGBA sziluett, teteje a forrás y=193..227-nél
 │   └── sprites/
 │       ├── knight/               # player sprite sheetek, mind 128x64-es blokkokra vágva
 │       │   ├── Idle.png Run.png Jump.png Attacks.png
@@ -119,6 +132,7 @@ the-wingless-crow/
 │       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown)
 │       ├── playerAnimations.test.ts       # state->anim leképezés + a Player animáció-vezérlése
 │       ├── crowHarvesterAnimations.test.ts # state->anim + a facing-kompenzáció regressziós tesztje
+│       ├── parallaxBackground.test.ts     # scroll->tilePositionX + a Level 1 réteg-terv invariánsai
 │       └── helpers/
 │           ├── fakePhaser.ts        # a 'phaser' modul önálló fake névtere (createFakePhaserModule)
 │           └── phaserTestUtils.ts   # megosztott mock scene/body/delayedCall-stepper helperek
@@ -142,7 +156,8 @@ the-wingless-crow/
 │   │   └── GraftedWingBreaker.ts # Boss 1, két fázis, slash / projectile / charge
 │   ├── systems/
 │   │   ├── CheckpointSystem.ts   # egyetlen aktív respawn-pont tárolása
-│   │   └── AudioManager.ts       # egy zenesáv: loop + fade-in/out, scene-shutdown hookkal
+│   │   ├── AudioManager.ts       # egy zenesáv: loop + fade-in/out, scene-shutdown hookkal
+│   │   └── ParallaxBackground.ts # réteges parallax háttér + a Level 1 réteg-terve
 │   └── combat/
 │       ├── Attack.ts             # AttackType enum + ATTACK_CONFIGS (light/heavy sebzés, cooldown, hitbox méret)
 │       ├── Projectile.ts         # Fireball osztály + FIREBALL_CONFIG + ProjectileOptions (boss lövedék)
@@ -295,7 +310,31 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   checkpointot ÉS azonnal átvált a `BossScene`-re, egy sima mezőben tárolt checkpoint minden
   `create()` újrafutáskor (pl. `BossScene`-ből visszatéréskor) nulláról jönne létre és
   elveszne. A registry ezt túléli, mert Game-szintű, nem scene-szintű adattár.
-- Dekoráció: parallax háttéroszlopok (`scrollFactor 0.6`), létra-hátfal
+- **Parallax háttér (Phase 8)**: három réteg a `systems/ParallaxBackground.ts`
+  `LEVEL1_BACKGROUND_LAYERS` adattömbjéből, a `create()` legelején létrehozva, az
+  `update()` első sorában frissítve (`background.update(cameras.main.scrollX)`):
+
+  | réteg | textúra | scrollFactor | depth | elhelyezés |
+  |---|---|---|---|---|
+  | ég | `bg-sky` | 0.10 | −30 | 0..450, függőlegesen kifeszítve (`tileScaleY = 450/384`) |
+  | hegyek | `bg-mountains` | 0.30 | −25 | top 126, 1:1 |
+  | városrom | `bg-ruins` | 0.50 | −20 | top 126, 1:1 |
+
+  - **A rétegek `setScrollFactor(0)`-val a KAMERÁHOZ vannak rögzítve**, a mozgást a
+    `tilePositionX` adja — NEM világméretű tileSprite `setScrollFactor(f)`-fel. Így a
+    réteg mindig pontosan kitölti a képernyőt, és nem kell a `WORLD_WIDTH`-hez méretezni.
+  - **A sziluettek alja szándékosan a képernyő alá lóg**: `SILHOUETTE_BOTTOM_Y = 510`,
+    tehát `top = 510 - 384 = 126`. Ez viszi le a horizontot (hegycsúcsok ~289, városrom
+    teteje ~319), és tolja a városrom tömör alsó részét nagyrészt a talaj mögé — különben
+    ~125px sima sötét sáv állna a játéktér mögött. **Ez az egyetlen hangolópont, ha a
+    horizontot mozgatni kell.**
+  - Csak az ég nyúlik függőlegesen (közel egyenletes színátmenet, nem látszik rajta);
+    a sziluettek 1:1-ben maradnak, hogy a peremük éles legyen.
+  - `setBackgroundColor('#673838')` = az ég legfelső sorának színe. A háttér amúgy is
+    kitakarja, de így egy letterbox / a `create()` előtti pillanat sem villant feketét.
+    A `main.ts` game-szintű `#0a0a0f`-je változatlan — arra a `BossScene` épül.
+- Dekoráció: létra-hátfal. *(Az 5 korábbi `pillar-placeholder` parallax oszlop törölve —
+  a valódi háttérrétegek vették át a szerepüket.)*
 - Placeholder grafikák kódból generálva (`BootScene.ts` `createPlaceholderTextures()`), nem valódi sprite-ok
 
 ### Boss — The Grafted Wing-Breaker (`src/bosses/GraftedWingBreaker.ts`)
@@ -389,13 +428,29 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 9. **Egy nem loopoló animációt NEM elég `play(key, true)`-val „ignoreIfPlaying" módban indítani.** Amint a lejátszás véget ér, az animáció már nem „playing", tehát a következő frame `play(key, true)`-ja ÚJRAINDÍTJA — a halál-animáció így vég nélkül loopolna. Ezért van a `Player.playAnim()` `currentAnimKey` guardja: csak akkor hív `play()`-t, ha a kulcs ténylegesen VÁLTOZOTT. Következmény: minden olyan hely, ami „ugyanarra" a state-re akar animációt ÚJRAINDÍTANI (pl. `respawn()`), köteles előbb `currentAnimKey = null`-t írni.
 10. **`Phaser.Physics.Arcade.Sprite`-on a `setSize()`/`setOffset()` KÉT különböző dolgot jelenthet.** A `Components.Size` (physics body) verziója árnyékolja a GameObject logikai-méret verzióját, és a kettő mást csinál. A félreértés elkerülésére a `Player` konstruktora közvetlenül a bodyn hívja őket: `body.setSize(w, h, false)` + `body.setOffset(x, y)`. A `center: false` KELL — különben a `setSize` újraközpontozza és felülírja az utána beállított offsetet.
 11. **Off-center sprite + `flipX` = a karakter oldalra UGRIK forduláskor.** A `flipX` a FRAME közepére tükröz, nem az originre. Ha a rajzolt figura nem a frame közepén van (a `CrowHarvester` teste a 64px-es frame x=14-énél ül, mert a kasza tölti ki a jobb oldalt), akkor egy sima `setFlipX()` a testet `2 * (32 - 14) = 36px`-t ugrasztja. A javítás: forduláskor az **`originX`-et ÉS a physics body offsetjét EGYÜTT** tükrözni (`CrowHarvester.setFacing()`): `originX ↔ 1 - originX`, `offsetX ↔ frameWidth - offsetX - bodyWidth`. A `tests/unit/crowHarvesterAnimations.test.ts` pont ezt a párost őrzi (a body világkoordinátás közepének nem szabad elmozdulnia). **Minden további off-center enemy sheetnél ugyanez a teendő** — érdemes lesz kiemelni közös helperbe, ha jön a második ilyen.
-12. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
+12. **A Phaser 4 `TileSprite` NEM nyújtja kettőhatványra a textúrát — a Phaser 3 igen.**
+    Phaser 3-ban a `TileSprite` a forrás frame-et a következő kettőhatvány méretű canvasra
+    rajzolta *átméretezve* (426×384 → 512×512), tehát minden nem-POT háttér torzult. Phaser
+    4-ben a WebGL út shaderben csomagolja a UV-t (`TexCoordFrameWrap`,
+    `BatchHandlerTileSprite.js`), a canvas út pedig pontos frame-méretű
+    `createPattern(..., 'repeat')`-et használ — a 426×384-es háttérrétegek torzításmentesen
+    csempéződnek. **Ha Phaser 3-as tutorialt követsz, ez a lépés (a háttér POT-ra vágása)
+    nálunk felesleges.**
+13. **`pixelArt: true` mellett a `tilePositionX`-et KÉZZEL kell kerekíteni.** A
+    `pixelArt: true` bekapcsolja a `roundPixels`-t, de az csak a **GameObject transformját**
+    kerekíti — a `tilePositionX` shader-oldali textúra-offset, arra nem hat. Tört
+    `tilePositionX` + nearest-neighbor mintavétel = frame-enként ugráló oszlopok a sziluettek
+    peremén, és a `startFollow` lerpje miatt a `camera.scrollX` gyakorlatilag mindig tört.
+    Ezért van a `ParallaxBackground.tilePositionForScroll()`-ban a `Math.round()` — a
+    `tests/unit/parallaxBackground.test.ts` ezt őrzi.
+14. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
-- **A player és a CrowHarvester KIVÉTELÉVEL** minden grafika kódból generált színes
-  téglalap/kör (`generateTexture`) — a boss, a talaj/platformok, a létra, az ajtó, az
-  oszlopok és mindkét lövedék még placeholder
+- **A player, a CrowHarvester és a Level 1 háttere KIVÉTELÉVEL** minden grafika kódból
+  generált színes téglalap/kör (`generateTexture`) — a boss, a talaj/platformok, a létra,
+  az ajtó és mindkét lövedék még placeholder. A **boss aréna** háttere is az (oda külön
+  asset jön egy későbbi iterációban)
 - CrowHarvester felett lebegő HP szöveg (debug célra, valódi HUD a `ui/` modulban készül majd)
 - A bal felső sarki HUD szöveg a HP mellett a **player state-et is kiírja** (`HP: 100/100 | CLIMB`) — a mászás manuális tesztelését segíti, Phase 8-ban cserélendő
 - Hit-reakció **a bossnál** = tint villanás, nincs valódi animáció (a playernél és a
@@ -405,8 +460,15 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   elhalasztott döntés. A forrás valószínűleg a `2D helper/Credits.txt`-ben szereplő
   karakter-csomag; **a repo nyilvánossá tétele / GitHub Pages deploy ELŐTT tisztázni kell.**
   Ezért maradt meg az eredeti `enemy04_sheet.png` fájlnév: ez az egyetlen megmaradó
-  kapocs a forráscsomaghoz.
-- `pillar-placeholder` és `door-placeholder` dekorációk: puszta színes téglalapok
+  kapocs a forráscsomaghoz. **Ez a tétel kizárólag a CrowHarvesterre vonatkozik** — a
+  knight csomag licence a repóban van, a háttéré (`PixelPlatformerSet1 v1.1`, Szadi art)
+  pedig **public domain** (*"License for Everyone. Public domain and free to use, personal
+  or commercial. Credit is not required but appreciated."*). A user a licenceket külön
+  gyűjti, és a projekt végén másolja be őket — ezért nem került licenc fájl a
+  `assets/backgrounds/ruined-city/` mellé, a forráscsomagot a `BootScene` importjainál
+  lévő komment köti vissza.
+- `pillar-placeholder` (már csak a létra mögötti hátfal) és `door-placeholder`
+  dekorációk: puszta színes téglalapok
 - A checkpoint-prompt szöveg ("E: Checkpoint" / "Checkpoint mentve...") debug-stílusú `add.text`, a `playerHpText`-hez hasonlóan — valódi UI a `ui/` modulban készül majd
 - A `BossScene` HP-barja nyers `Graphics`-szal rajzolt téglalap (`drawBossHealthBar()`), és a player HP-ja ott is a debug `add.text` — mindkettő a `ui/` modulba költözik Phase 8-ban
 - `Level2Scene` teljes egészében placeholder ("Level 2 — The Crowless Forest / tervezés alatt"), és benne az **R billentyű** visszavisz a `Level1Scene`-re — kizárólag azért, hogy a `Level1 → Boss → átvezető → Level2` lánc manuálisan körbejárható legyen. A valódi Level 2 elkészültekor törlendő
@@ -422,8 +484,9 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   death, jump, checkpoint stb.). Az `AudioManager` jelenleg csak zenét kezel — SFX-hez
   kap majd egy `playSfx(key)`-t, ami nem exkluzív (több hang egyszerre). A player
   animációi már megvannak, tehát a hangokat könnyű a megfelelő frame-hez kötni.
-- **Boss / environment sprite-ok** — a player (2. iteráció) és a CrowHarvester
-  (3. iteráció) kész; a *Grafted Wing-Breaker*, a tile-ok és a háttér még placeholder.
+- **Boss / environment sprite-ok** — a player (2. iteráció), a CrowHarvester
+  (3. iteráció) és a Level 1 háttere (4. iteráció) kész; a *Grafted Wing-Breaker*,
+  a tile-ok és a **boss aréna háttere** még placeholder.
   A `2D helper/Sprites/` alatt van még Enemy01/02/03/05 és egy "Gino Character" — ha
   bármelyik boss- vagy enemy-jelöltként bejön, számíts rá, hogy szintén off-center
   (lásd a 11. technikai tanulságot).
@@ -432,7 +495,9 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),
   narration ambient (`NarrationScene.create()`), victory sting (`BossScene.scheduleVictory()`).
 - A maradék kódból generált placeholder téglalapok cseréje valódi pixel art sprite-okra
-  (`assets/backgrounds/`, `assets/tiles/`, `assets/effects/`).
+  (`assets/tiles/`, `assets/effects/`), és a **boss aréna háttere**. Utóbbihoz a
+  `ParallaxBackground` már újrahasználható: elég egy új `ParallaxLayerDef[]` tömb
+  (a `BossScene` nem görget, tehát ott akár egyetlen álló réteg is elég).
 - `ui/` modul: valódi HUD a debug `add.text`-ek helyett, és a boss HP-bar átköltöztetése
   a `BossScene.drawBossHealthBar()`-ból. Ide kerülhet a `BootScene` betöltésjelzője is.
 - A `main.ts` `arcade.debug: true` kikapcsolása.

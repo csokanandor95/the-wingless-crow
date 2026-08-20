@@ -836,6 +836,35 @@ Ez önmagában is érdekes QA feladat.
 > - A frame-sorrendet nem feltételeztük, hanem **ellenőriztük**: az egyedi PNG-k
 >   (idle01.png, walk01.png, …) alpha bounding boxait párosítottuk a sheet frame-jeivel.
 
+> **Implementációs állapot (Phase 8, 4. iteráció) — Level 1 parallax háttér:**
+>
+> - Harmadszor is **kész, külső pixel art csomag**, nem AI-generált: *PixelPlatformerSet1
+>   v1.1* (Szadi art). Három réteg került be az `assets/backgrounds/ruined-city/` alá
+>   (ég / hegyek / városrom), mind 426×384-es. A csomag két füves előtér-rétege (04, 05)
+>   szándékosan kimaradt: zöld tónusuk ütne a pálya vörösesbarna palettájával.
+> - **Licenc: public domain** (*"License for Everyone. Public domain and free to use,
+>   personal or commercial. Credit is not required but appreciated."*) — tehát ez NEM
+>   nyitott jogi tétel, ellentétben a CrowHarvesterrel. A user a licenceket külön gyűjti
+>   és a projekt végén másolja be, ezért licenc fájl most nem került a repóba.
+> - A fenti hibalistából itt **kettő** jött elő, mindkettő a betöltés előtti ellenőrzésen:
+>   - *rossz sprite méret:* a rétegek 426×384-esek, a canvas 450 magas. Megoldás: az ég
+>     (közel egyenletes színátmenet) függőlegesen kifeszítve, a sziluettek 1:1-ben,
+>     a képernyő alja alá lógó alsó éllel — így nincs sem torzulás, sem átlátszó rés.
+>   - *nem megfelelő loop:* a vízszintes csempézhetőséget nem feltételeztük, hanem
+>     **megmértük** (a bal és jobb szélső oszlop alpha-profilja legfeljebb 1–2 sorban tér
+>     el mindhárom rétegnél → varratmentes). A csomag `03 background A` változata is
+>     megfelelt volna, a `B` lett kiválasztva.
+> - Két Phaser 4 specifikus tanulság (részletesen a `CLAUDE.md` 12. és 13. pontjában):
+>   a `TileSprite` itt **nem** nyújtja kettőhatványra a nem-POT textúrát (Phaser 3 igen),
+>   viszont `pixelArt` mellett a `tilePositionX`-et **kézzel kell kerekíteni**, mert a
+>   `roundPixels` csak a GameObject transformját érinti.
+> - Új, újrahasználható modul: `src/systems/ParallaxBackground.ts`. A scroll → textúra-
+>   eltolás leképezés itt is **pure függvény** (`tilePositionForScroll`), a réteg-terv
+>   pedig exportált adattömb — így Phaser GameObject-ek mockolása nélkül unit-tesztelhető
+>   (`tests/unit/parallaxBackground.test.ts`).
+> - **Ami tudatosan kimaradt:** a `BossScene` háttere továbbra is placeholder — oda külön
+>   asset kerül egy későbbi iterációban.
+
 ---
 
 # 20. Javasolt projektstruktúra
@@ -996,8 +1025,9 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 
 - sprites — *részben kész: a **player** (2. iteráció) és a **CrowHarvester** (3. iteráció)
   valódi pixel artot és animációkat kapott, lásd 19. pont. A boss és az environment
-  (tile-ok, háttér, lövedékek) még placeholder.*
-- backgrounds
+  (tile-ok, lövedékek) még placeholder.*
+- backgrounds — *részben kész: a **Level 1** háromrétegű parallax hátteret kapott
+  (4. iteráció, lásd 19. pont). A **boss aréna** háttere még placeholder.*
 - particles
 - lighting-like effects
 - music — *kész: boss theme (1. iteráció, lásd 18. pont)*

@@ -4,6 +4,9 @@ import PlayerController from '../player/PlayerController';
 import Fireball from '../combat/Projectile';
 import CrowHarvester from '../enemies/CrowHarvester';
 import CheckpointSystem from '../systems/CheckpointSystem';
+import ParallaxBackground, {
+  LEVEL1_BACKGROUND_LAYERS,
+} from '../systems/ParallaxBackground';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 
 const WORLD_WIDTH = 3200;
@@ -74,6 +77,7 @@ export default class Level1Scene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
   private playerHpText!: Phaser.GameObjects.Text;
+  private background!: ParallaxBackground;
 
   private ladderZone!: Phaser.GameObjects.Zone;
   private ladderContact!: LadderContact;
@@ -103,10 +107,17 @@ export default class Level1Scene extends Phaser.Scene {
     this.isTransitioning = false;
     this.respawnScheduled = false;
 
-    this.cameras.main.setBackgroundColor('#0a0a0f');
+    // Az ég legfelső sorának színe: a parallax háttér ezt amúgy is teljesen kitakarja,
+    // de így egy esetleges letterbox / a create() előtti pillanat sem villant feketét.
+    // A main.ts game-szintű backgroundColor-ja (#0a0a0f) változatlan — arra a BossScene épül.
+    this.cameras.main.setBackgroundColor('#673838');
 
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+    // A háttér mindent megelőz: a rétegei -30..-20 depth-en ülnek, tehát a scene minden
+    // további eleme (létra hátfal -2, létra/ajtó -1, a többi 0) előttük rajzolódik.
+    this.background = new ParallaxBackground(this, LEVEL1_BACKGROUND_LAYERS);
 
     this.createDecor();
 
@@ -241,13 +252,9 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   private createDecor(): void {
-    // Parallax háttéroszlopok — nincs fizikájuk, csak mélységet adnak a pályának.
-    for (const x of [250, 900, 1600, 2300, 3000]) {
-      this.add
-        .image(x, 340, 'pillar-placeholder')
-        .setScrollFactor(0.6)
-        .setDepth(-10);
-    }
+    // A korábbi 5 parallax háttéroszlop (pillar-placeholder, scrollFactor 0.6) törölve:
+    // a mélység-illúziót most a ParallaxBackground három valódi rétege adja. A létra
+    // mögötti hátfal-oszlop megmarad (createLadder()), az funkcionális.
 
     // Pálya végi ajtó a felső platform jobb végén — a checkpoint + boss-transition trigger.
     const upper = platformById('P9');
@@ -285,6 +292,11 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   update(): void {
+    // A kamera scrollX-e a scene update() UTÁN frissül, tehát a háttér 1 frame-et késik.
+    // 0.1-0.5-ös parallax faktornál ez legfeljebb ~1.5px — nem észlelhető, ezért nem
+    // kell külön PRE_RENDER hook.
+    this.background.update(this.cameras.main.scrollX);
+
     // Szinkron overlap-teszt: azonnal ad eredményt, szemben a physics.add.overlap
     // callbackkel, ami csak a scene update() UTÁN futna le (1 frame késés a mászásban).
     const touchingLadder =
