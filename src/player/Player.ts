@@ -2,6 +2,17 @@ import Phaser from 'phaser';
 import { AttackType, ATTACK_CONFIGS, AttackConfig } from '../combat/Attack';
 import { FIREBALL_CONFIG } from '../combat/Projectile';
 import type { Damageable } from '../combat/DamageSystem';
+import {
+  animKeyForState,
+  BODY_HEIGHT,
+  BODY_OFFSET_X,
+  BODY_OFFSET_Y,
+  BODY_WIDTH,
+  CAST_ANIM_MS,
+  HURT_ANIM_MS,
+  ORIGIN_Y,
+  PLAYER_TEXTURES,
+} from './PlayerAnimations';
 
 export enum PlayerState {
   IDLE = 'IDLE',
@@ -28,8 +39,14 @@ export interface LadderContact {
 export const MOVE_SPEED = 200;
 export const JUMP_VELOCITY = -500;
 export const MAX_HP = 100;
-export const CAST_DELAY_MS = 120;
+// A cast- és a hurt-lock hossza az ANIMÁCIÓK hosszából jön (PlayerAnimations.ts), hogy a
+// kettő ne csúszhasson el egymástól: a fireball pont akkor születik, amikor a lovag kezében
+// szikrákra pattan a gömb, és a HURT state pont a hurt animáció végéig tart.
+export const CAST_DELAY_MS = CAST_ANIM_MS;
+export const HURT_LOCK_MS = HURT_ANIM_MS;
 export const CLIMB_SPEED = 130;
+/** A fireball a lovag felemelt keze magasságában szülessen, ne a sprite közepén. */
+const FIREBALL_SPAWN_OFFSET_Y = -8;
 
 export default class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public playerState: PlayerState = PlayerState.IDLE;
@@ -47,18 +64,38 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   private attackHitboxBody: Phaser.Physics.Arcade.Body;
   private hitTargetsThisAttack: Set<Phaser.GameObjects.GameObject> = new Set();
 
+  /** Az ATTACK state animációja ebből dől el (light vagy heavy vágás). */
+  private lastAttackType: AttackType = AttackType.LIGHT;
+  /** Az épp lejátszott animáció kulcsa — lásd playAnim(). */
+  private currentAnimKey: string | null = null;
+
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    super(scene, x, y, 'player-placeholder');
+    super(scene, x, y, PLAYER_TEXTURES.IDLE, 0);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setCollideWorldBounds(true);
+
+    // A sprite frame-je 128x64, de a rajzolt karakter csak ~28x46 ezen belül. Az origin
+    // úgy van megválasztva, hogy a TALP a sprite.y + 24-nél legyen (lásd ORIGIN_Y).
+    this.setOrigin(0.5, ORIGIN_Y);
+
+    // Közvetlenül a body-n, NEM a sprite setSize()/setOffset()-jén: az Arcade.Sprite-on a
+    // Components.Size verziója árnyékolja a GameObject-ét, és a kettő mást csinál
+    // (logikai megjelenítési méret vs. physics body). A setSize center paramétere false,
+    // különben újraközpontozná — és felülírná — az utána beállított offsetet.
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setSize(BODY_WIDTH, BODY_HEIGHT, false);
+    body.setOffset(BODY_OFFSET_X, BODY_OFFSET_Y);
 
     this.attackHitbox = scene.add.zone(x, y, 10, 10);
     scene.physics.add.existing(this.attackHitbox);
     this.attackHitboxBody = this.attackHitbox.body as Phaser.Physics.Arcade.Body;
     this.attackHitboxBody.setAllowGravity(false);
     this.attackHitboxBody.enable = false;
+
+    // Enélkül a player a legelső updateState()-ig a sheet 0. frame-jén állna mozdulatlanul.
+    this.updateAnimation();
   }
 
   getAttackHitbox(): Phaser.GameObjects.Zone {
@@ -79,15 +116,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     if (this.isGrounded()) this.playerState = PlayerState.RUN;
   }
 
-  // A visszatérési típus `this`, mert ez FELÜLÍRJA a Phaser Sprite.stop()-ját (ami az
-  // animációt állítja meg, és `this`-t ad vissza) — `void`-dal a strict typecheck elszáll.
-  // Phase 8-ban, valódi animációkkal érdemes lesz átnevezni (pl. stopMoving()), hogy ne
-  // fedje el az ősosztály metódusát.
-  stop(): this {
-    if (this.isLocked()) return this;
+  // Korábban `stop()` volt, ami elfedte a Phaser Sprite.stop()-ját (az animációt állítja
+  // meg). Amíg nem volt valódi animáció, ez ártalmatlan volt; a Phase 8 sprite-jaival
+  // viszont már ütközne, ezért kapott saját nevet.
+  stopMoving(): void {
+    if (this.isLocked()) return;
     this.setVelocityX(0);
     if (this.isGrounded()) this.playerState = PlayerState.IDLE;
-    return this;
   }
 
   jump(): void {
@@ -187,11 +222,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     const config = ATTACK_CONFIGS[type];
     this.isAttacking = true;
     this.canAttack = false;
+    this.lastAttackType = type;
     this.playerState = PlayerState.ATTACK;
     this.hitTargetsThisAttack.clear();
     this.setVelocityX(0);
 
-    this.setTint(0xffcc66);
+    // A korábbi sárga attack-tint elmaradt: a támadás-animáció önmagában közli az infót.
+    this.updateAnimation();
 
     this.scene.time.delayedCall(config.startupDelayMs, () => {
       if (this.playerState === PlayerState.DEAD) return;
@@ -204,7 +241,6 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
 
     this.scene.time.delayedCall(config.startupDelayMs + config.activeDurationMs, () => {
       this.isAttacking = false;
-      this.clearTint();
       if (this.playerState === PlayerState.ATTACK) {
         this.playerState = this.isGrounded() ? PlayerState.IDLE : PlayerState.FALL;
       }
@@ -247,16 +283,22 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.canCastFireball = false;
     this.playerState = PlayerState.CAST;
     this.setVelocityX(0);
-    this.setTint(0x66aaff);
+    // A korábbi kék cast-tint elmaradt: a cast-animáció (felemelt izzó gömb + szikrák)
+    // maga a visszajelzés.
+    this.updateAnimation();
 
     this.scene.time.delayedCall(CAST_DELAY_MS, () => {
       this.isCasting = false;
-      this.clearTint();
 
       if (this.playerState === PlayerState.DEAD) return;
 
       const direction = this.flipX ? -1 : 1;
-      this.emit('fireball-cast', this.x + direction * 20, this.y, direction);
+      this.emit(
+        'fireball-cast',
+        this.x + direction * 20,
+        this.y + FIREBALL_SPAWN_OFFSET_Y,
+        direction
+      );
 
       if (this.playerState === PlayerState.CAST) {
         this.playerState = this.isGrounded() ? PlayerState.IDLE : PlayerState.FALL;
@@ -276,9 +318,15 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
 
     this.hp = Math.max(0, this.hp - amount);
     this.playerState = PlayerState.HURT;
+    // A piros villanás MARAD az animáció mellett is: a sebzés-visszajelzésnek egy
+    // 3 frame-es hurt animációnál erősebbnek kell lennie, hogy harc közben is olvasható legyen.
     this.setTint(0xff0000);
+    // Nullázás a playAnim() guardja miatt: két gyors találat között a state végig HURT
+    // marad, tehát a kulcs nem változna — a második ütésre nem indulna újra az animáció.
+    this.currentAnimKey = null;
+    this.updateAnimation();
 
-    this.scene.time.delayedCall(150, () => {
+    this.scene.time.delayedCall(HURT_LOCK_MS, () => {
       this.clearTint();
       if (this.hp <= 0) {
         this.die();
@@ -293,8 +341,10 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.playerState = PlayerState.DEAD;
     this.setVelocity(0, 0);
     this.disableHitbox();
-    this.setTint(0x555555);
+    // A korábbi szürke tint elmaradt: a Death animáció (a lovag összerogy, majd
+    // fekve marad az utolsó frame-en) önmagában közli a halált.
     (this.body as Phaser.Physics.Arcade.Body).enable = false;
+    this.updateAnimation();
   }
 
   // A die() ellentéte: visszaállítja a playert élő, harcra kész állapotba a megadott
@@ -322,6 +372,10 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.disableHitbox();
 
     this.playerState = PlayerState.IDLE;
+    // Nullázni KELL: a playAnim() guardja miatt egy „ugyanaz a kulcs” egyébként átugorná
+    // az újraindítást, és a halál animáció utolsó (fekvő) frame-jén ragadna a sprite.
+    this.currentAnimKey = null;
+    this.updateAnimation();
   }
 
   isDead(): boolean {
@@ -351,6 +405,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   }
 
   updateState(): void {
+    this.applyAirborneState();
+    // MINDIG lefut, az applyAirborneState() korai return-jeitől függetlenül — különben
+    // pont a lockolt state-ek (ATTACK, HURT, DEAD) és a mászás maradnának animáció nélkül.
+    this.updateAnimation();
+  }
+
+  private applyAirborneState(): void {
     // Mászás közben nem szabad JUMP/FALL-ra váltani — a CLIMB state-et a climb() vezérli.
     if (this.climbing) return;
     if (this.isLocked() || this.isAttacking || this.isCasting) return;
@@ -359,5 +420,32 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
       const body = this.body as Phaser.Physics.Arcade.Body;
       this.playerState = body.velocity.y < 0 ? PlayerState.JUMP : PlayerState.FALL;
     }
+  }
+
+  private updateAnimation(): void {
+    this.playAnim(animKeyForState(this.playerState, this.lastAttackType));
+
+    // Létrán állva (nincs függőleges input) a mászás-animáció fagyjon ki, ne pörögjön
+    // a helyben álló lovag alatt.
+    if (this.playerState === PlayerState.CLIMB) {
+      const body = this.body as Phaser.Physics.Arcade.Body;
+      if (body.velocity.y === 0) {
+        this.anims.pause();
+      } else {
+        this.anims.resume();
+      }
+    }
+  }
+
+  /**
+   * Csak akkor indít animációt, ha ténylegesen VÁLTOZOTT a kulcs. Enélkül a nem loopoló
+   * animációk (DEAD, ATTACK, HURT, CAST) minden frame-ben újraindulnának: a lejátszás
+   * végén a `play(key, true)` „ignoreIfPlaying” ága már nem fogna, mert az animáció
+   * ilyenkor épp NEM playing — a halál animáció így vég nélkül loopolna.
+   */
+  private playAnim(key: string): void {
+    if (this.currentAnimKey === key) return;
+    this.currentAnimKey = key;
+    this.play(key, true);
   }
 }

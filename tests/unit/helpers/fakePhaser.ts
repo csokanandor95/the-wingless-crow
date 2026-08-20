@@ -25,6 +25,34 @@ export function createFakePhaserModule() {
     }
   }
 
+  // A sprite AnimationState-jének minimális mása. A `playedKeys` azért van, hogy a tesztek
+  // ne csak az AKTUÁLIS animációt, hanem a lejátszás-hívások SZÁMÁT is nézhessék — ezen
+  // múlik a Player.playAnim() guardja (egy state ne indítsa újra minden frame-ben az animját).
+  class MockAnimationState {
+    currentKey: string | null = null;
+    playedKeys: string[] = [];
+    paused = false;
+
+    play(key: string) {
+      this.currentKey = key;
+      this.playedKeys.push(key);
+      this.paused = false;
+      return this;
+    }
+    pause() {
+      this.paused = true;
+      return this;
+    }
+    resume() {
+      this.paused = false;
+      return this;
+    }
+    stop() {
+      this.currentKey = null;
+      return this;
+    }
+  }
+
   class MockSprite extends EventEmitter {
     scene: unknown;
     x: number;
@@ -32,6 +60,9 @@ export function createFakePhaserModule() {
     texture: string;
     flipX = false;
     active = true;
+    originX = 0.5;
+    originY = 0.5;
+    anims = new MockAnimationState();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     body: any = null;
 
@@ -44,6 +75,16 @@ export function createFakePhaserModule() {
     }
 
     setCollideWorldBounds() {
+      return this;
+    }
+    setOrigin(x: number, y?: number) {
+      this.originX = x;
+      this.originY = y ?? x;
+      return this;
+    }
+    /** A Phaser Sprite.play()-je az AnimationState-re delegál — a mock is így tesz. */
+    play(key: string, _ignoreIfPlaying?: boolean) {
+      this.anims.play(key);
       return this;
     }
     setVelocityX(x: number) {

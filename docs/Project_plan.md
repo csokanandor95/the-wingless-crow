@@ -777,6 +777,35 @@ Problémák lehetnek:
 
 Ez önmagában is érdekes QA feladat.
 
+> **Implementációs állapot (Phase 8, 2. iteráció) — player sprite:**
+>
+> - **Eltérés a fenti "lehetőleg AI-generált" iránytól:** a player sprite NEM AI-generált,
+>   hanem egy kész, licenc-tiszta pixel art csomag (**2D_SL_Knight_v1.0**, "License for
+>   Everyone": kereskedelmi használat, módosítás és továbbadás engedélyezett, credit nem
+>   kötelező; a `license.txt` be van másolva az `assets/sprites/knight/` mappába).
+>   Indok: a csomag 9 kész, konzisztens animációt hoz (idle, run, jump, 4-féle támadás,
+>   hurt, death, climb, item-use), amit AI-val konzisztens art style-ban előállítani a
+>   fenti hibalista alapján lényegesen nagyobb QA-teher lett volna. Az AI-assisted út a
+>   **többi** asset (enemy, boss, background, tiles, effects) esetében marad a terv.
+> - A fenti hibalistából ténylegesen **négy** probléma jött elő, mind a betöltés előtti
+>   ellenőrzésen bukott ki (nem futásidőben), ami épp a 30. pont asset-testing feladatát
+>   igazolja:
+>   - *rossz frame order / duplikáció:* az `Attacks.png` 40 frame-je valójában 20 jobbra
+>     néző + ugyanaz 20 tükrözve — a második fele eldobva, a fordulás `setFlipX()`-szel megy;
+>   - *hibás animáció:* a `Hurt.png` 4. frame-je teljesen üres;
+>   - *rossz sprite méret:* a 128×64-es frame-en belül a karakter csak ~28×46, ezért a
+>     physics body kézzel van illesztve (`BODY_*` konstansok), különben a 128px-es frame
+>     lenne az ütköző test;
+>   - *rendering:* `pixelArt: true` nélkül a Phaser bilineárisan szűrte volna a textúrát.
+> - Az assetek **Vite-importtal** jönnek be (mint a `boss-theme.mp3`), nem `public/`-ból:
+>   hiányzó fájlnál a build elszáll néma 404 helyett.
+> - A leképezés (`animKeyForState`) szándékosan pure függvény, hogy Phaser
+>   AnimationManager mockolása nélkül unit-tesztelhető legyen
+>   (`tests/unit/playerAnimations.test.ts`).
+> - **Ami tudatosan kimaradt:** a csomag Roll / Slide / Crouch / Hanging / Pray /
+>   air-attack animációi. Ezekhez nincs state a játékban, és ez a dokumentum sem tervez
+>   ilyen mechanikát — bevezetésük külön döntést (és e dokumentum frissítését) igényelné.
+
 ---
 
 # 20. Javasolt projektstruktúra
@@ -935,11 +964,12 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 
 ## Phase 8 – Atmosphere
 
-- sprites
+- sprites — *részben kész: a **player** valódi pixel artot és animációkat kapott
+  (2. iteráció, lásd 19. pont). Az enemy / boss / environment még placeholder.*
 - backgrounds
 - particles
 - lighting-like effects
-- music
+- music — *kész: boss theme (1. iteráció, lásd 18. pont)*
 - sound effects
 - UI
 

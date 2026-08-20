@@ -69,7 +69,14 @@ boss entrance, HP-bar, két fázis, boss victory. A győzelem után egy adatvez�
 **Phase 8 (Atmosphere) ELINDULT — 1. iteráció: boss music kész.** `systems/AudioManager.ts`
 (egy zenesáv, loop, fade-in/fade-out) + `assets/audio/boss-theme.mp3` (2 MB). A zene a boss
 belépőjénél indul, a harc alatt loopol, és elhalkulva leáll, ha a player VAGY a boss meghal.
-A Phase 8 többi része (sprite-ok, SFX, particles, level ambient, `ui/` modul) még hátravan.
+
+**Phase 8 — 2. iteráció: PLAYER SPRITE + ANIMÁCIÓK kész.** A player már nem téglalap, hanem
+valódi pixel art (`assets/sprites/knight/`, a *2D_SL_Knight_v1.0* csomagból — "License for
+Everyone", kereskedelmi használat és módosítás engedélyezett, credit nem kötelező; a
+`license.txt` be van másolva a repóba). Új modul: `player/PlayerAnimations.ts`. Részletek
+lentebb, az "Implementált gameplay / Player" és a "Fontos technikai tanulságok" alatt.
+A Phase 8 többi része (enemy/boss/environment sprite-ok, SFX, particles, level ambient,
+`ui/` modul) még hátravan.
 
 **Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (Hollow) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (4 fájl, 72 teszt). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `Hollow.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `Hollow`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
@@ -86,8 +93,13 @@ the-wingless-crow/
 ├── docs/
 │   └── Project_plan.md
 ├── assets/
-│   └── audio/
-│       └── boss-theme.mp3        # Vite-importtal jön be (nem public/), lásd lentebb
+│   ├── audio/
+│   │   └── boss-theme.mp3        # Vite-importtal jön be (nem public/), lásd lentebb
+│   └── sprites/
+│       └── knight/               # player sprite sheetek, mind 128x64-es blokkokra vágva
+│           ├── Idle.png Run.png Jump.png Attacks.png
+│           ├── Hurt.png Death.png Climb.png Health.png
+│           └── license.txt       # 2D_SL_Knight_v1.0 licenc, a repo dokumentálja a jogi státuszt
 ├── tests/
 │   └── unit/
 │       ├── player.test.ts       # Project_plan.md §23 Player scope
@@ -95,6 +107,7 @@ the-wingless-crow/
 │       ├── hollow.test.ts       # §23 Enemy scope (Hollow HP/damage/death/state transitions)
 │       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, attack state, death)
 │       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown)
+│       ├── playerAnimations.test.ts # state->anim leképezés + a Player animáció-vezérlése
 │       └── helpers/
 │           ├── fakePhaser.ts        # a 'phaser' modul önálló fake névtere (createFakePhaserModule)
 │           └── phaserTestUtils.ts   # megosztott mock scene/body/delayedCall-stepper helperek
@@ -109,6 +122,7 @@ the-wingless-crow/
 │   │   └── Level2Scene.ts        # placeholder — a Level 2 tervezése még hátravan
 │   ├── player/
 │   │   ├── Player.ts             # + CLIMB state, LadderContact interface, respawn()
+│   │   ├── PlayerAnimations.ts   # sprite geometria, anim kulcsok/frame-tartományok, animKeyForState()
 │   │   └── PlayerController.ts   # + létra-input ág
 │   ├── enemies/
 │   │   └── Hollow.ts             # Enemy 1, state machine + HollowConfig (patrol határok)
@@ -131,9 +145,34 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 
 ## Implementált gameplay
 
-### Player (`src/player/Player.ts`, `PlayerController.ts`)
+### Player (`src/player/Player.ts`, `PlayerAnimations.ts`, `PlayerController.ts`)
 - Mozgás: balra/jobbra (nyilak vagy A/D), ugrás (fel/W/Space)
 - State-ek: IDLE, RUN, JUMP, FALL, ATTACK, CAST, HURT, CLIMB, DEAD
+- **Sprite + animációk (Phase 8):** minden state-hez tartozik animáció; a leképezést a
+  `PlayerAnimations.ts` **pure** `animKeyForState(state, lastAttackType)` függvénye adja,
+  a `Player.updateAnimation()` pedig ezt szinkronizálja minden frame-ben. A sheetek 128×64-es
+  frame-ekből állnak, a rajzolt karakter ~28×46 ezen belül:
+  - `ORIGIN_Y = 0.625` → a **talp pontosan a `sprite.y + 24`-nél** van, ezért a
+    `Level1Scene` `PLAYER_HALF_HEIGHT = 24` konstansa (létra `topY`/`bottomY`, `CHECKPOINT_Y`)
+    a placeholder óta változatlanul érvényes. **Ha valaha más karakter-sheetre cserélsz,
+    ezt a hármast (`ORIGIN_Y`, `BODY_*`, `PLAYER_HALF_HEIGHT`) együtt kell újraszámolni.**
+  - Az `Attacks.png` 40 frame-je valójában **20 jobbra néző + ugyanaz 20 tükrözve**; a
+    20–39 tartományt eldobjuk, a fordulást továbbra is a `setFlipX()` intézi. LIGHT = `f0–6`,
+    HEAVY = `f15–19`. A `Hurt.png` 4. frame-je ÜRES (csak `f0–2` használható).
+  - **A `frameRate` mindig SZÁMÍTÓDIK** (`frames * 1000 / durationMs`), sosem beégetett:
+    a támadás-animációk hossza az `ATTACK_CONFIGS[type].startupDelayMs + activeDurationMs`,
+    a cast/hurt lock pedig a `CAST_ANIM_MS` / `HURT_ANIM_MS`-ból származik
+    (`CAST_DELAY_MS = CAST_ANIM_MS`). Így az animáció és a gameplay-lock nem tud elcsúszni.
+  - **Nincs magic animáció a csomagban** — a CAST a `Health.png` "gyógyital" anim `f0–4`
+    szakaszát használja (a lovag piros izzó gömböt emel, ami szikrákra pattan). A fireball
+    pont a szikrák pillanatában születik, a kéz magasságában (`FIREBALL_SPAWN_OFFSET_Y`).
+  - **Tint már csak a sebzésnél van** (piros villanás, mert 3 frame-es hurt animáció önmagában
+    harc közben nem elég olvasható). A korábbi sárga attack- / kék cast- / szürke death-tint
+    törölve: azokat most az animáció közli.
+  - CLIMB alatt, ha `body.velocity.y === 0`, az animáció `pause()`-ol (a létrán állva ne
+    pörögjön), mozgásnál `resume()`.
+  - `main.ts`-ben **`pixelArt: true`** kötelező — enélkül a Phaser bilineárisan szűri
+    a textúrákat, és a pixel art elmosódik.
 - **Létramászás (CLIMB)**: a scene minden frame-ben átad egy `LadderContact`-ot
   (`setLadderContact()`), ha a player fedésben van a létra zónájával. Mászás közben:
   gravitáció ki, `body.checkCollision.down = false` (hogy az egyirányú felső platformon
@@ -297,14 +336,19 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
    (Az `AudioManager` ezt megteszi, ezért a scene-eknek nem kell kézzel takarítaniuk.)
 7. **A `Phaser.Sound.BaseSound` típusán NINCS `volume`/`setVolume`** — csak a konkrét implementációkon (`WebAudioSound`, `HTML5AudioSound`, `NoAudioSound`). Mivel `sound.add()` `BaseSound`-ot ad vissza, a volume-tweeneléshez (fade) szűkíteni kell rá — lásd a `PlayableSound` uniót az `AudioManager.ts`-ben.
 8. **A `vi.fn()` paramétertípus nélkül üres tuple-ként (`[]`) tipizálja a `mock.calls`-t.** Ha a teszt ki akarja olvasni a hívás argumentumait (pl. a tween konfigját), a mocknak explicit paramétertípust kell adni: `vi.fn((_config: MockTweenConfig) => ...)`. A tesztek futottak, de a `tsc --noEmit` elszállt tőle.
-9. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
+9. **Egy nem loopoló animációt NEM elég `play(key, true)`-val „ignoreIfPlaying" módban indítani.** Amint a lejátszás véget ér, az animáció már nem „playing", tehát a következő frame `play(key, true)`-ja ÚJRAINDÍTJA — a halál-animáció így vég nélkül loopolna. Ezért van a `Player.playAnim()` `currentAnimKey` guardja: csak akkor hív `play()`-t, ha a kulcs ténylegesen VÁLTOZOTT. Következmény: minden olyan hely, ami „ugyanarra" a state-re akar animációt ÚJRAINDÍTANI (pl. `respawn()`), köteles előbb `currentAnimKey = null`-t írni.
+10. **`Phaser.Physics.Arcade.Sprite`-on a `setSize()`/`setOffset()` KÉT különböző dolgot jelenthet.** A `Components.Size` (physics body) verziója árnyékolja a GameObject logikai-méret verzióját, és a kettő mást csinál. A félreértés elkerülésére a `Player` konstruktora közvetlenül a bodyn hívja őket: `body.setSize(w, h, false)` + `body.setOffset(x, y)`. A `center: false` KELL — különben a `setSize` újraközpontozza és felülírja az utána beállított offsetet.
+11. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
-- Minden grafika kódból generált színes téglalap/kör (`generateTexture`), nincs valódi pixel art
+- **A player KIVÉTELÉVEL** minden grafika kódból generált színes téglalap/kör
+  (`generateTexture`) — a Hollow, a boss, a talaj/platformok, a létra, az ajtó, az oszlopok
+  és mindkét lövedék még placeholder
 - Player és Hollow felett lebegő HP szöveg (debug célra, valódi HUD a `ui/` modulban készül majd)
 - A bal felső sarki HUD szöveg a HP mellett a **player state-et is kiírja** (`HP: 100/100 | CLIMB`) — a mászás manuális tesztelését segíti, Phase 8-ban cserélendő
-- Hit-reakció = tint villanás, nincs valódi animáció
+- Hit-reakció a Hollow-nál és a bossnál = tint villanás, nincs valódi animáció
+  (a playernél már van hurt animáció a piros villanás mellett)
 - `pillar-placeholder` és `door-placeholder` dekorációk: puszta színes téglalapok
 - A checkpoint-prompt szöveg ("E: Checkpoint" / "Checkpoint mentve...") debug-stílusú `add.text`, a `playerHpText`-hez hasonlóan — valódi UI a `ui/` modulban készül majd
 - A `BossScene` HP-barja nyers `Graphics`-szal rajzolt téglalap (`drawBossHealthBar()`), és a player HP-ja ott is a debug `add.text` — mindkettő a `ui/` modulba költözik Phase 8-ban
@@ -319,13 +363,16 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 **Phase 8 – Atmosphere folyamatban.** Az 1. iteráció (boss music) kész; ami még hátravan:
 - **Sound effectek** (Project_plan.md 18. pont listája: sword swing/hit, fireball, hurt,
   death, jump, checkpoint stb.). Az `AudioManager` jelenleg csak zenét kezel — SFX-hez
-  kap majd egy `playSfx(key)`-t, ami nem exkluzív (több hang egyszerre).
+  kap majd egy `playSfx(key)`-t, ami nem exkluzív (több hang egyszerre). A player
+  animációi már megvannak, tehát a hangokat könnyű a megfelelő frame-hez kötni.
+- **Enemy / boss / environment sprite-ok** — a player kész (2. iteráció), a Hollow, a
+  *Grafted Wing-Breaker*, a tile-ok és a háttér még placeholder.
 - **Level / menü ambient.** Figyelem: az `AudioManager` most **scene-hatókörű** (a scene
   shutdownja elvágja) — scene-eken átívelő zenéhez game-szintűvé kell emelni.
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),
   narration ambient (`NarrationScene.create()`), victory sting (`BossScene.scheduleVictory()`).
-- A kódból generált placeholder téglalapok cseréje valódi (AI-generált) pixel art sprite-okra
-  (`assets/sprites/`, `assets/backgrounds/`, `assets/tiles/`, `assets/effects/`).
+- A maradék kódból generált placeholder téglalapok cseréje valódi pixel art sprite-okra
+  (`assets/backgrounds/`, `assets/tiles/`, `assets/effects/`).
 - `ui/` modul: valódi HUD a debug `add.text`-ek helyett, és a boss HP-bar átköltöztetése
   a `BossScene.drawBossHealthBar()`-ból. Ide kerülhet a `BootScene` betöltésjelzője is.
 - A `main.ts` `arcade.debug: true` kikapcsolása.
@@ -336,7 +383,9 @@ többi Enemy típus + Level + Bossok, VAGY tovább a Lore (Phase 9) / QA (Phase 
 Nyitott, nem blokkoló polish-tételek:
 - Szakadékok (gap) bevezetése a Level 1 `PLATFORMS` layoutjába (Project_plan.md 13. pont) —
   a checkpoint/respawn már készen áll rá.
-- A `Player.stop()` elfedi a `Phaser.Sprite.stop()`-ot (animáció-stop). Amíg nincs animáció,
-  ez ártalmatlan; valódi animációk bevezetésekor érdemes átnevezni (pl. `stopMoving()`).
+- A knight csomagban van még **landolás** (`Jump.png` `f6–7`), és több nem használt sheet
+  (Roll, Slide, crouch, Hanging, Pray, attack_from_air) az eredeti forrásmappában. Ezekhez
+  nincs state a játékban, és a Project_plan.md sem tervez ilyet — csak akkor kerüljenek be,
+  ha külön döntés születik róluk (a `Pray` pl. jó checkpoint-animáció lenne).
 - A boss számai (HP 240, sebzések, cooldownok) az első hangolatlan értékek — manuális
   játszás után érdemes finomítani őket a `GraftedWingBreaker.ts` exportált konstansaiban.

@@ -1,12 +1,41 @@
 import Phaser from 'phaser';
 import { MUSIC_KEYS } from '../systems/AudioManager';
+import {
+  createPlayerAnimations,
+  FRAME_HEIGHT,
+  FRAME_WIDTH,
+  PLAYER_TEXTURES,
+} from '../player/PlayerAnimations';
 // Vite-on át importálva (nem `public/`-ból): így az asset hash-elve bekerül a buildbe,
 // a base path (GitHub Pages) magától helyes lesz, és HIÁNYZÓ fájl esetén a build elszáll
 // ahelyett, hogy néma 404 lenne futásidőben.
 import bossThemeUrl from '../../assets/audio/boss-theme.mp3';
+// Player sprite sheetek (2D_SL_Knight_v1.0, lásd assets/sprites/knight/license.txt).
+// Mind 128x64-es blokkokra van vágva.
+import knightIdleUrl from '../../assets/sprites/knight/Idle.png';
+import knightRunUrl from '../../assets/sprites/knight/Run.png';
+import knightJumpUrl from '../../assets/sprites/knight/Jump.png';
+import knightAttacksUrl from '../../assets/sprites/knight/Attacks.png';
+import knightHurtUrl from '../../assets/sprites/knight/Hurt.png';
+import knightDeathUrl from '../../assets/sprites/knight/Death.png';
+import knightClimbUrl from '../../assets/sprites/knight/Climb.png';
+import knightCastUrl from '../../assets/sprites/knight/Health.png';
 
 const LOADING_BAR_WIDTH = 320;
 const LOADING_BAR_HEIGHT = 14;
+
+const PLAYER_SHEETS: Array<{ key: string; url: string }> = [
+  { key: PLAYER_TEXTURES.IDLE, url: knightIdleUrl },
+  { key: PLAYER_TEXTURES.RUN, url: knightRunUrl },
+  { key: PLAYER_TEXTURES.JUMP, url: knightJumpUrl },
+  { key: PLAYER_TEXTURES.ATTACK, url: knightAttacksUrl },
+  { key: PLAYER_TEXTURES.HURT, url: knightHurtUrl },
+  { key: PLAYER_TEXTURES.DEATH, url: knightDeathUrl },
+  { key: PLAYER_TEXTURES.CLIMB, url: knightClimbUrl },
+  // A Health.png a cast animáció forrása — a csomagban nincs magic anim, ez áll
+  // legközelebb hozzá (felemelt piros izzó gömb + szikrák).
+  { key: PLAYER_TEXTURES.CAST, url: knightCastUrl },
+];
 
 export default class BootScene extends Phaser.Scene {
   constructor() {
@@ -18,9 +47,20 @@ export default class BootScene extends Phaser.Scene {
     this.createLoadingIndicator();
 
     this.load.audio(MUSIC_KEYS.BOSS_THEME, bossThemeUrl);
+
+    for (const sheet of PLAYER_SHEETS) {
+      this.load.spritesheet(sheet.key, sheet.url, {
+        frameWidth: FRAME_WIDTH,
+        frameHeight: FRAME_HEIGHT,
+      });
+    }
   }
 
   create(): void {
+    // Az AnimationManager GAME-szintű, nem scene-szintű: elég egyszer, itt létrehozni,
+    // és minden későbbi scene (Level1Scene, BossScene) ugyanazt használja.
+    createPlayerAnimations(this);
+
     this.scene.start('Level1Scene');
   }
 
@@ -51,13 +91,8 @@ export default class BootScene extends Phaser.Scene {
     });
   }
 
+  // A player NEM szerepel itt: neki már valódi sprite sheetjei vannak (lásd PLAYER_SHEETS).
   private createPlaceholderTextures(): void {
-    const playerGfx = this.make.graphics({ x: 0, y: 0 }, false);
-    playerGfx.fillStyle(0xb33a3a, 1);
-    playerGfx.fillRect(0, 0, 32, 48);
-    playerGfx.generateTexture('player-placeholder', 32, 48);
-    playerGfx.destroy();
-
     const groundGfx = this.make.graphics({ x: 0, y: 0 }, false);
     groundGfx.fillStyle(0x3a3a3a, 1);
     groundGfx.fillRect(0, 0, 64, 32);

@@ -15,6 +15,9 @@ export function createMockBody() {
     enable: true,
     setAllowGravity: vi.fn(),
     setSize: vi.fn(),
+    // A Player konstruktora ezzel illeszti a bodyt a 128x64-es sprite frame-en belüli
+    // rajzolt karakterre.
+    setOffset: vi.fn(),
     reset: vi.fn(),
   };
 }

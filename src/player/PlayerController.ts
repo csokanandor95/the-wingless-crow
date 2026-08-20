@@ -67,7 +67,7 @@ export default class PlayerController {
     } else if (right) {
       this.player.moveRight();
     } else {
-      this.player.stop();
+      this.player.stopMoving();
     }
 
     if (up || jumpKey) {

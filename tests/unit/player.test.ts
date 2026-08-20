@@ -72,10 +72,10 @@ describe('Player', () => {
       expect(player.playerState).not.toBe(PlayerState.RUN);
     });
 
-    it('stop: nullázza az X sebességet, IDLE state földön', () => {
+    it('stopMoving: nullázza az X sebességet, IDLE state földön', () => {
       setGrounded(player, true);
       player.moveRight();
-      player.stop();
+      player.stopMoving();
 
       expect(getBody(player).velocity.x).toBe(0);
       expect(player.playerState).toBe(PlayerState.IDLE);
@@ -105,7 +105,7 @@ describe('Player', () => {
 
         player.moveLeft();
         player.moveRight();
-        player.stop();
+        player.stopMoving();
         player.jump();
 
         expect(getBody(player).velocity.x).toBe(0);

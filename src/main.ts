@@ -11,6 +11,9 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 450,
   parent: 'game-container',
   backgroundColor: '#0a0a0f',
+  // Kötelező a pixel art sprite-okhoz: enélkül a Phaser bilineárisan szűri a textúrákat,
+  // és a knight sheetek elmosódnak.
+  pixelArt: true,
   physics: {
     default: 'arcade',
     arcade: {
