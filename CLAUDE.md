@@ -45,10 +45,10 @@ npx tsc --noEmit # típusellenőrzés (nincs külön npm script)
 
 A chat-beszélgetés közepén, mielőtt Claude Code-ra váltottunk, ez a kérdés függőben maradt, **válasz nélkül**:
 
-> A Project_plan.md 11. pontja az Archer/Caster-t (Enemy 2) és a Beast-et (Enemy 3, opcionális) is felsorolja, de a 21. pont Phase 5 roadmap sora kifejezetten csak "Hollow"-t nevesíti.
+> A Project_plan.md 11. pontja az Archer/Caster-t (Enemy 2) és a Beast-et (Enemy 3, opcionális) is felsorolja, de a 21. pont Phase 5 roadmap sora kifejezetten csak "CrowHarvester"-t nevesíti.
 
 Három opció volt feltéve a usernek:
-1. Csak Hollow (terv szerint) → mehetünk Phase 6 – Level-re
+1. Csak CrowHarvester (terv szerint) → mehetünk Phase 6 – Level-re
 2. Archer hozzáadása most, mielőtt továbbmegyünk
 3. Archer ÉS Beast hozzáadása most
 
@@ -56,7 +56,7 @@ Három opció volt feltéve a usernek:
 
 ## Jelenlegi állapot
 
-Készen: Step 1 (Projekt setup), Phase 2 (Player), Phase 3 (Combat), Phase 4 (Magic), Phase 5 (Enemy) részlegesen — Hollow kész.
+Készen: Step 1 (Projekt setup), Phase 2 (Player), Phase 3 (Combat), Phase 4 (Magic), Phase 5 (Enemy) részlegesen — CrowHarvester kész.
 
 **Phase 6 (Level) KÉSZ:** level layout, platforms, environment, checkpoint, transition mind megvan. A pálya végi ajtónál (`door-placeholder`, P9 platform) **E** billentyűvel aktiválható a checkpoint, ami egyben fade-out után átvált a `BossScene`-re.
 
@@ -75,13 +75,21 @@ valódi pixel art (`assets/sprites/knight/`, a *2D_SL_Knight_v1.0* csomagból �
 Everyone", kereskedelmi használat és módosítás engedélyezett, credit nem kötelező; a
 `license.txt` be van másolva a repóba). Új modul: `player/PlayerAnimations.ts`. Részletek
 lentebb, az "Implementált gameplay / Player" és a "Fontos technikai tanulságok" alatt.
-A Phase 8 többi része (enemy/boss/environment sprite-ok, SFX, particles, level ambient,
+
+**Phase 8 — 3. iteráció: CrowHarvester (Enemy 1) SPRITE + ÁTNEVEZÉS kész.** Az Enemy 1
+korábbi neve `Hollow` volt; a hozzá választott pixel art egy csuklyás, csőrös, **kaszás**
+dögevő, ami sokkal jobban illik a varjú-tematikába, mint egy husk-lovag — ezért a lény
+neve **`CrowHarvester`** lett, és az átnevezés végigfut a kódon, a teszteken és mindkét
+dokumentumon. A gameplay-paraméterek és a state machine változatlanok. Új modul:
+`enemies/CrowHarvesterAnimations.ts`. Részletek lentebb.
+
+A Phase 8 többi része (boss/environment sprite-ok, SFX, particles, level ambient,
 `ui/` modul) még hátravan.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (Hollow) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (4 fájl, 72 teszt). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `Hollow.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `Hollow`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (7 fájl, 114 teszt — ebből 2 az animáció-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
-- A `Hollow`/`Player`/`GraftedWingBreaker` `scene.time.delayedCall`-jai **interleave-elhetnek** (pl. `Hollow.resolveAttackHit()` a `Player.takeDamage()`-en keresztül saját delayedCallt ütemez ugyanazon a mock scene-en) — ezért a `createDelayedCallStepper` helper (`tests/unit/helpers/phaserTestUtils.ts`) `.next()` (egy lépés) ÉS `.flushRemaining()` (a kurzortól a végéig, újra-tüzelés nélkül) metódust is ad. A `createDelayedCallStepper(scene, true)` (`skipExisting`) a kurzort a MÁR ütemezett hívások mögé állítja — ez kell, ha a teszt előkészítése maga is ütemez callbackeket (pl. a bosst Phase 2-be sebezzük, ami hit-villanást ütemez).
+- A `CrowHarvester`/`Player`/`GraftedWingBreaker` `scene.time.delayedCall`-jai **interleave-elhetnek** (pl. `CrowHarvester.resolveAttackHit()` a `Player.takeDamage()`-en keresztül saját delayedCallt ütemez ugyanazon a mock scene-en) — ezért a `createDelayedCallStepper` helper (`tests/unit/helpers/phaserTestUtils.ts`) `.next()` (egy lépés) ÉS `.flushRemaining()` (a kurzortól a végéig, újra-tüzelés nélkül) metódust is ad. A `createDelayedCallStepper(scene, true)` (`skipExisting`) a kurzort a MÁR ütemezett hívások mögé állítja — ez kell, ha a teszt előkészítése maga is ütemez callbackeket (pl. a bosst Phase 2-be sebezzük, ami hit-villanást ütemez).
 
 ## Fájlstruktúra (jelenlegi, tényleges állapot)
 
@@ -96,18 +104,21 @@ the-wingless-crow/
 │   ├── audio/
 │   │   └── boss-theme.mp3        # Vite-importtal jön be (nem public/), lásd lentebb
 │   └── sprites/
-│       └── knight/               # player sprite sheetek, mind 128x64-es blokkokra vágva
-│           ├── Idle.png Run.png Jump.png Attacks.png
-│           ├── Hurt.png Death.png Climb.png Health.png
-│           └── license.txt       # 2D_SL_Knight_v1.0 licenc, a repo dokumentálja a jogi státuszt
+│       ├── knight/               # player sprite sheetek, mind 128x64-es blokkokra vágva
+│       │   ├── Idle.png Run.png Jump.png Attacks.png
+│       │   ├── Hurt.png Death.png Climb.png Health.png
+│       │   └── license.txt       # 2D_SL_Knight_v1.0 licenc, a repo dokumentálja a jogi státuszt
+│       └── crow-harvester/       # Enemy 1 sprite
+│           └── enemy04_sheet.png # 1792x64 = 28 db 64x64-es frame. NINCS mellette licenc (lásd lentebb)
 ├── tests/
 │   └── unit/
 │       ├── player.test.ts       # Project_plan.md §23 Player scope
 │       ├── combat.test.ts       # §23 Combat scope (ATTACK_CONFIGS, Player attack, Fireball + ProjectileOptions)
-│       ├── hollow.test.ts       # §23 Enemy scope (Hollow HP/damage/death/state transitions)
+│       ├── crowHarvester.test.ts # §23 Enemy scope (CrowHarvester HP/damage/death/state transitions)
 │       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, attack state, death)
 │       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown)
-│       ├── playerAnimations.test.ts # state->anim leképezés + a Player animáció-vezérlése
+│       ├── playerAnimations.test.ts       # state->anim leképezés + a Player animáció-vezérlése
+│       ├── crowHarvesterAnimations.test.ts # state->anim + a facing-kompenzáció regressziós tesztje
 │       └── helpers/
 │           ├── fakePhaser.ts        # a 'phaser' modul önálló fake névtere (createFakePhaserModule)
 │           └── phaserTestUtils.ts   # megosztott mock scene/body/delayedCall-stepper helperek
@@ -116,7 +127,7 @@ the-wingless-crow/
 │   ├── vite-env.d.ts             # /// <reference types="vite/client" /> — az *.mp3 import típusa
 │   ├── scenes/
 │   │   ├── BootScene.ts          # placeholder textúrák + audio betöltés + loading kijelzés
-│   │   ├── Level1Scene.ts        # 3200px pálya, PLATFORMS adattömb, létra, 5 Hollow, checkpoint-ajtó
+│   │   ├── Level1Scene.ts        # 3200px pálya, PLATFORMS adattömb, létra, 5 CrowHarvester, checkpoint-ajtó
 │   │   ├── BossScene.ts          # 800x450 fix aréna, boss entrance, HP-bar, victory/defeat ágak
 │   │   ├── NarrationScene.ts     # adatvezérelt szöveges átvezető (typewriter), újrahasználható
 │   │   └── Level2Scene.ts        # placeholder — a Level 2 tervezése még hátravan
@@ -125,7 +136,8 @@ the-wingless-crow/
 │   │   ├── PlayerAnimations.ts   # sprite geometria, anim kulcsok/frame-tartományok, animKeyForState()
 │   │   └── PlayerController.ts   # + létra-input ág
 │   ├── enemies/
-│   │   └── Hollow.ts             # Enemy 1, state machine + HollowConfig (patrol határok)
+│   │   ├── CrowHarvester.ts      # Enemy 1, state machine + CrowHarvesterConfig (patrol határok)
+│   │   └── CrowHarvesterAnimations.ts # sheet geometria, anim kulcsok, facing-kompenzáció, animKeyForState()
 │   ├── bosses/
 │   │   └── GraftedWingBreaker.ts # Boss 1, két fázis, slash / projectile / charge
 │   ├── systems/
@@ -170,7 +182,7 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
     a hitboxot EGYÜTT kell újraszámolni** — különben a kard láthatóan a levegőt találja el
     (pontosan ez volt a hiba az első verzióban: a light hitbox 18px-szel tovább ért, mint
     ameddig a kard elér). Következmény, amivel számolni kell: a light attack effektív
-    hatótávja (+30, plusz az enemy félszélessége) alig van a Hollow `ATTACK_RANGE = 42`-je
+    hatótávja (+30, plusz az enemy félszélessége) alig van a CrowHarvester `ATTACK_RANGE = 42`-je
     fölött — a light így szándékosan közelharci, a heavy a biztonságos távolságú opció.
   - **Nincs magic animáció a csomagban** — a CAST a `Health.png` "gyógyital" anim `f0–4`
     szakaszát használja (a lovag piros izzó gömböt emel, ami szikrákra pattan). A fireball
@@ -196,9 +208,38 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - Kard: Light Attack (J / bal klikk) és Heavy Attack (K / jobb klikk), külön cooldown/damage/hitbox méret (`combat/Attack.ts` konfigból)
 - Fireball: F billentyű, `combat/Projectile.ts` Fireball osztályt hoz létre a Level1Scene-ben egy `fireball-cast` eventen keresztül
 
-### Enemy — Hollow (`src/enemies/Hollow.ts`)
+### Enemy — CrowHarvester (`src/enemies/CrowHarvester.ts`, `CrowHarvesterAnimations.ts`)
+> Korábbi neve **`Hollow`** volt. A Phase 8 3. iterációjában átnevezve, mert a hozzá
+> választott pixel art egy csuklyás, csőrös, kaszás dögevő (varjú-tematika), nem husk-lovag.
+> Az átnevezés tisztán névváltás: a state machine és minden szám változatlan.
+
 - State machine: PATROL → DETECT PLAYER → CHASE → ATTACK → COOLDOWN → CHASE (Project_plan.md 11. pont szerint)
 - HP: 40, kard és fireball is sebzi
+- **Sprite + animációk (Phase 8):** egyetlen 1792×64-es csík (`enemy04_sheet.png`),
+  28 db 64×64-es frame. A sorrend ELLENŐRIZVE (az egyedi PNG-k alpha bounding boxai a
+  sheet frame-jeivel párosítva): `idle 0–6`, `walk 7–12`, `attack 13–19`,
+  `jump_mid 20–23`, `jump_landing 24`, `hit 25–27`. A jump frame-ek **nem kellenek**.
+  - **A lény a frame BAL oldalán ül** (teste x≈4–24, a kasza tölti ki a jobb oldalt,
+    támadáskor x=54-ig), a teste közepe frame-x **14**, nem 32. Emiatt van a
+    `setFacing()` **flip-kompenzáció** — lásd a "Fontos technikai tanulságok" 11. pontját.
+  - `ORIGIN_Y = 0.640625` → a talp a `sprite.y + 23`-nál, pontosan ott, ahol a régi
+    30×46-os placeholderé volt. Ezért maradt érvényben a `Level1Scene`
+    `HARVESTER_SPAWN_OFFSET = 24`.
+  - **A támadás-animáció a state machine-hez van illesztve**, nem fordítva: az
+    `ATTACK_FRAMES = [13,13,13,14,15,16,17,18,19]` explicit lista a windup frame-et
+    megháromszorozza, hogy a csapás (`f14`, a fehér ív) pontosan `ATTACK_STARTUP_MS`-nél
+    kerüljön képre — ott, ahol a `resolveAttackHit()` fut. Az `ATTACK_STARTUP_MS` maga is
+    az animációs modul `ATTACK_WINDUP_MS`-éből származik. Az `ATTACK` és a `COOLDOWN`
+    UGYANARRA az anim kulcsra képződik le, így a 900ms-os animáció egyben fut végig a
+    300+900ms-os állapotpáron ahelyett, hogy a state-váltásnál újraindulna.
+  - **Nincs tint sehol.** A hit frame-ekbe **be van égetve** a fehér villanás; a korábbi
+    `setTint(0xffffff)` amúgy is **no-op volt** (fehér tint = azonosság), tehát a
+    Hollow-nak sosem volt látható találat-visszajelzése. A támadás narancs windup-tintjét
+    a magasba emelt kasza váltotta ki.
+  - **A csomagban NINCS death animáció:** a `die()` a hit animációt játssza le, majd egy
+    tween `alpha: 0` + 6px süllyedés, végül `setVisible(false)`.
+  - A találat-reakciót egy `isReacting` flag védi (`HIT_ANIM_MS` = 180ms), hogy a walk/idle
+    ne írja felül a következő frame-en.
 - Közelharci támadás: nem külön hitbox-zónával, hanem távolság-ellenőrzéssel a támadás windup végén (implementációs egyszerűsítés, nem terveltérés)
 - Patrol range: spawn ponttól ±80px (felülírható), detection range: 220px, lose range: 320px (hiszterézis)
 - **DETECT PLAYER kiváltói**: közelség VAGY sebzés PATROL közben — a `takeDamage()` PATROL
@@ -214,7 +255,7 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   "a padlón át" eltalálni egy másik platformon álló playert. A `DIRECTION_DEADZONE` (4px)
   megakadályozza, hogy egy vertikálisan elérhetetlen, de vízszintesen majdnem egy vonalban
   lévő cél felé az enemy balra-jobbra pörögjön (irány-flip minden frame-ben nulla körül)
-- **`HollowConfig`** (opcionális 4. konstruktor-paraméter): `patrolMinX` / `patrolMaxX`
+- **`CrowHarvesterConfig`** (opcionális 4. konstruktor-paraméter): `patrolMinX` / `patrolMaxX`
   abszolút világ-X határok, és `clampChaseToBounds` — utóbbi hatására CHASE közben sem
   lép ki a határokon. Ez teszi lehetővé a platformon álló enemyt, ami nem sétál le a
   peremről. A flag nélkül (default false) a földi enemyk szabadon üldöznek — ez fontos,
@@ -227,7 +268,7 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   ugyanebből a forrásból származnak, `platformTop/Left/Right` helper függvényekkel — ne
   duplikálj magic numbereket). P9 `oneWay: true` → `checkCollision.down = false`, a létra
   ezen megy át
-- **5 Hollow**: 3 földi (820, 1850, 2700) + 2 platformon álló (P4 tágas, P8 szűk)
+- **5 CrowHarvester**: 3 földi (820, 1850, 2700) + 2 platformon álló (P4 tágas, P8 szűk)
 - **Létra** a pálya végén (x=2762): `tileSprite` a vizuál, külön `Zone` statikus bodyval
   a fizika. A scene `update()`-je **szinkron** `this.physics.overlap(player, ladderZone)`-t
   használ, NEM `physics.add.overlap` callbacket — utóbbi csak a scene `update()` UTÁN
@@ -280,7 +321,7 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   utána 3 mp `CHARGE_COOLDOWN_MS` csend
 - A `takeDamage()` hit-villanása **szándékosan nem törli a charge piros telegraph-ját** —
   a player abból olvassa ki, hogy jön a roham
-- `DIRECTION_DEADZONE` (6px), ugyanaz a védelem, mint a Hollow-nál: a boss ne pörögjön
+- `DIRECTION_DEADZONE` (6px), ugyanaz a védelem, mint a CrowHarvesternél: a boss ne pörögjön
   balra-jobbra, ha a player pont felette áll az aréna platformján
 - UI **nincs** az osztályban (se HP-szöveg, se bar) — azt a scene rajzolja. Ez tartja a
   boss unit-tesztelhetőnek a `fakePhaser` minimális `MockSprite` felületén
@@ -328,9 +369,9 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 
 ## Fontos technikai tanulságok (ne ismételd meg ezeket a hibákat!)
 
-1. **Phaser Arcade Physics Group `.add()` felülírja a body sebességét/gravitációját.** Ha egy már konfigurált (velocity/gravity beállított) physics objektumot egy `Phaser.Physics.Arcade.Group`-hoz adsz hozzá, a group visszaállítja azokat az alapértékekre. Ezért a fireballokat és enemyket **plain TypeScript tömbben** tároljuk (`Fireball[]`, `Hollow[]`), nem Phaser Group-ban.
+1. **Phaser Arcade Physics Group `.add()` felülírja a body sebességét/gravitációját.** Ha egy már konfigurált (velocity/gravity beállított) physics objektumot egy `Phaser.Physics.Arcade.Group`-hoz adsz hozzá, a group visszaállítja azokat az alapértékekre. Ezért a fireballokat és enemyket **plain TypeScript tömbben** tároljuk (`Fireball[]`, `CrowHarvester[]`), nem Phaser Group-ban.
 2. **Ne rendelj hozzá ÚJ tömböt egy már `physics.add.overlap`/`collider`-hez kötött referenciához.** A `filter()` új tömböt hoz létre — ha ezt visszaírod a property-be, a collider a régi (elavult) tömbre marad kötve. Élő elemek eltávolításához mindig `splice()`-t használj helyben (lásd `Level1Scene.update()` a fireballok takarításánál).
-3. **Scene-restart (`scene.start(kulcsSajátMaga)`) NEM hívja újra a class field initializereket.** A Phaser Scene példány egyszer jön létre; `scene.start()` csak a lifecycle-t (init/preload/create) futtatja újra UGYANAZON a példányon. A `private enemies: Hollow[] = [];`-szerű mezők csak a LEGELSŐ konstruáláskor inicializálódnak — ha a `create()` nem üríti ki őket explicit módon, a régi (a scene leállásakor Phaser által már megsemmisített body-jú) objektumok bennmaradnak, és az `update()` rajtuk hívott metódusai (`setVelocityX` stb.) `undefined`-on szállnak el. Ez okozta, hogy a `BossScene` "R: vissza Level1Scene-re" debug-gombja "nem csinált semmit" — valójában lefutott a scene-váltás, csak utána azonnal crashelt. **Minden scene, aminek van saját magára mutató restart-útja, a `create()` elején explicit nullázza a class-field tömbjeit/flag-jeit** (lásd `Level1Scene.create()` teteje: `this.fireballs = []; this.enemies = []; this.isTransitioning = false; this.respawnScheduled = false;`).
+3. **Scene-restart (`scene.start(kulcsSajátMaga)`) NEM hívja újra a class field initializereket.** A Phaser Scene példány egyszer jön létre; `scene.start()` csak a lifecycle-t (init/preload/create) futtatja újra UGYANAZON a példányon. A `private enemies: CrowHarvester[] = [];`-szerű mezők csak a LEGELSŐ konstruáláskor inicializálódnak — ha a `create()` nem üríti ki őket explicit módon, a régi (a scene leállásakor Phaser által már megsemmisített body-jú) objektumok bennmaradnak, és az `update()` rajtuk hívott metódusai (`setVelocityX` stb.) `undefined`-on szállnak el. Ez okozta, hogy a `BossScene` "R: vissza Level1Scene-re" debug-gombja "nem csinált semmit" — valójában lefutott a scene-váltás, csak utána azonnal crashelt. **Minden scene, aminek van saját magára mutató restart-útja, a `create()` elején explicit nullázza a class-field tömbjeit/flag-jeit** (lásd `Level1Scene.create()` teteje: `this.fireballs = []; this.enemies = []; this.isTransitioning = false; this.respawnScheduled = false;`).
 4. **A `camera.fadeOut(duration, r, g, b, callback)` ötödik paramétere a fade MINDEN frame-jén lefut**, nem csak a végén — a szignatúrája `(camera, progress)`. Ha abból hívsz `scene.start()`-ot, az frame-enként újraindítja a cél scene-t. Helyette mindig:
    ```ts
    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.start(key));
@@ -347,17 +388,24 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 8. **A `vi.fn()` paramétertípus nélkül üres tuple-ként (`[]`) tipizálja a `mock.calls`-t.** Ha a teszt ki akarja olvasni a hívás argumentumait (pl. a tween konfigját), a mocknak explicit paramétertípust kell adni: `vi.fn((_config: MockTweenConfig) => ...)`. A tesztek futottak, de a `tsc --noEmit` elszállt tőle.
 9. **Egy nem loopoló animációt NEM elég `play(key, true)`-val „ignoreIfPlaying" módban indítani.** Amint a lejátszás véget ér, az animáció már nem „playing", tehát a következő frame `play(key, true)`-ja ÚJRAINDÍTJA — a halál-animáció így vég nélkül loopolna. Ezért van a `Player.playAnim()` `currentAnimKey` guardja: csak akkor hív `play()`-t, ha a kulcs ténylegesen VÁLTOZOTT. Következmény: minden olyan hely, ami „ugyanarra" a state-re akar animációt ÚJRAINDÍTANI (pl. `respawn()`), köteles előbb `currentAnimKey = null`-t írni.
 10. **`Phaser.Physics.Arcade.Sprite`-on a `setSize()`/`setOffset()` KÉT különböző dolgot jelenthet.** A `Components.Size` (physics body) verziója árnyékolja a GameObject logikai-méret verzióját, és a kettő mást csinál. A félreértés elkerülésére a `Player` konstruktora közvetlenül a bodyn hívja őket: `body.setSize(w, h, false)` + `body.setOffset(x, y)`. A `center: false` KELL — különben a `setSize` újraközpontozza és felülírja az utána beállított offsetet.
-11. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
+11. **Off-center sprite + `flipX` = a karakter oldalra UGRIK forduláskor.** A `flipX` a FRAME közepére tükröz, nem az originre. Ha a rajzolt figura nem a frame közepén van (a `CrowHarvester` teste a 64px-es frame x=14-énél ül, mert a kasza tölti ki a jobb oldalt), akkor egy sima `setFlipX()` a testet `2 * (32 - 14) = 36px`-t ugrasztja. A javítás: forduláskor az **`originX`-et ÉS a physics body offsetjét EGYÜTT** tükrözni (`CrowHarvester.setFacing()`): `originX ↔ 1 - originX`, `offsetX ↔ frameWidth - offsetX - bodyWidth`. A `tests/unit/crowHarvesterAnimations.test.ts` pont ezt a párost őrzi (a body világkoordinátás közepének nem szabad elmozdulnia). **Minden további off-center enemy sheetnél ugyanez a teendő** — érdemes lesz kiemelni közös helperbe, ha jön a második ilyen.
+12. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
-- **A player KIVÉTELÉVEL** minden grafika kódból generált színes téglalap/kör
-  (`generateTexture`) — a Hollow, a boss, a talaj/platformok, a létra, az ajtó, az oszlopok
-  és mindkét lövedék még placeholder
-- Player és Hollow felett lebegő HP szöveg (debug célra, valódi HUD a `ui/` modulban készül majd)
+- **A player és a CrowHarvester KIVÉTELÉVEL** minden grafika kódból generált színes
+  téglalap/kör (`generateTexture`) — a boss, a talaj/platformok, a létra, az ajtó, az
+  oszlopok és mindkét lövedék még placeholder
+- CrowHarvester felett lebegő HP szöveg (debug célra, valódi HUD a `ui/` modulban készül majd)
 - A bal felső sarki HUD szöveg a HP mellett a **player state-et is kiírja** (`HP: 100/100 | CLIMB`) — a mászás manuális tesztelését segíti, Phase 8-ban cserélendő
-- Hit-reakció a Hollow-nál és a bossnál = tint villanás, nincs valódi animáció
-  (a playernél már van hurt animáció a piros villanás mellett)
+- Hit-reakció **a bossnál** = tint villanás, nincs valódi animáció (a playernél és a
+  CrowHarvesternél már van hit/hurt animáció)
+- **NYITOTT JOGI TÉTEL:** a CrowHarvester assethez (`assets/sprites/crow-harvester/`)
+  — a knight csomaggal ellentétben — **nem került licenc fájl a repóba**. Ez tudatos,
+  elhalasztott döntés. A forrás valószínűleg a `2D helper/Credits.txt`-ben szereplő
+  karakter-csomag; **a repo nyilvánossá tétele / GitHub Pages deploy ELŐTT tisztázni kell.**
+  Ezért maradt meg az eredeti `enemy04_sheet.png` fájlnév: ez az egyetlen megmaradó
+  kapocs a forráscsomaghoz.
 - `pillar-placeholder` és `door-placeholder` dekorációk: puszta színes téglalapok
 - A checkpoint-prompt szöveg ("E: Checkpoint" / "Checkpoint mentve...") debug-stílusú `add.text`, a `playerHpText`-hez hasonlóan — valódi UI a `ui/` modulban készül majd
 - A `BossScene` HP-barja nyers `Graphics`-szal rajzolt téglalap (`drawBossHealthBar()`), és a player HP-ja ott is a debug `add.text` — mindkettő a `ui/` modulba költözik Phase 8-ban
@@ -365,7 +413,7 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - A `BOSS_VICTORY_NARRATION` szövege placeholder lore — a végleges a Phase 9 – Lore-ban készül
 - A `BootScene` "Betöltés..." szövege + progress-sávja nyers `add.text` / `Graphics` — a `ui/` modulba költözik, amint több asset (sprite-ok) is betöltendő lesz
 - `main.ts`-ben `arcade.debug: true` — a physics bodyk és a létra zónája ki van rajzolva
-- A training dummy és a régi 'H' debug billentyű (self-damage teszteléshez) már törölve lett, miután a Hollow valódi sebzésforrássá vált
+- A training dummy és a régi 'H' debug billentyű (self-damage teszteléshez) már törölve lett, miután a CrowHarvester valódi sebzésforrássá vált
 
 ## Következő lépés
 
@@ -374,8 +422,11 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   death, jump, checkpoint stb.). Az `AudioManager` jelenleg csak zenét kezel — SFX-hez
   kap majd egy `playSfx(key)`-t, ami nem exkluzív (több hang egyszerre). A player
   animációi már megvannak, tehát a hangokat könnyű a megfelelő frame-hez kötni.
-- **Enemy / boss / environment sprite-ok** — a player kész (2. iteráció), a Hollow, a
-  *Grafted Wing-Breaker*, a tile-ok és a háttér még placeholder.
+- **Boss / environment sprite-ok** — a player (2. iteráció) és a CrowHarvester
+  (3. iteráció) kész; a *Grafted Wing-Breaker*, a tile-ok és a háttér még placeholder.
+  A `2D helper/Sprites/` alatt van még Enemy01/02/03/05 és egy "Gino Character" — ha
+  bármelyik boss- vagy enemy-jelöltként bejön, számíts rá, hogy szintén off-center
+  (lásd a 11. technikai tanulságot).
 - **Level / menü ambient.** Figyelem: az `AudioManager` most **scene-hatókörű** (a scene
   shutdownja elvágja) — scene-eken átívelő zenéhez game-szintűvé kell emelni.
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),

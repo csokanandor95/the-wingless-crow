@@ -1,7 +1,7 @@
 // Boss (The Grafted Wing-Breaker) unit tesztek — Project_plan.md §23 "Unit testing / Boss"
 // bontása szerint: HP, phase transition, attack state, death.
 //
-// Ugyanaz a harness, mint a hollow.test.ts-ben: a Hollow-hoz hasonlóan itt is VALÓDI
+// Ugyanaz a harness, mint a crowHarvester.test.ts-ben: a CrowHarvesterhez hasonlóan itt is VALÓDI
 // (mock scene-nel létrehozott) Player példányokat adunk át a boss.update()-nek, hogy a
 // találat-feloldás igazi getHP() csökkenést tudjon ellenőrizni.
 import { describe, it, expect, beforeEach, vi } from 'vitest';

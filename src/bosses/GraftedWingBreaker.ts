@@ -8,7 +8,7 @@ import type Player from '../player/Player';
 // Phase 2 (50% HP alatt): gyorsabb mozgás + charge támadás egyenes vonalban, piros
 // villanásos telegraph-fal (~1s windup), utána 3 mp csend.
 //
-// A Hollow.ts mintáját követi: state machine + delayedCall-láncok az időzítéshez, és
+// A CrowHarvester.ts mintáját követi: state machine + delayedCall-láncok az időzítéshez, és
 // minden hangolható szám exportált konstans, hogy a unit tesztek ne égessenek be
 // nyers értékeket.
 export enum BossState {
@@ -57,7 +57,7 @@ export const ACTION_COOLDOWN_MS = 900;
 /**
  * Ha a player vízszintesen szinte pontosan a boss felett/alatt áll (pl. az aréna
  * platformján), a "merre induljak" döntés nulla körül minden frame-ben átbillenne, és a
- * boss balra-jobbra rezegne. Ugyanaz a védelem, mint a Hollow DIRECTION_DEADZONE-ja.
+ * boss balra-jobbra rezegne. Ugyanaz a védelem, mint a CrowHarvester DIRECTION_DEADZONE-ja.
  */
 export const DIRECTION_DEADZONE = 6;
 
@@ -95,7 +95,7 @@ export default class GraftedWingBreaker
     this.bossState = BossState.APPROACH;
   }
 
-  // A scene minden frame-ben meghívja, átadva a player referenciát (Hollow.update mintája).
+  // A scene minden frame-ben meghívja, átadva a player referenciát (CrowHarvester.update mintája).
   update(player: Player): void {
     if (this.bossState === BossState.DEAD || this.bossState === BossState.DORMANT) return;
 
@@ -216,7 +216,7 @@ export default class GraftedWingBreaker
       this.x, this.y, this.playerRef.x, this.playerRef.y
     );
 
-    // Kis tolerancia (+10px), mint a Hollow-nál: ha a player épp kimozdult, még találat.
+    // Kis tolerancia (+10px), mint a CrowHarvesternél: ha a player épp kimozdult, még találat.
     if (distance <= SLASH_RANGE + 10) {
       this.playerRef.takeDamage(SLASH_DAMAGE);
     }

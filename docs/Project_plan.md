@@ -370,9 +370,19 @@ A cél az egyszerűség.
 
 Első verzióban 2–3 egyszerű enemy archetype elegendő.
 
-## Enemy 1 – Hollow / Knight
+## Enemy 1 – CrowHarvester
 
 Közelharcos.
+
+> **Névváltás és vizuál (Phase 8, 3. iteráció):** ez az enemy eredetileg *Hollow / Knight*
+> néven szerepelt (kardot forgató husk). A hozzá választott pixel art viszont egy
+> **csuklyás, csőrös, kaszás dögevő** — ami sokkal jobban illeszkedik a 4–5. pont
+> varjú-tematikájához, mint egy általános husk-lovag. Ezért a lény neve
+> **CrowHarvester** lett, és az átnevezés végigfut a kódon (`enemies/CrowHarvester.ts`),
+> a teszteken és ezen a dokumentumon. **A state machine és minden gameplay-paraméter
+> változatlan** — ez tisztán elnevezés- és látvány-döntés.
+>
+> A fegyver ettől kezdve kasza, nem kard; a támadás telegraph-ja a magasba emelt penge.
 
 Egyszerű state machine:
 
@@ -399,7 +409,7 @@ CHASE
 Visszaváltás PATROL-ra `LOSE_RANGE`-en (320px) túl — a két külön határ hiszterézist ad,
 hogy a state ne pattogjon a detektálási határon.
 
-**Platformon álló Hollow** (Phase 6): a patrol range a platform tetejére korlátozható
+**Platformon álló CrowHarvester** (Phase 6): a patrol range a platform tetejére korlátozható
 (abszolút X-határok), és egy kapcsolóval elérhető, hogy CHASE közben se lépjen ki
 ezekből — így nem sétál le a peremről, hanem ott várakozik, amíg a player a közelben van.
 
@@ -490,7 +500,7 @@ A cél egy olyan boss, amely:
 > cooldown-kapuk döntenek. Ez egyszerre szolgálja a tesztelhetőséget (nem flaky unit teszt)
 > és a játékélményt — a player fel tudja ismerni a boss mintáit.
 >
-> A közelharci találat — a Hollow-hoz hasonlóan — nem külön hitbox-zóna, hanem
+> A közelharci találat — a CrowHarvester-hoz hasonlóan — nem külön hitbox-zóna, hanem
 > távolság-ellenőrzés a windup végén. A charge roham közben legfeljebb **egyszer** sebez,
 > és a pálya falának ütközve idő előtt véget ér.
 
@@ -806,6 +816,26 @@ Ez önmagában is érdekes QA feladat.
 >   air-attack animációi. Ezekhez nincs state a játékban, és ez a dokumentum sem tervez
 >   ilyen mechanikát — bevezetésük külön döntést (és e dokumentum frissítését) igényelné.
 
+> **Implementációs állapot (Phase 8, 3. iteráció) — CrowHarvester (Enemy 1) sprite:**
+>
+> - Szintén kész, külső pixel art csomag (nem AI-generált), egyetlen 1792×64-es csíkban:
+>   `assets/sprites/crow-harvester/enemy04_sheet.png`, 28 db 64×64-es frame.
+> - **Nyitott tétel:** ehhez a csomaghoz — a knighttal ellentétben — **nem került licenc
+>   fájl a repóba**. Ez tudatos, elhalasztott döntés, nem feledékenység. A forrás
+>   valószínűleg a `2D helper/Credits.txt`-ben szereplő karakter-csomag; publikálás
+>   (GitHub Pages / repo nyilvánossá tétele) ELŐTT tisztázni kell. Ezért maradt meg az
+>   eredeti `enemy04_sheet.png` fájlnév: ez az egyetlen kapocs a forráscsomaghoz.
+> - A fenti hibalistából itt **három** dolog jött elő az ellenőrzésen:
+>   - *hiányzó animáció:* a csomagban **nincs death animáció** — a halál a hit frame-ekből
+>     + egy elhalványuló/megsüllyedő tweenből áll össze;
+>   - *rossz sprite méret / pozíció:* a lény a 64×64-es frame **bal oldalán** ül (a teste
+>     x≈4–24, a kasza tölti ki a jobb oldalt), ezért egy sima `flipX` 36px-t ugrasztotta
+>     volna forduláskor — az origint és a physics body offsetjét együtt kell tükrözni;
+>   - *nem megfelelő loop:* a `hit` frame-ekbe be van égetve a fehér villanás, tehát a
+>     korábbi tint-alapú visszajelzés feleslegessé vált (az amúgy is no-op volt).
+> - A frame-sorrendet nem feltételeztük, hanem **ellenőriztük**: az egyedi PNG-k
+>   (idle01.png, walk01.png, …) alpha bounding boxait párosítottuk a sheet frame-jeivel.
+
 ---
 
 # 20. Javasolt projektstruktúra
@@ -837,7 +867,7 @@ the-wingless-crow/
 │   │   └── PlayerController.ts
 │   │
 │   ├── enemies/
-│   │   ├── Hollow.ts
+│   │   ├── CrowHarvester.ts
 │   │   ├── Archer.ts
 │   │   └── Beast.ts
 │   │
@@ -939,7 +969,7 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 
 ## Phase 5 – Enemy
 
-- Hollow
+- CrowHarvester
 - enemy state machine
 - attack
 - damage
@@ -964,8 +994,9 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 
 ## Phase 8 – Atmosphere
 
-- sprites — *részben kész: a **player** valódi pixel artot és animációkat kapott
-  (2. iteráció, lásd 19. pont). Az enemy / boss / environment még placeholder.*
+- sprites — *részben kész: a **player** (2. iteráció) és a **CrowHarvester** (3. iteráció)
+  valódi pixel artot és animációkat kapott, lásd 19. pont. A boss és az environment
+  (tile-ok, háttér, lövedékek) még placeholder.*
 - backgrounds
 - particles
 - lighting-like effects

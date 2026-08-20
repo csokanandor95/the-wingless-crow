@@ -5,9 +5,9 @@
 //
 // A valódi Phaser csomag már betöltéskor (window global hiányában) elszáll Node alatt,
 // ezért nem hívható rá `importOriginal()` sem — ez a fake teljesen önálló, csak azt a
-// felületet adja, amit a src/ osztályok (Player, Hollow, Fireball) ténylegesen használnak:
+// felületet adja, amit a src/ osztályok (Player, CrowHarvester, Fireball) ténylegesen használnak:
 // Physics.Arcade.Sprite (mindhárom ebből örököl), Events.EventEmitter, Math.Linear
-// (Player.climb() lágy rásnapelése) és Math.Distance.Between (Hollow távolság-számításai).
+// (Player.climb() lágy rásnapelése) és Math.Distance.Between (CrowHarvester távolság-számításai).
 export function createFakePhaserModule() {
   class EventEmitter {
     private listeners = new Map<string, Array<(...args: unknown[]) => void>>();
@@ -60,6 +60,10 @@ export function createFakePhaserModule() {
     texture: string;
     flipX = false;
     active = true;
+    visible = true;
+    // A CrowHarvester halál-tweenje ezt animálja; a tween mock nem futtatja, de a
+    // tween-konfig ellenőrzéséhez a mezőnek léteznie kell.
+    alpha = 1;
     originX = 0.5;
     originY = 0.5;
     anims = new MockAnimationState();
@@ -102,6 +106,10 @@ export function createFakePhaserModule() {
     }
     setFlipX(v: boolean) {
       this.flipX = v;
+      return this;
+    }
+    setVisible(v: boolean) {
+      this.visible = v;
       return this;
     }
     setTint(_color: number) {

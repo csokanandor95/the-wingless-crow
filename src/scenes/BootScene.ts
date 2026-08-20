@@ -6,6 +6,11 @@ import {
   FRAME_WIDTH,
   PLAYER_TEXTURES,
 } from '../player/PlayerAnimations';
+import {
+  createCrowHarvesterAnimations,
+  FRAME_SIZE as HARVESTER_FRAME_SIZE,
+  TEXTURE_KEY as HARVESTER_TEXTURE_KEY,
+} from '../enemies/CrowHarvesterAnimations';
 // Vite-on át importálva (nem `public/`-ból): így az asset hash-elve bekerül a buildbe,
 // a base path (GitHub Pages) magától helyes lesz, és HIÁNYZÓ fájl esetén a build elszáll
 // ahelyett, hogy néma 404 lenne futásidőben.
@@ -20,6 +25,8 @@ import knightHurtUrl from '../../assets/sprites/knight/Hurt.png';
 import knightDeathUrl from '../../assets/sprites/knight/Death.png';
 import knightClimbUrl from '../../assets/sprites/knight/Climb.png';
 import knightCastUrl from '../../assets/sprites/knight/Health.png';
+// CrowHarvester (Enemy 1): egyetlen 1792x64-es csík, 28 db 64x64-es frame.
+import crowHarvesterSheetUrl from '../../assets/sprites/crow-harvester/enemy04_sheet.png';
 
 const LOADING_BAR_WIDTH = 320;
 const LOADING_BAR_HEIGHT = 14;
@@ -54,12 +61,18 @@ export default class BootScene extends Phaser.Scene {
         frameHeight: FRAME_HEIGHT,
       });
     }
+
+    this.load.spritesheet(HARVESTER_TEXTURE_KEY, crowHarvesterSheetUrl, {
+      frameWidth: HARVESTER_FRAME_SIZE,
+      frameHeight: HARVESTER_FRAME_SIZE,
+    });
   }
 
   create(): void {
     // Az AnimationManager GAME-szintű, nem scene-szintű: elég egyszer, itt létrehozni,
     // és minden későbbi scene (Level1Scene, BossScene) ugyanazt használja.
     createPlayerAnimations(this);
+    createCrowHarvesterAnimations(this);
 
     this.scene.start('Level1Scene');
   }
@@ -91,7 +104,7 @@ export default class BootScene extends Phaser.Scene {
     });
   }
 
-  // A player NEM szerepel itt: neki már valódi sprite sheetjei vannak (lásd PLAYER_SHEETS).
+  // A player és a CrowHarvester NEM szerepel itt: nekik már valódi sprite sheetjeik vannak.
   private createPlaceholderTextures(): void {
     const groundGfx = this.make.graphics({ x: 0, y: 0 }, false);
     groundGfx.fillStyle(0x3a3a3a, 1);
@@ -104,13 +117,6 @@ export default class BootScene extends Phaser.Scene {
     fireballGfx.fillCircle(8, 8, 8);
     fireballGfx.generateTexture('fireball-placeholder', 16, 16);
     fireballGfx.destroy();
-
-    // Hollow (Enemy 1) placeholder: 30x46 sötétzöld téglalap
-    const hollowGfx = this.make.graphics({ x: 0, y: 0 }, false);
-    hollowGfx.fillStyle(0x4a5a3a, 1);
-    hollowGfx.fillRect(0, 0, 30, 46);
-    hollowGfx.generateTexture('hollow-placeholder', 30, 46);
-    hollowGfx.destroy();
 
     // Lebegő platform: vékonyabb és világosabb, mint a talaj, hogy vizuálisan elváljon.
     const platformGfx = this.make.graphics({ x: 0, y: 0 }, false);
@@ -143,7 +149,7 @@ export default class BootScene extends Phaser.Scene {
     doorGfx.generateTexture('door-placeholder', 48, 72);
     doorGfx.destroy();
 
-    // Boss (The Grafted Wing-Breaker) placeholder: 64x96, a Hollow-nál jóval nagyobb.
+    // Boss (The Grafted Wing-Breaker) placeholder: 64x96, a CrowHarvesternél jóval nagyobb.
     // A vállnál lévő sötétvörös sáv adja a "hozzávarrt szárnyak" utalást, és egyben
     // láthatóvá teszi a tintelést (támadás-windup, charge telegraph).
     const bossGfx = this.make.graphics({ x: 0, y: 0 }, false);

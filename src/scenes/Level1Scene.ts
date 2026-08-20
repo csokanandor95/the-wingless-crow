@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import Player, { LadderContact } from '../player/Player';
 import PlayerController from '../player/PlayerController';
 import Fireball from '../combat/Projectile';
-import Hollow from '../enemies/Hollow';
+import CrowHarvester from '../enemies/CrowHarvester';
 import CheckpointSystem from '../systems/CheckpointSystem';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 
@@ -18,7 +18,7 @@ const GROUND_TOP = 418; // ground-placeholder 64x32, origin 0.5 -> 434 - 16
 const PLAYER_HALF_HEIGHT = 24; // player-placeholder 32x48
 const START_X = 100; // pálya eleji kezdőpont = a CheckpointSystem default-ja
 const START_Y = 300;
-const HOLLOW_SPAWN_OFFSET = 24; // hollow-placeholder 30x46, félmagasság 23 -> 1px ejtés
+const HARVESTER_SPAWN_OFFSET = 24; // a CrowHarvester talpa a sprite.y + 23-nál van -> 1px ejtés
 
 interface PlatformDef {
   id: string;
@@ -35,11 +35,11 @@ const PLATFORMS: PlatformDef[] = [
   { id: 'P1', x: 380, y: 350, tiles: 3 }, // első ugrás a talajról
   { id: 'P2', x: 620, y: 292, tiles: 2 }, // magasabb lépés
   { id: 'P3', x: 1000, y: 322, tiles: 3 }, // átvezetés
-  { id: 'P4', x: 1360, y: 300, tiles: 5 }, // platform-Hollow A (tágas)
+  { id: 'P4', x: 1360, y: 300, tiles: 5 }, // platform-CrowHarvester A (tágas)
   { id: 'P5', x: 1750, y: 342, tiles: 2 }, // lépcsős emelkedő start
   { id: 'P6', x: 1980, y: 272, tiles: 2 },
   { id: 'P7', x: 2200, y: 202, tiles: 2 }, // csúcspont
-  { id: 'P8', x: 2440, y: 272, tiles: 3 }, // platform-Hollow B (szűk)
+  { id: 'P8', x: 2440, y: 272, tiles: 3 }, // platform-CrowHarvester B (szűk)
   { id: 'P9', x: 2900, y: 140, tiles: 6, oneWay: true }, // létra célja
 ];
 
@@ -59,7 +59,7 @@ const LADDER_X = 2762;
 const LADDER_ZONE_TOP = 100;
 const LADDER_WIDTH = 28;
 
-// Platformon álló enemy patrol-határainak behúzása a peremtől (Hollow félszélesség 15px).
+// Platformon álló enemy patrol-határainak behúzása a peremtől (a CrowHarvester félszélessége 10px).
 const EDGE_INSET = 24;
 
 // Ajtó (checkpoint + boss-transition) a P9 felső platformon, a door-placeholder helyén.
@@ -86,7 +86,7 @@ export default class Level1Scene extends Phaser.Scene {
   private respawnScheduled = false;
 
   private fireballs: Fireball[] = [];
-  private enemies: Hollow[] = [];
+  private enemies: CrowHarvester[] = [];
 
   constructor() {
     super('Level1Scene');
@@ -96,7 +96,7 @@ export default class Level1Scene extends Phaser.Scene {
     // A fireballs/enemies mezők class field initializerek — csak a Scene ELSŐ
     // létrehozásakor futnak le. Egy scene-restart (pl. BossScene "R"-je) újra meghívja
     // a create()-et ugyanazon a Scene példányon, ezért itt explicit ki kell üríteni
-    // őket — különben a régi, már megsemmisített (destroyed body-jú) Hollow/Fireball
+    // őket — különben a régi, már megsemmisített (destroyed body-jú) CrowHarvester/Fireball
     // objektumok bennmaradnának, és az update() rajtuk hívott setVelocityX stb. elszállna.
     this.fireballs = [];
     this.enemies = [];
@@ -265,17 +265,17 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   private spawnEnemies(): void {
-    // Földi Hollow-k: default patrol (spawn ±80px), üldözés közben szabadon mozognak.
-    this.enemies.push(new Hollow(this, 820, 386));
-    this.enemies.push(new Hollow(this, 1850, 386));
-    this.enemies.push(new Hollow(this, 2700, 386));
+    // Földi CrowHarvesterek: default patrol (spawn ±80px), üldözés közben szabadon mozognak.
+    this.enemies.push(new CrowHarvester(this, 820, 386));
+    this.enemies.push(new CrowHarvester(this, 1850, 386));
+    this.enemies.push(new CrowHarvester(this, 2700, 386));
 
-    // Platform-kötött Hollow-k: a patrol range a platform tetejére szorul, és
+    // Platform-kötött CrowHarvesterek: a patrol range a platform tetejére szorul, és
     // clampChaseToBounds miatt üldözés közben sem sétálnak le a peremről.
     for (const id of ['P4', 'P8']) {
       const p = platformById(id);
       this.enemies.push(
-        new Hollow(this, p.x, platformTop(p) - HOLLOW_SPAWN_OFFSET, {
+        new CrowHarvester(this, p.x, platformTop(p) - HARVESTER_SPAWN_OFFSET, {
           patrolMinX: platformLeft(p) + EDGE_INSET,
           patrolMaxX: platformRight(p) - EDGE_INSET,
           clampChaseToBounds: true,
@@ -346,7 +346,7 @@ export default class Level1Scene extends Phaser.Scene {
     hitbox: PhysicsOverlapObject,
     enemyObj: PhysicsOverlapObject
   ): void {
-    const enemy = enemyObj as Hollow;
+    const enemy = enemyObj as CrowHarvester;
     if (enemy.isDead() || this.player.hasHitTarget(enemy)) return;
 
     const damage = (hitbox as Phaser.GameObjects.Zone).getData('damage') as number;
@@ -359,7 +359,7 @@ export default class Level1Scene extends Phaser.Scene {
     enemyObj: PhysicsOverlapObject
   ): void {
     const fireball = fireballObj as Fireball;
-    const enemy = enemyObj as Hollow;
+    const enemy = enemyObj as CrowHarvester;
     if (!fireball.active || fireball.hasAlreadyHit() || enemy.isDead()) return;
 
     enemy.takeDamage(fireball.getDamage());

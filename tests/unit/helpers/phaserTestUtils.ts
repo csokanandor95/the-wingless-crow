@@ -1,6 +1,6 @@
 // Megosztott mock-scene/body/segédfüggvények a unit tesztekhez. A 'phaser' modul
 // mockolása a vitest.config.ts setupFiles-ében (tests/unit/setup/phaserMock.ts)
-// történik globálisan — ez a fájl csak a Player/Hollow/Fireball konstruktorai által
+// történik globálisan — ez a fájl csak a Player/CrowHarvester/Fireball konstruktorai által
 // elvárt scene-felületet és néhány időzítés-vezérlő helpert ad.
 import { vi } from 'vitest';
 import type Phaser from 'phaser';
@@ -145,7 +145,7 @@ export function getBody(obj: { body: unknown }): Phaser.Physics.Arcade.Body {
 /**
  * Lépésenkénti delayedCall-vezérlés: minden `.next()` a *következő még le nem
  * futtatott* ütemezett hívást futtatja le, regisztrációs sorrendben. Ez kell az olyan
- * EGYMÁSBA ÁGYAZOTT delayedCall-láncokhoz, mint a Hollow.startAttack() (startup →
+ * EGYMÁSBA ÁGYAZOTT delayedCall-láncokhoz, mint a CrowHarvester.startAttack() (startup →
  * a callbackjén belül cooldown) — csak így figyelhető meg a köztes állapot
  * (pl. COOLDOWN a CHASE előtt).
  *
@@ -168,7 +168,7 @@ export function createDelayedCallStepper(scene: MockScene, skipExisting = false)
     /**
      * A kurzortól a végéig lefuttat mindent (beleértve a futtatás közben újonnan
      * ütemezetteket is), anélkül hogy a már `.next()`-tel lefuttatott hívásokat
-     * újra elsütné. Arra kell, amikor két objektum (pl. Hollow + Player) UGYANAZT
+     * újra elsütné. Arra kell, amikor két objektum (pl. CrowHarvester + Player) UGYANAZT
      * a scene-t osztja meg, és egymásba ágyazva/összefonódva ütemeznek
      * delayedCall-okat — ilyenkor a köztes állapotot `.next()`-tel figyeljük meg,
      * a többit meg egyszerűen lefuttatjuk.
