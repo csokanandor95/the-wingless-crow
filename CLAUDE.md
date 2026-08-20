@@ -163,6 +163,15 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
     a támadás-animációk hossza az `ATTACK_CONFIGS[type].startupDelayMs + activeDurationMs`,
     a cast/hurt lock pedig a `CAST_ANIM_MS` / `HURT_ANIM_MS`-ból származik
     (`CAST_DELAY_MS = CAST_ANIM_MS`). Így az animáció és a gameplay-lock nem tud elcsúszni.
+  - **A hitbox MÉRETE is az animációból van levezetve**, nem szabadon hangolt szám: az
+    `ATTACK_CONFIGS[type].hitboxWidth/hitboxOffsetX` az adott támadás AKTÍV frame-jeinek
+    tényleges kiterjedéséhez igazodik (LIGHT: az ív +32px-ig ér → hitbox +6..+30; HEAVY:
+    +63px → +9..+59). **Ha a támadás frame-tartománya változik a `PlayerAnimations.ts`-ben,
+    a hitboxot EGYÜTT kell újraszámolni** — különben a kard láthatóan a levegőt találja el
+    (pontosan ez volt a hiba az első verzióban: a light hitbox 18px-szel tovább ért, mint
+    ameddig a kard elér). Következmény, amivel számolni kell: a light attack effektív
+    hatótávja (+30, plusz az enemy félszélessége) alig van a Hollow `ATTACK_RANGE = 42`-je
+    fölött — a light így szándékosan közelharci, a heavy a biztonságos távolságú opció.
   - **Nincs magic animáció a csomagban** — a CAST a `Health.png` "gyógyital" anim `f0–4`
     szakaszát használja (a lovag piros izzó gömböt emel, ami szikrákra pattan). A fireball
     pont a szikrák pillanatában születik, a kéz magasságában (`FIREBALL_SPAWN_OFFSET_Y`).
