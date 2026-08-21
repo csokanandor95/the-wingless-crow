@@ -16,15 +16,23 @@ import GraftedWingBreaker, {
   SLASH_DAMAGE,
   PROJECTILE_MIN_RANGE,
   PROJECTILE_SPAWN_OFFSET_X,
+  PROJECTILE_STARTUP_MS,
   CHARGE_MIN_RANGE,
   CHARGE_SPEED,
   CHARGE_DAMAGE,
+  ACTION_COOLDOWN_MS,
+  SPELL_MIN_RANGE,
+  SPELL_CAST_MS,
+  SPELL_DAMAGE,
+  SPELL_HIT_HALF_WIDTH,
 } from '../../src/bosses/GraftedWingBreaker';
+import { SPELL_IMPACT_MS } from '../../src/bosses/GraftedWingBreakerAnimations';
 import Player, { MAX_HP as PLAYER_MAX_HP } from '../../src/player/Player';
 import {
   createMockScene,
   getBody,
   createDelayedCallStepper,
+  createDelayedCallRunner,
   type MockScene,
 } from './helpers/phaserTestUtils';
 
@@ -131,10 +139,15 @@ describe('GraftedWingBreaker (Boss)', () => {
 
   describe('approach', () => {
     it('DIRECTION_DEADZONE: közvetlenül a boss felett álló player nem okoz irány-oszcillációt', () => {
-      // A player majdnem pontosan a boss felett van (pl. az aréna platformján): a
-      // vízszintes távolság ~0, a 2D távolság viszont túl nagy a slash-hez és túl kicsi
-      // a lövedékhez -> az APPROACH ág fut, aminek meg kell állnia, nem pörögnie.
-      const abovePlayer = createPlayerAt(scene, BOSS_X + 2, BOSS_Y - 120);
+      // A player majdnem pontosan a boss felett van (pl. felugorva): a vízszintes távolság
+      // ~0, a 2D távolság viszont túl nagy a slash-hez és túl kicsi a lövedékhez/spellhez
+      // -> az APPROACH ág fut, aminek meg kell állnia, nem pörögnie.
+      //
+      // A magasság a KONSTANSOKBÓL származik, nem beégetett szám: a SLASH_RANGE a boss
+      // sprite kaszájának tényleges nyúlásából jön, tehát egy sprite-csere magától
+      // elmozdítaná ezt a küszöböt.
+      const gapDistance = (SLASH_RANGE + PROJECTILE_MIN_RANGE) / 2;
+      const abovePlayer = createPlayerAt(scene, BOSS_X + 2, BOSS_Y - gapDistance);
 
       boss.update(abovePlayer);
       const firstVelocity = getBody(boss).velocity.x;
@@ -216,6 +229,107 @@ describe('GraftedWingBreaker (Boss)', () => {
         expect.any(Number),
         -1
       );
+    });
+  });
+
+  // Shadow Spell (Phase 8): a boss a player AKKORI pozíciójára idéz egy árny-oszlopot, ami
+  // csak SPELL_IMPACT_MS múlva csap le — addig oldalra kilépve kikerülhető. A charge-dzsal
+  // szemben MINDKÉT fázisban elérhető.
+  describe('attack state — shadow spell', () => {
+    // Elég messze a spellhez (>SPELL_MIN_RANGE), de a charge vízszintes küszöbén BELÜL,
+    // hogy Phase 2-ben ne a roham vigye el a sort.
+    const SPELL_PLAYER_X = BOSS_X + SPELL_MIN_RANGE + 20;
+
+    /**
+     * A spell a lövedék MÖGÖTT áll a prioritási sorban, tehát oda kell juttatni a bosst,
+     * hogy a lövedék épp újratöltsön. A runner késleltetés szerint válogat, így a lövedék
+     * 500ms-os startupját lefuttatjuk, a 2200ms-os újratöltését viszont NEM.
+     */
+    function advanceToSpell(
+      player: Player,
+      runner: ReturnType<typeof createDelayedCallRunner>
+    ): void {
+      boss.update(player);
+      expect(boss.bossState).toBe(BossState.PROJECTILE);
+
+      runner.run(PROJECTILE_STARTUP_MS); // lövés -> COOLDOWN
+      runner.run(ACTION_COOLDOWN_MS); // -> APPROACH, de canShoot még false
+      boss.update(player);
+    }
+
+    it('a lövedék újratöltése alatt Shadow Spellt használ', () => {
+      const player = createPlayerAt(scene, SPELL_PLAYER_X, BOSS_Y);
+      advanceToSpell(player, createDelayedCallRunner(scene));
+
+      expect(boss.bossState).toBe(BossState.SPELL);
+      expect(getBody(boss).velocity.x).toBe(0); // castolás közben áll
+    });
+
+    it("a 'boss-spell' a cast végén tüzel, a player AKKORI pozíciójával", () => {
+      const player = createPlayerAt(scene, SPELL_PLAYER_X, BOSS_Y);
+      const runner = createDelayedCallRunner(scene);
+      const onSpell = vi.fn();
+      boss.on('boss-spell', onSpell);
+
+      advanceToSpell(player, runner);
+      expect(onSpell).not.toHaveBeenCalled(); // csak a cast UTÁN
+
+      runner.run(SPELL_CAST_MS);
+
+      expect(onSpell).toHaveBeenCalledTimes(1);
+      // A célpont X-e a player pozíciója, az Y a boss talpa (a scene ide teszi az oszlopot).
+      expect(onSpell).toHaveBeenCalledWith(SPELL_PLAYER_X, expect.any(Number));
+      expect(boss.bossState).toBe(BossState.COOLDOWN);
+    });
+
+    it('a becsapódás eltalálja a helyben maradó playert', () => {
+      const player = createPlayerAt(scene, SPELL_PLAYER_X, BOSS_Y);
+      const runner = createDelayedCallRunner(scene);
+
+      advanceToSpell(player, runner);
+      runner.run(SPELL_CAST_MS);
+      runner.run(SPELL_IMPACT_MS);
+
+      expect(player.getHP()).toBe(PLAYER_MAX_HP - SPELL_DAMAGE);
+    });
+
+    it('oldalra kilépve NEM talál — a célpont a cast pillanatában rögzül', () => {
+      const player = createPlayerAt(scene, SPELL_PLAYER_X, BOSS_Y);
+      const runner = createDelayedCallRunner(scene);
+
+      advanceToSpell(player, runner);
+      runner.run(SPELL_CAST_MS);
+
+      // A telegraph alatt kitér: a sáv széléről pont egy pixellel kilépve már elkerüli.
+      player.x = SPELL_PLAYER_X + SPELL_HIT_HALF_WIDTH + 1;
+      runner.run(SPELL_IMPACT_MS);
+
+      expect(player.getHP()).toBe(PLAYER_MAX_HP);
+    });
+
+    it('Phase 2-ben is elérhető (szemben a charge-dzsal, ami csak ott)', () => {
+      boss.takeDamage(DAMAGE_TO_PHASE2);
+      const player = createPlayerAt(scene, SPELL_PLAYER_X, BOSS_Y);
+      // A runner a takeDamage() hit-villanását egyszerűen nem futtatja le: késleltetés
+      // szerint válogat, a 100ms-os villanás pedig egyik lépésben sem szerepel.
+      advanceToSpell(player, createDelayedCallRunner(scene));
+
+      expect(boss.getPhase()).toBe(2);
+      expect(boss.bossState).toBe(BossState.SPELL);
+    });
+
+    it('a saját cooldownja előtt nem ismételhető', () => {
+      const player = createPlayerAt(scene, SPELL_PLAYER_X, BOSS_Y);
+      const runner = createDelayedCallRunner(scene);
+
+      advanceToSpell(player, runner);
+      runner.run(SPELL_CAST_MS);
+      runner.run(ACTION_COOLDOWN_MS); // -> APPROACH
+
+      // Se lövedék (újratölt), se spell (cooldownon) -> egyszerűen közelít.
+      boss.update(player);
+      expect(boss.bossState).toBe(BossState.APPROACH);
+      expect(getBody(boss).velocity.x).toBeGreaterThan(0);
     });
   });
 

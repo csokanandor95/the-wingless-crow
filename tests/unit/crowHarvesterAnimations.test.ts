@@ -154,6 +154,27 @@ describe('CrowHarvester animáció-vezérlés', () => {
     expect(anims(harvester).playedKeys.length).toBe(playsAfterAttackStart);
   });
 
+  it('két egymást követő támadás MINDKÉTSZER újraindítja az animációt', () => {
+    // Regresszió: a COOLDOWN ugyanarra az anim kulcsra képződik le, mint az ATTACK, és a
+    // cooldown lejárta után a lény már a következő update()-ben újra csaphat, ha a player
+    // végig hatótávon belül maradt — közben egyetlen frame sem jut a walk/idle-re. A
+    // playAnim() guardja emiatt kihagyná a második lejátszást, és a csapás a befagyott
+    // utolsó frame-en állna.
+    const near = createPlayerAt(scene, HARVESTER_X + 20, HARVESTER_Y);
+    harvester.crowHarvesterState = CrowHarvesterState.CHASE;
+
+    harvester.update(near);
+    const playsAfterFirst = anims(harvester).playedKeys.length;
+
+    flushAllDelayedCalls(scene); // startup -> találat -> cooldown -> CHASE
+    expect(harvester.crowHarvesterState).toBe(CrowHarvesterState.CHASE);
+
+    harvester.update(near); // azonnal új támadás, walk/idle frame nélkül
+
+    expect(harvester.crowHarvesterState).toBe(CrowHarvesterState.ATTACK);
+    expect(anims(harvester).playedKeys.length).toBe(playsAfterFirst + 1);
+  });
+
   it('sebzésre lejátszik egy hit animációt, ami a következő frame-eken sem íródik felül', () => {
     harvester.takeDamage(5);
     expect(anims(harvester).currentKey).toBe(CROW_HARVESTER_ANIMS.HIT);

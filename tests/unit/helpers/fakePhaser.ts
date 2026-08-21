@@ -66,6 +66,14 @@ export function createFakePhaserModule() {
     alpha = 1;
     originX = 0.5;
     originY = 0.5;
+    scaleX = 1;
+    scaleY = 1;
+    depth = 0;
+    // A tint mostantól MEGFIGYELHETŐ: a boss hit-villanása FILL módú fehér tint (a MULTIPLY
+    // módú fehér ugyanis az egységelem, tehát no-op lenne), és a charge piros telegraph-ja
+    // sem törlődhet el egy találattól. Enélkül a tesztek nem tudnák ezt őrizni.
+    tintColor: number | null = null;
+    tintMode = 0; // Phaser.TintModes.MULTIPLY
     anims = new MockAnimationState();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     body: any = null;
@@ -112,10 +120,30 @@ export function createFakePhaserModule() {
       this.visible = v;
       return this;
     }
-    setTint(_color: number) {
+    setScale(x: number, y?: number) {
+      this.scaleX = x;
+      this.scaleY = y ?? x;
+      return this;
+    }
+    setDepth(v: number) {
+      this.depth = v;
+      return this;
+    }
+    setAlpha(v: number) {
+      this.alpha = v;
+      return this;
+    }
+    setTint(color: number) {
+      this.tintColor = color;
+      return this;
+    }
+    /** Phaser 4: a tint SZÍNE és MÓDJA külön beállítás (a setTintFill() törölve lett). */
+    setTintMode(mode: number) {
+      this.tintMode = mode;
       return this;
     }
     clearTint() {
+      this.tintColor = null;
       return this;
     }
     destroy() {
@@ -131,6 +159,10 @@ export function createFakePhaserModule() {
     // a regisztrált callbacket.
     Scenes: { Events: { SHUTDOWN: 'shutdown' } },
     Sound: { Events: { UNLOCKED: 'unlocked' } },
+    Animations: { Events: { ANIMATION_COMPLETE: 'animationcomplete' } },
+    // Phaser 4-ben a tint módja külön enum (Phaser 3-ban a setTintFill() kapcsolta).
+    // Csak a ténylegesen használt kettő kell; az értékek a valódi Phaser sorrendjét követik.
+    TintModes: { MULTIPLY: 0, FILL: 1 },
     Math: {
       // Ugyanaz a lerp-képlet, mint a valódi Phaser.Math.Linear: p0 + (p1 - p0) * t.
       Linear: (p0: number, p1: number, t: number) => p0 + (p1 - p0) * t,

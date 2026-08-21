@@ -5,19 +5,15 @@ import {
   animKeyForState,
   ATTACK_WINDUP_MS,
   BODY_HEIGHT,
-  BODY_OFFSET_X,
-  BODY_OFFSET_X_FLIPPED,
-  BODY_OFFSET_Y,
   BODY_WIDTH,
   CROW_HARVESTER_ANIMS,
+  CROW_HARVESTER_FACING,
   DEATH_FADE_MS,
   DEATH_SINK_PX,
   HIT_ANIM_MS,
-  ORIGIN_X,
-  ORIGIN_X_FLIPPED,
-  ORIGIN_Y,
   TEXTURE_KEY,
 } from './CrowHarvesterAnimations';
+import { applyFacing } from '../systems/SpriteFacing';
 
 // Projektterv 11. pont – Enemy 1 (CrowHarvester) state machine:
 // PATROL → DETECT PLAYER → CHASE → ATTACK → COOLDOWN → CHASE
@@ -197,6 +193,13 @@ export default class CrowHarvester extends Phaser.Physics.Arcade.Sprite implemen
     this.setVelocityX(0);
     // A korábbi narancs windup-tint elmaradt: a telegraph most a magasba emelt kasza,
     // ami olvashatóbb (a sebzés akkor érkezik, amikor a fehér ív megjelenik).
+    //
+    // currentAnimKey = null KELL: a COOLDOWN ugyanerre az anim kulcsra képződik le, és a
+    // cooldown lejárta után a lény már a KÖVETKEZŐ update()-ben újra támadhat (ha a player
+    // végig ATTACK_RANGE-en belül maradt) — közben egyetlen frame sem jut a walk/idle-re.
+    // A playAnim() guardja így kihagyná a lejátszást, és a második csapás a befagyott
+    // utolsó frame-en állna.
+    this.currentAnimKey = null;
     this.updateAnimation();
 
     this.scene.time.delayedCall(ATTACK_STARTUP_MS, () => {
@@ -286,16 +289,11 @@ export default class CrowHarvester extends Phaser.Physics.Arcade.Sprite implemen
   /**
    * Fordulás. A sprite natívan JOBBRA néz, és a lény teste a 64px-es frame BAL oldalán ül
    * (közepe x=14), ezért egy sima setFlipX() 36px-t ugrasztaná oldalra — a flipX ugyanis a
-   * FRAME közepére tükröz, nem az originre. Ezt úgy kompenzáljuk, hogy az origint ÉS a
-   * body offsetjét együtt tükrözzük: így a test mindkét irányban a sprite.x-en marad.
+   * FRAME közepére tükröz, nem az originre. A kompenzációt (origin + body offset együttes
+   * tükrözése) a megosztott `systems/SpriteFacing.ts` végzi.
    */
   private setFacing(faceLeft: boolean): void {
-    this.setFlipX(faceLeft);
-    this.setOrigin(faceLeft ? ORIGIN_X_FLIPPED : ORIGIN_X, ORIGIN_Y);
-    (this.body as Phaser.Physics.Arcade.Body).setOffset(
-      faceLeft ? BODY_OFFSET_X_FLIPPED : BODY_OFFSET_X,
-      BODY_OFFSET_Y
-    );
+    applyFacing(this, CROW_HARVESTER_FACING, faceLeft);
   }
 
   private updateAnimation(): void {

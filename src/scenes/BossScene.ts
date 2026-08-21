@@ -3,11 +3,21 @@ import Player from '../player/Player';
 import PlayerController from '../player/PlayerController';
 import Fireball from '../combat/Projectile';
 import GraftedWingBreaker, {
+  BossState,
   PROJECTILE_DAMAGE,
   PROJECTILE_SPEED,
 } from '../bosses/GraftedWingBreaker';
+import {
+  FEET_OFFSET_Y as BOSS_FEET_OFFSET_Y,
+  SCALE as BOSS_SCALE,
+  SPELL_ORIGIN_X,
+  SPELL_ORIGIN_Y,
+  TEXTURE_KEY as BOSS_TEXTURE_KEY,
+  WING_BREAKER_ANIMS,
+} from '../bosses/GraftedWingBreakerAnimations';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 import AudioManager, { MUSIC_KEYS } from '../systems/AudioManager';
+import AfterImageTrail from '../systems/AfterImageTrail';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 
 // Boss aréna (Project_plan.md 15. pont): fix, egy képernyős pálya — nincs kameragörgetés,
@@ -19,21 +29,18 @@ const ARENA_HEIGHT = 450;
 const GROUND_CENTER_Y = 434;
 const GROUND_TOP = 418; // ground-placeholder 64x32, origin 0.5 -> 434 - 16
 
-// A spawn X szándékosan a bal oldali platform (x >= 126) BAL oldalán van, hogy a player
-// ne akadhasson fel a platform sarkára belépéskor, hanem szabadon a talajra essen.
+// Az aréna szélén, hogy a boss (aki jobb oldalt spawnol) és a player között legyen távolság.
 const PLAYER_SPAWN_X = 80;
 const PLAYER_SPAWN_Y = 300;
 
-const BOSS_HALF_HEIGHT = 48; // boss-placeholder 64x96
+// A boss sprite talpa a sprite.y-tól BOSS_FEET_OFFSET_Y-ra van (a sprite geometriájából
+// levezetve, lásd GraftedWingBreakerAnimations.ts) — így a spawn pontosan a talajra teszi.
 const BOSS_SPAWN_X = 620;
-const BOSS_SPAWN_Y = GROUND_TOP - BOSS_HALF_HEIGHT;
+const BOSS_SPAWN_Y = GROUND_TOP - BOSS_FEET_OFFSET_Y;
 
-// Két alacsony oldalsó platform: kitérési lehetőség a charge elől, és magaslat, ahonnan
-// a player leugorva támadhat. Elég alacsonyak ahhoz, hogy egy ugrással elérhetők legyenek.
-const ARENA_PLATFORMS = [
-  { x: 190, y: 290, tiles: 2 },
-  { x: 610, y: 290, tiles: 2 },
-];
+// Az aréna ÜRES: nincs lebegő platform. A charge elől vízszintesen kitérve vagy a roham
+// fölött átugorva lehet menekülni, a Shadow Spell elől pedig oldalra lépve — mindkettőhöz
+// tiszta, akadálymentes padló kell, és így a 108px magas boss sem akadhat platformba.
 
 // A háttér 800x450-es, tehát 1:1-ben, skálázás nélkül fedi az arénát. A tint egy enyhe
 // sötétítés (0xb0 = 69%): a nyers festmény olyan világos és részletgazdag, hogy elnyomná
@@ -66,6 +73,7 @@ export default class BossScene extends Phaser.Scene {
   private controller!: PlayerController;
   private boss!: GraftedWingBreaker;
   private audio!: AudioManager;
+  private chargeTrail!: AfterImageTrail;
 
   private playerHpText!: Phaser.GameObjects.Text;
   private bossHpBar!: Phaser.GameObjects.Graphics;
@@ -110,39 +118,24 @@ export default class BossScene extends Phaser.Scene {
     // A body aktív marad, csak a rajzolás marad el.
     groundSprite.setVisible(false);
 
-    const platforms = this.createPlatforms();
-
     this.player = new Player(this, PLAYER_SPAWN_X, PLAYER_SPAWN_Y);
     this.physics.add.collider(this.player, ground);
-    this.physics.add.collider(this.player, platforms);
 
     this.boss = new GraftedWingBreaker(this, BOSS_SPAWN_X, BOSS_SPAWN_Y);
     this.physics.add.collider(this.boss, ground);
-    this.physics.add.collider(this.boss, platforms);
     // Player és boss között SZÁNDÉKOSAN nincs collider: a sebzés a támadás-hitboxokon
     // keresztül megy, így nem tolják egymást a pálya szélére.
 
-    this.registerCombatOverlaps(ground, platforms);
+    // A charge sebesség-csíkja. A boss sprite csomagjában nincs dash animáció; a megtartott
+    // kitörés-póz mellé ez adja a mozgás érzetét.
+    this.chargeTrail = new AfterImageTrail(this, this.boss);
+
+    this.registerCombatOverlaps(ground);
     this.registerBossEvents();
 
     this.controller = new PlayerController(this, this.player);
     this.createHud();
     this.startEntrance();
-  }
-
-  private createPlatforms(): Phaser.Physics.Arcade.StaticGroup {
-    const platforms = this.physics.add.staticGroup();
-
-    for (const def of ARENA_PLATFORMS) {
-      const sprite = platforms.create(
-        def.x,
-        def.y,
-        'platform-placeholder'
-      ) as Phaser.Physics.Arcade.Sprite;
-      sprite.setScale(def.tiles, 1).refreshBody();
-    }
-
-    return platforms;
   }
 
   /**
@@ -159,10 +152,7 @@ export default class BossScene extends Phaser.Scene {
       .setTint(BACKGROUND_TINT);
   }
 
-  private registerCombatOverlaps(
-    ground: Phaser.Physics.Arcade.StaticGroup,
-    platforms: Phaser.Physics.Arcade.StaticGroup
-  ): void {
+  private registerCombatOverlaps(ground: Phaser.Physics.Arcade.StaticGroup): void {
     this.physics.add.overlap(
       this.player.getAttackHitbox(),
       this.boss,
@@ -184,14 +174,12 @@ export default class BossScene extends Phaser.Scene {
       this
     );
 
-    // Mindkét lövedék-fajta becsapódik a geometriába.
+    // Mindkét lövedék-fajta becsapódik a talajba.
     for (const projectiles of [this.fireballs, this.bossProjectiles]) {
-      for (const solid of [ground, platforms]) {
-        this.physics.add.collider(projectiles, solid, (projectileObj) => {
-          const projectile = projectileObj as Fireball;
-          if (projectile.active) projectile.onImpact();
-        });
-      }
+      this.physics.add.collider(projectiles, ground, (projectileObj) => {
+        const projectile = projectileObj as Fireball;
+        if (projectile.active) projectile.onImpact();
+      });
     }
   }
 
@@ -207,6 +195,21 @@ export default class BossScene extends Phaser.Scene {
           size: 20,
         })
       );
+    });
+
+    // Shadow Spell: a boss csak a CÉLPONTOT emittálja (a sebzést maga oldja fel), az
+    // árny-oszlopot mi rajzoljuk ki. Az origin a Spell frame-ek mért geometriájából jön:
+    // az oszlop talpa pontosan a megadott talaj-Y-ra ül, az izzás pedig a player feje
+    // fölött lebeg, amíg le nem csap.
+    this.boss.on('boss-spell', (x: number, groundY: number) => {
+      const pillar = this.add
+        .sprite(x, groundY, BOSS_TEXTURE_KEY)
+        .setOrigin(SPELL_ORIGIN_X, SPELL_ORIGIN_Y)
+        .setScale(BOSS_SCALE)
+        .setDepth(5);
+
+      pillar.play(WING_BREAKER_ANIMS.SPELL);
+      pillar.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => pillar.destroy());
     });
 
     this.boss.on('boss-phase-change', () => {
@@ -304,6 +307,9 @@ export default class BossScene extends Phaser.Scene {
     if (this.fightStarted) {
       this.boss.update(this.player);
     }
+
+    // A dash sebesség-csíkja. A boss állapota public, ezért nem kell hozzá külön event.
+    this.chargeTrail.update(this.boss.bossState === BossState.CHARGE);
 
     // Az inaktív lövedékek kitakarítása MINDIG helyben, splice()-szal: a tömbök
     // referenciája be van kötve a physics.add.overlap-ba, egy filter()-es újra-értékadás

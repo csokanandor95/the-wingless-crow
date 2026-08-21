@@ -98,13 +98,36 @@ gótikus katedrális, ami palettában pontosan illik a Level 1 hátteréhez. **N
 1 `door-placeholder` dekoráció törölve, a szürke talaj-téglalap pedig láthatatlanná téve
 (a fizikája megmarad). Részletek lentebb, a "BossScene" szakaszban.
 
-A Phase 8 többi része (boss/environment sprite-ok, SFX, particles, level ambient,
+**Phase 8 — 6. iteráció: BOSS SPRITE + SHADOW SPELL kész.** A *Grafted Wing-Breaker* már
+nem placeholder téglalap, hanem valódi pixel art (`assets/sprites/grafted-wing-breaker/`,
+a **Bringer of Death** csomagból — Clembod; személyes és kereskedelmi használat + módosítás
+engedélyezett, újraértékesítés nem). Új modulok: `bosses/GraftedWingBreakerAnimations.ts`,
+`systems/SpriteFacing.ts` (a CrowHarvesterrel MEGOSZTOTT fordulás-kompenzáció),
+`systems/AfterImageTrail.ts`.
+
+A csomag egyetlen hiányossága, hogy **nincs dash animációja**. Két irányból oldottuk meg:
+- **A charge** egy MEGTARTOTT kitörés-pózt kapott a sheet effekt nélküli változatáról
+  (`clean[20]`), plusz egy afterimage-csíkot. A windup (`Attack f16–19`) és a dash póz
+  animáció-folytonos: a boss hátrahúzza a kaszát, majd abból lendül előre.
+- **Új negyedik támadás: Shadow Spell** (`Cast` + a csomag különálló `Spell` effektje).
+  A boss a player AKKORI pozíciójára idéz egy árny-oszlopot, ami 960 ms-ig izzásként lebeg
+  a feje fölött, és csak utána csap le → oldalra kilépve kikerülhető. **Mindkét fázisban**
+  elérhető (a charge továbbra is csak Phase 2-ben).
+
+A boss `SCALE = 2` (94×112 px látvány), és ezzel együtt a **`SLASH_RANGE` 70 → 138**:
+a projekt elve szerint a hitbox az animáció tényleges kiterjedéséből származik, itt a kasza
+mért nyúlásából. Ez érdemi balansz-változás — lásd a "Nyitott polish-tételek" alatt.
+Az aréna **két lebegő platformja törölve** (user döntés): a charge és a spell elől is tiszta,
+akadálymentes padlón kell kitérni.
+
+A Phase 8 többi része (environment sprite-ok, SFX, particles, level ambient,
 `ui/` modul) még hátravan.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (8 fájl, 123 teszt — ebből 3 az animáció-/háttér-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (10 fájl, 156 teszt — ebből 5 az animáció-/háttér-/VFX-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
 - A `CrowHarvester`/`Player`/`GraftedWingBreaker` `scene.time.delayedCall`-jai **interleave-elhetnek** (pl. `CrowHarvester.resolveAttackHit()` a `Player.takeDamage()`-en keresztül saját delayedCallt ütemez ugyanazon a mock scene-en) — ezért a `createDelayedCallStepper` helper (`tests/unit/helpers/phaserTestUtils.ts`) `.next()` (egy lépés) ÉS `.flushRemaining()` (a kurzortól a végéig, újra-tüzelés nélkül) metódust is ad. A `createDelayedCallStepper(scene, true)` (`skipExisting`) a kurzort a MÁR ütemezett hívások mögé állítja — ez kell, ha a teszt előkészítése maga is ütemez callbackeket (pl. a bosst Phase 2-be sebezzük, ami hit-villanást ütemez).
+- A stepper viszont REGISZTRÁCIÓS sorrendben halad, ami néha túl merev: a boss egy támadásnál több, KÜLÖNBÖZŐ hosszúságú callbacket is ütemez egyszerre (a lövedék 500ms-os startupját ÉS a 2200ms-os újratöltését), és pont az a kérdés, mi történik, ha az egyik lefutott, a másik nem — így jut el a boss a lövedékről a Shadow Spellre. Erre való a `createDelayedCallRunner(scene)`: a `run(delayMs)` mindig az adott késleltetéssel ütemezett, még le nem futtatott ELSŐ callbacket süti el.
 
 ## Fájlstruktúra (jelenlegi, tényleges állapot)
 
@@ -130,17 +153,22 @@ the-wingless-crow/
 │       │   ├── Idle.png Run.png Jump.png Attacks.png
 │       │   ├── Hurt.png Death.png Climb.png Health.png
 │       │   └── license.txt       # 2D_SL_Knight_v1.0 licenc, a repo dokumentálja a jogi státuszt
-│       └── crow-harvester/       # Enemy 1 sprite
-│           └── enemy04_sheet.png # 1792x64 = 28 db 64x64-es frame. NINCS mellette licenc (lásd lentebb)
+│       ├── crow-harvester/       # Enemy 1 sprite
+│       │   └── enemy04_sheet.png # 1792x64 = 28 db 64x64-es frame. NINCS mellette licenc (lásd lentebb)
+│       └── grafted-wing-breaker/ # Boss 1 sprite, eredeti fájlnéven (Bringer of Death, Clembod)
+│           ├── Bringer-of-Death-SpritSheet.png          # 1120x744 = 8x8 db 140x93-as frame
+│           └── Bringer-of-Death-SpritSheet_no-Effect.png # ugyanaz effektek nélkül; 1 frame kell belőle
 ├── tests/
 │   └── unit/
 │       ├── player.test.ts       # Project_plan.md §23 Player scope
 │       ├── combat.test.ts       # §23 Combat scope (ATTACK_CONFIGS, Player attack, Fireball + ProjectileOptions)
 │       ├── crowHarvester.test.ts # §23 Enemy scope (CrowHarvester HP/damage/death/state transitions)
-│       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, attack state, death)
+│       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, slash/projectile/spell/charge, death)
 │       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown)
 │       ├── playerAnimations.test.ts       # state->anim leképezés + a Player animáció-vezérlése
 │       ├── crowHarvesterAnimations.test.ts # state->anim + a facing-kompenzáció regressziós tesztje
+│       ├── bossAnimations.test.ts         # state->anim, facing-kompenzáció SCALE-lel, levezetett konstansok
+│       ├── afterImageTrail.test.ts        # a dash sebesség-csíkja: throttle + geometria-másolás
 │       ├── parallaxBackground.test.ts     # scroll->tilePositionX + a Level 1 réteg-terv invariánsai
 │       └── helpers/
 │           ├── fakePhaser.ts        # a 'phaser' modul önálló fake névtere (createFakePhaserModule)
@@ -162,10 +190,13 @@ the-wingless-crow/
 │   │   ├── CrowHarvester.ts      # Enemy 1, state machine + CrowHarvesterConfig (patrol határok)
 │   │   └── CrowHarvesterAnimations.ts # sheet geometria, anim kulcsok, facing-kompenzáció, animKeyForState()
 │   ├── bosses/
-│   │   └── GraftedWingBreaker.ts # Boss 1, két fázis, slash / projectile / charge
+│   │   ├── GraftedWingBreaker.ts # Boss 1, két fázis, slash / projectile / spell / charge
+│   │   └── GraftedWingBreakerAnimations.ts # sheet geometria, anim kulcsok, időzítések forrása
 │   ├── systems/
 │   │   ├── CheckpointSystem.ts   # egyetlen aktív respawn-pont tárolása
 │   │   ├── AudioManager.ts       # egy zenesáv: loop + fade-in/out, scene-shutdown hookkal
+│   │   ├── SpriteFacing.ts       # off-center sprite fordulás-kompenzáció (CrowHarvester + boss)
+│   │   ├── AfterImageTrail.ts    # afterimage-csík gyors mozgáshoz (a boss dash-éhez)
 │   │   └── ParallaxBackground.ts # réteges parallax háttér + a Level 1 réteg-terve
 │   └── combat/
 │       ├── Attack.ts             # AttackType enum + ATTACK_CONFIGS (light/heavy sebzés, cooldown, hitbox méret)
@@ -346,8 +377,31 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   a valódi háttérrétegek vették át a szerepüket.)*
 - Placeholder grafikák kódból generálva (`BootScene.ts` `createPlaceholderTextures()`), nem valódi sprite-ok
 
-### Boss — The Grafted Wing-Breaker (`src/bosses/GraftedWingBreaker.ts`)
-- State machine: `DORMANT → APPROACH → SLASH / PROJECTILE / CHARGE_WINDUP → CHARGE → COOLDOWN → DEAD`
+### Boss — The Grafted Wing-Breaker (`src/bosses/GraftedWingBreaker.ts`, `GraftedWingBreakerAnimations.ts`)
+- State machine: `DORMANT → APPROACH → SLASH / PROJECTILE / SPELL / CHARGE_WINDUP → CHARGE → COOLDOWN → DEAD`
+- **Sprite + animációk (Phase 8):** két 1120×744-es sheet (effektes + `_no-Effect`), mindkettő
+  **8×8 db 140×93-as frame, AZONOS indexeléssel**: `idle 0–7`, `walk 8–15`, `attack 16–25`,
+  `hurt 26–28`, `death 29–38`, `cast 39–47`, `spell 48–63`. A sorrend ellenőrizve (az egyedi
+  PNG-k pixel-hash-e párosítva a sheet frame-jeivel). A `_no-Effect` sheetből **pontosan egy
+  frame** kell: a `clean[20]` dash póz.
+  - **`SCALE = 2`** — a rajzolt karakter 1:1-ben csak 47×56 px (a player 28×46), ami bosshoz
+    kevés. Egész szám, tehát minden forrás-pixel tiszta 2×2-es blokk, a pixel art éles marad.
+    Minden `*_PX` konstans FORRÁS-pixelben van, a világ-koordinátás értékek ebből származnak.
+  - **Natívan BALRA néz** (a CrowHarvester jobbra), és a karakter a frame **jobb** oldalán ül
+    (közepe x=106, a frame közepe 70) → dupla off-center probléma. A kompenzációt a
+    **megosztott `systems/SpriteFacing.ts`** végzi, `nativeFacing: 'left'`-tel.
+  - `ORIGIN_Y = 64/93` → a talp a `sprite.y + 54`-nél (`FEET_OFFSET_Y`), tehát a `BossScene`
+    `BOSS_SPAWN_Y`-ja is ebből számol, nem beégetett félmagasságból.
+  - **A hatótávok és az időzítések LEVEZETETTEK:** `SLASH_RANGE = BLADE_REACH_PX(69) * SCALE`
+    (a kasza mért nyúlása a csapás frame-jén), `SLASH_STARTUP_MS = SLASH_WINDUP_MS`,
+    `PROJECTILE_STARTUP_MS = CAST_RELEASE_MS`, `CHARGE_HIT_RANGE = HALF_WIDTH + player fél + 8`,
+    `PROJECTILE_SPAWN_OFFSET_Y = FEET_OFFSET_Y − player fél testmagasság`. **Az animációs modul
+    az időzítések forrása** — a boss osztály importál belőle, sosem fordítva (körkörös import).
+  - **A boss NEM flinchel** találatra: a hurt animáció megszakítaná a telegraph-jait. A
+    `Hurt` frame-ek helye a **falnak ütköző charge staggerje** — ott érdemelt, és megmutatja
+    a player-nek a punish-ablakot.
+  - A slash sárga és a projectile lila windup-tintje **törölve** (a telegraph most az animáció).
+    A **piros charge-telegraph marad** (Project_plan 12. pont).
 - **`DORMANT`** = a boss entrance ideje: nem mozog, nem támad, és **nem is sebezhető**.
   A scene a belépő-animáció végén hívja az `activate()`-et
 - HP: 240 (`MAX_HP`). **Phase 2 a 50%-nál** (`PHASE2_HP_RATIO`): gyorsabb mozgás
@@ -361,14 +415,34 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - **A boss nem hozza létre a lövedéket**, hanem `'boss-projectile'` eventet emittál (x, y, irány),
   a `BossScene` készíti el a `Fireball`-t — ugyanaz a minta, mint a `Player` `'fireball-cast'`-ja.
   Így a boss osztály nem függ a `Fireball`-tól, és unit tesztben az emisszió megfigyelhető
-- Lövedék-magasság: `PROJECTILE_SPAWN_OFFSET_Y = 30` a boss középpontjához képest — ez pont a
-  player mellmagassága, tehát **át lehet ugrani** (Project_plan.md 12. pont követelménye)
+- Lövedék-magasság: `PROJECTILE_SPAWN_OFFSET_Y = 31` a boss középpontjához képest — ez pont a
+  player mellmagassága, tehát **át lehet ugrani** (Project_plan.md 12. pont követelménye).
+  Következmény, amivel élni kell: mivel a boss 2,4×-e a playernek, a lövedék az ő
+  térdmagasságából indul, nem a felemelt kaszából
+- **Shadow Spell (Phase 8, Phase 1-ben ÉS Phase 2-ben)**: a boss a `Cast` animációval a player
+  AKKORI x-ére idéz egy árny-oszlopot (`SPELL_CAST_MS = 500` után rögzül a célpont). Az oszlop
+  előbb izzásként lebeg 76–112 px-szel a talaj felett (`SPELL_TELEGRAPH_MS = 960`), és csak
+  `SPELL_IMPACT_MS = 1140` után csap le → **oldalra kilépve kikerülhető**, ugrással NEM
+  (a becsapódás csak vízszintes távolságot néz, mert az arénában egyetlen talajszint van).
+  Sebzés 20, cooldown 5 mp. A boss — a lövedékhez hasonlóan — csak a `'boss-spell'` eventet
+  emittálja (célpont x + talaj y), a sprite-ot a `BossScene` rakja ki; a **sebzés viszont a
+  boss osztályban marad**, hogy unit-tesztelhető legyen
+- **A támadás-választás sorrendje**: `slash (≤138) → charge (P2, >200 vízsz.) → projectile (>160)
+  → spell (>160) → közelítés`. A spell szándékosan a projectile MÖGÖTT áll: így a lövedék
+  2,2 mp-es újratöltése alatt tölti ki a ritmust, és a boss nem áll be egyetlen mintába
 - Charge: `CHARGE_WINDUP_MS` (1000ms) piros telegraph-tint, az **irány a windup ELEJÉN rögzül**
   (egyenes vonalú roham, nem követi a playert), roham közben `hasHitThisCharge` miatt
   legfeljebb egyszer sebez, falnak ütközve (`body.blocked.left/right`) idő előtt véget ér,
   utána 3 mp `CHARGE_COOLDOWN_MS` csend
+- **A dash látványa** (a csomagban nincs dash animáció): a `CHARGE_WINDUP` az `Attack f16–19`
+  hátrahúzott-kasza pózán áll meg, a `CHARGE` pedig a tiszta sheet **megtartott** `clean[20]`
+  kitörés-pózán — a kettő animáció-folytonos. A sebesség érzetét a `systems/AfterImageTrail.ts`
+  adja hozzá (50 ms-onként egy halványuló másolat). A csíkot a **scene** vezérli
+  (`chargeTrail.update(boss.bossState === BossState.CHARGE)`), nem a boss osztály — így az
+  továbbra sem hoz létre scene-objektumot
 - A `takeDamage()` hit-villanása **szándékosan nem törli a charge piros telegraph-ját** —
-  a player abból olvassa ki, hogy jön a roham
+  a player abból olvassa ki, hogy jön a roham. Az `endCharge()` viszont mindenképp törli
+  (ott `resetTint()` megy, nem az állapotfüggő `clearTintState()`, mert a state ekkor még CHARGE)
 - `DIRECTION_DEADZONE` (6px), ugyanaz a védelem, mint a CrowHarvesternél: a boss ne pörögjön
   balra-jobbra, ha a player pont felette áll az aréna platformján
 - UI **nincs** az osztályban (se HP-szöveg, se bar) — azt a scene rajzolja. Ez tartja a
@@ -399,11 +473,12 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
     tölti be; a szürke téglalap kitakarná.
   - A 3 `pillar-placeholder` + 1 `door-placeholder` dekoráció **törölve** (a festményen
     valódi oszlopok és oltár van). A `createDecor()` helyére `createBackground()` lépett.
-  - **A két aréna-platform (y=290) továbbra is szürke placeholder** — gameplay-kritikusak
-    (kitérés a charge elől), ezért olvashatóságuk fontosabb, mint a stílus-egység;
-    valódi tile-t a `assets/tiles/` iterációban kapnak.
-- Folyamatos talaj + 2 alacsony oldalsó platform (kitérés a charge elől, magaslat a leugró
-  támadáshoz)
+  - **A két aréna-platform TÖRÖLVE** (Phase 8, 6. iteráció — user döntés). Az aréna padlója
+    teljesen üres: a charge elől vízszintesen kitérve vagy a roham fölött átugorva, a Shadow
+    Spell elől oldalra lépve lehet menekülni — mindkettőhöz akadálymentes padló kell, és így
+    a 108px magas boss sem akadhat platformba. Ezzel a `platform-placeholder` teljesen
+    kikerült a `BossScene`-ből.
+- Folyamatos, akadálymentes talaj (nincs lebegő platform)
 - **Player és boss között SZÁNDÉKOSAN nincs collider**: a sebzés a támadás-hitboxokon megy,
   így nem tolják egymást a pálya szélére
 - Belépő: `fadeIn` + a boss neve be/kifadel (tween `hold` + `yoyo`), utána `boss.activate()`
@@ -460,7 +535,7 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 8. **A `vi.fn()` paramétertípus nélkül üres tuple-ként (`[]`) tipizálja a `mock.calls`-t.** Ha a teszt ki akarja olvasni a hívás argumentumait (pl. a tween konfigját), a mocknak explicit paramétertípust kell adni: `vi.fn((_config: MockTweenConfig) => ...)`. A tesztek futottak, de a `tsc --noEmit` elszállt tőle.
 9. **Egy nem loopoló animációt NEM elég `play(key, true)`-val „ignoreIfPlaying" módban indítani.** Amint a lejátszás véget ér, az animáció már nem „playing", tehát a következő frame `play(key, true)`-ja ÚJRAINDÍTJA — a halál-animáció így vég nélkül loopolna. Ezért van a `Player.playAnim()` `currentAnimKey` guardja: csak akkor hív `play()`-t, ha a kulcs ténylegesen VÁLTOZOTT. Következmény: minden olyan hely, ami „ugyanarra" a state-re akar animációt ÚJRAINDÍTANI (pl. `respawn()`), köteles előbb `currentAnimKey = null`-t írni.
 10. **`Phaser.Physics.Arcade.Sprite`-on a `setSize()`/`setOffset()` KÉT különböző dolgot jelenthet.** A `Components.Size` (physics body) verziója árnyékolja a GameObject logikai-méret verzióját, és a kettő mást csinál. A félreértés elkerülésére a `Player` konstruktora közvetlenül a bodyn hívja őket: `body.setSize(w, h, false)` + `body.setOffset(x, y)`. A `center: false` KELL — különben a `setSize` újraközpontozza és felülírja az utána beállított offsetet.
-11. **Off-center sprite + `flipX` = a karakter oldalra UGRIK forduláskor.** A `flipX` a FRAME közepére tükröz, nem az originre. Ha a rajzolt figura nem a frame közepén van (a `CrowHarvester` teste a 64px-es frame x=14-énél ül, mert a kasza tölti ki a jobb oldalt), akkor egy sima `setFlipX()` a testet `2 * (32 - 14) = 36px`-t ugrasztja. A javítás: forduláskor az **`originX`-et ÉS a physics body offsetjét EGYÜTT** tükrözni (`CrowHarvester.setFacing()`): `originX ↔ 1 - originX`, `offsetX ↔ frameWidth - offsetX - bodyWidth`. A `tests/unit/crowHarvesterAnimations.test.ts` pont ezt a párost őrzi (a body világkoordinátás közepének nem szabad elmozdulnia). **Minden további off-center enemy sheetnél ugyanez a teendő** — érdemes lesz kiemelni közös helperbe, ha jön a második ilyen.
+11. **Off-center sprite + `flipX` = a karakter oldalra UGRIK forduláskor.** A `flipX` a FRAME közepére tükröz, nem az originre. Ha a rajzolt figura nem a frame közepén van (a `CrowHarvester` teste a 64px-es frame x=14-énél ül, mert a kasza tölti ki a jobb oldalt), akkor egy sima `setFlipX()` a testet `2 * (32 - 14) = 36px`-t ugrasztja. A javítás: forduláskor az **`originX`-et ÉS a physics body offsetjét EGYÜTT** tükrözni (`CrowHarvester.setFacing()`): `originX ↔ 1 - originX`, `offsetX ↔ frameWidth - offsetX - bodyWidth`. A `tests/unit/crowHarvesterAnimations.test.ts` pont ezt a párost őrzi (a body világkoordinátás közepének nem szabad elmozdulnia). **Ez a tétel LEZÁRVA:** a boss sheetje volt a második ilyen eset, ezért a kompenzáció átkerült a megosztott `systems/SpriteFacing.ts`-be — lásd a 16. pontot.
 12. **A Phaser 4 `TileSprite` NEM nyújtja kettőhatványra a textúrát — a Phaser 3 igen.**
     Phaser 3-ban a `TileSprite` a forrás frame-et a következő kettőhatvány méretű canvasra
     rajzolta *átméretezve* (426×384 → 512×512), tehát minden nem-POT háttér torzult. Phaser
@@ -476,17 +551,42 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
     peremén, és a `startFollow` lerpje miatt a `camera.scrollX` gyakorlatilag mindig tört.
     Ezért van a `ParallaxBackground.tilePositionForScroll()`-ban a `Math.round()` — a
     `tests/unit/parallaxBackground.test.ts` ezt őrzi.
-14. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
+14. **A `setTintFill()` Phaser 4-ben TÖRÖLVE van** — a hívása csak egy `console.error`-t ír ki
+    és nem csinál semmit (`Tint.js`). Helyette:
+    `sprite.setTint(color).setTintMode(Phaser.TintModes.FILL)`, visszaállításnál pedig
+    `clearTint()` **ÉS** `setTintMode(Phaser.TintModes.MULTIPLY)` — Phaser 4-ben a tint SZÍNE
+    és MÓDJA külön beállítás, a `clearTint()` a módot nem állítja vissza.
+    Ebből következik a másik csapda: **a `setTint(0xffffff)` MULTIPLY módban NO-OP**, mert a
+    fehér a szorzás egységeleme. A bossnak (és korábban a Hollow-nak) emiatt éveken át
+    egyáltalán nem volt látható találat-visszajelzése, pedig a kód "villantott".
+15. **A `body.setSize()` a sprite `scale`-jével SZORZÓDIK, és a Body a skálát a
+    KONSTRUKTORÁBAN menti el.** Az Arcade `Body.setSize(w, h)` a `sourceWidth`-et állítja, a
+    tényleges méret `sourceWidth * this._sx` (`Body.js:1506`), a body pozíciója pedig
+    `x + scaleX * (offset.x - displayOriginX)`. Ezért:
+    - a `setScale()`-nek a `physics.add.existing()` **ELŐTT** kell lefutnia, különben a body
+      egy frame-ig rossz méretű (a `_sx` csak a következő physics step-ben frissül);
+    - a `setSize`/`setOffset` értékei **forrás-pixelben** mennek, nem világ-pixelben;
+    - a fordulás-kompenzáció képlete emiatt **skálafüggetlen** (a `scaleX` egyenletes szorzó).
+16. **Az off-center fordulás-kompenzáció közös helperbe került** (`systems/SpriteFacing.ts`),
+    mert a boss sheetje a második ilyen eset — és ellentétes natív iránnyal
+    (`nativeFacing: 'left'` vs. a CrowHarvester `'right'`-ja). Az `applyFacing()` három dolgot
+    állít EGYSZERRE: `flipX`, `originX` és a body `offsetX`. Ha bármelyik kimarad, a test
+    elcsúszik a `sprite.x`-től. A `bodyCenterX` **levezetett** érték
+    (`bodyOffsetX + bodyWidth / 2`), nem külön hangolható konstans. Ezt a
+    `crowHarvesterAnimations.test.ts` és a `bossAnimations.test.ts` egyaránt őrzi.
+17. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
-- **A player, a CrowHarvester és MINDKÉT háttér (Level 1 + boss aréna) KIVÉTELÉVEL**
-  minden grafika kódból generált színes téglalap/kör (`generateTexture`) — a boss, a
+- **A három karakter (player, CrowHarvester, boss) és MINDKÉT háttér (Level 1 + boss aréna)
+  KIVÉTELÉVEL** minden grafika kódból generált színes téglalap/kör (`generateTexture`) — a
   talaj/platformok, a létra, a Level 1 ajtaja és mindkét lövedék még placeholder
 - CrowHarvester felett lebegő HP szöveg (debug célra, valódi HUD a `ui/` modulban készül majd)
 - A bal felső sarki HUD szöveg a HP mellett a **player state-et is kiírja** (`HP: 100/100 | CLIMB`) — a mászás manuális tesztelését segíti, Phase 8-ban cserélendő
-- Hit-reakció **a bossnál** = tint villanás, nincs valódi animáció (a playernél és a
-  CrowHarvesternél már van hit/hurt animáció)
+- A boss találat-visszajelzése **szándékosan** csak fehér sziluett-villanás (`TintModes.FILL`),
+  nincs hurt animáció: egy bossnál a minden ütésre bekövetkező flinch megszakítaná a
+  telegraph-okat. NEM placeholder, hanem design-döntés — a `Hurt` frame-ek a falnak ütköző
+  charge staggerjében szerepelnek
 - **NYITOTT JOGI TÉTEL:** a CrowHarvester assethez (`assets/sprites/crow-harvester/`)
   — a knight csomaggal ellentétben — **nem került licenc fájl a repóba**. Ez tudatos,
   elhalasztott döntés. A forrás valószínűleg a `2D helper/Credits.txt`-ben szereplő
@@ -505,11 +605,21 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   előtt ellenőrizni kell. **Megjegyzés:** a `Bossbackground_2.png` (ugyanott, angyal-
   szobros katedrális, nyitott égbolttal) NEM ennek a fázis-variánsa, hanem egy külön
   aréna — jó jelölt egy jövőbeli Boss #2-höz.
+- **A boss sprite licence RENDBEN VAN, de a fájl nincs a repóban.** A forráscsomag
+  (`2D helper/enemy/Bringer-Of-Death`, Clembod) `License.txt`-je: *"You can use this asset for
+  personal and commercial purpose, you can modify this object to your needs. Credit is not
+  required but would be appreciated. You can NOT redistribute or resell it."* A user a
+  licenceket külön gyűjti, ezért itt sincs licenc fájl; a forrást a `BootScene` importjainál
+  lévő komment és az **eredeti fájlnevek** (`Bringer-of-Death-SpritSheet*.png`) kötik vissza.
+  A csomagban van egy `Contact.txt` is (Clembod: Twitter/Instagram/itch.io/ArtStation) — a
+  credit nem kötelező, de a projekt végén illendő.
 - `pillar-placeholder` (már csak a létra mögötti hátfal) és `door-placeholder`
   dekorációk: puszta színes téglalapok
 - A checkpoint-prompt szöveg ("E: Checkpoint" / "Checkpoint mentve...") debug-stílusú `add.text`, a `playerHpText`-hez hasonlóan — valódi UI a `ui/` modulban készül majd
 - A `BossScene` HP-barja nyers `Graphics`-szal rajzolt téglalap (`drawBossHealthBar()`), és a player HP-ja ott is a debug `add.text` — mindkettő a `ui/` modulba költözik Phase 8-ban
-- A `BossScene` két aréna-platformja szürke `platform-placeholder` a valódi festett háttér előtt — szándékos: az olvashatóság most fontosabb a stílus-egységnél, valódi tile-t a `assets/tiles/` iterációban kap
+- A boss lövedéke (`boss-projectile-placeholder`) még lila kör. A `Cast` animáció végén
+  **varjak röppennek fel** a kaszáról — egy varjú-lövedék tökéletesen illene a témához,
+  de az az `assets/effects/` iteráció dolga
 - `Level2Scene` teljes egészében placeholder ("Level 2 — The Crowless Forest / tervezés alatt"), és benne az **R billentyű** visszavisz a `Level1Scene`-re — kizárólag azért, hogy a `Level1 → Boss → átvezető → Level2` lánc manuálisan körbejárható legyen. A valódi Level 2 elkészültekor törlendő
 - A `BOSS_VICTORY_NARRATION` szövege placeholder lore — a végleges a Phase 9 – Lore-ban készül
 - A `BootScene` "Betöltés..." szövege + progress-sávja nyers `add.text` / `Graphics` — a `ui/` modulba költözik, amint több asset (sprite-ok) is betöltendő lesz
@@ -523,20 +633,19 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   death, jump, checkpoint stb.). Az `AudioManager` jelenleg csak zenét kezel — SFX-hez
   kap majd egy `playSfx(key)`-t, ami nem exkluzív (több hang egyszerre). A player
   animációi már megvannak, tehát a hangokat könnyű a megfelelő frame-hez kötni.
-- **Boss / environment sprite-ok** — a player (2. iteráció), a CrowHarvester
-  (3. iteráció) és a Level 1 háttere (4. iteráció) kész; a *Grafted Wing-Breaker*,
-  a tile-ok és a **boss aréna háttere** még placeholder.
+- **Environment sprite-ok** — a player (2. it.), a CrowHarvester (3. it.), a Level 1 háttere
+  (4. it.), a boss aréna háttere (5. it.) és a boss (6. it.) kész; **már csak a tile-ok, a
+  létra, a Level 1 ajtaja és a két lövedék** placeholder.
   A `2D helper/Sprites/` alatt van még Enemy01/02/03/05 és egy "Gino Character" — ha
-  bármelyik boss- vagy enemy-jelöltként bejön, számíts rá, hogy szintén off-center
-  (lásd a 11. technikai tanulságot).
+  bármelyik enemy-jelöltként bejön, számíts rá, hogy szintén off-center lesz; a
+  `systems/SpriteFacing.ts` már készen áll rá (lásd a 16. technikai tanulságot).
 - **Level / menü ambient.** Figyelem: az `AudioManager` most **scene-hatókörű** (a scene
   shutdownja elvágja) — scene-eken átívelő zenéhez game-szintűvé kell emelni.
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),
   narration ambient (`NarrationScene.create()`), victory sting (`BossScene.scheduleVictory()`).
 - A maradék kódból generált placeholder téglalapok cseréje valódi pixel art sprite-okra
   (`assets/tiles/`, `assets/effects/`): a talaj/platform tile-ok, a létra, a Level 1
-  ajtaja és a két lövedék. **Mindkét háttér kész** (Level 1: 4. iteráció, boss aréna:
-  5. iteráció).
+  ajtaja és a két lövedék. **Mindkét háttér és mind a három karakter kész.**
 - `ui/` modul: valódi HUD a debug `add.text`-ek helyett, és a boss HP-bar átköltöztetése
   a `BossScene.drawBossHealthBar()`-ból. Ide kerülhet a `BootScene` betöltésjelzője is.
 - A `main.ts` `arcade.debug: true` kikapcsolása.
@@ -551,5 +660,17 @@ Nyitott, nem blokkoló polish-tételek:
   (Roll, Slide, crouch, Hanging, Pray, attack_from_air) az eredeti forrásmappában. Ezekhez
   nincs state a játékban, és a Project_plan.md sem tervez ilyet — csak akkor kerüljenek be,
   ha külön döntés születik róluk (a `Pray` pl. jó checkpoint-animáció lenne).
-- A boss számai (HP 240, sebzések, cooldownok) az első hangolatlan értékek — manuális
-  játszás után érdemes finomítani őket a `GraftedWingBreaker.ts` exportált konstansaiban.
+- **A boss balanszát újra kell nézni a sprite-csere után.** A `SLASH_RANGE` 70 → **138**,
+  mert a hitboxot a projekt elve szerint az animációból vezetjük le (a kasza mért nyúlása
+  2×-es skálán). A boss így 70–138 px között is slashelhet, ahol a player még nem éri el
+  (a light attack +30, a heavy +59 a player középpontjától) — a fight ettől érdemben
+  nehezebb. Első hangolandó knobok: `SLASH_DAMAGE` (18), `ACTION_COOLDOWN_MS` (900).
+  A többi boss-szám (HP 240, sebzések, cooldownok) továbbra is az első, hangolatlan érték.
+- **A charge sebzése a boss TESTÉHEZ kötött** (`CHARGE_HIT_RANGE = 54` sugár), miközben a
+  dash pózban a kasza ~60 világ-pixellel a test előtt jár. 420 px/s mellett ez ~143 ms
+  eltérés, gyakorlatilag észrevehetetlen — de ha kézi teszten mégis "átmegy rajtam és nem
+  sebez" érzést kelt, egy irányfüggő (előre néző) találat-ellenőrzés a javítás.
+- **A Shadow Spell egyetlen nehézség-hangolópontja** a `SPELL_TELEGRAPH_LOOPS` (jelenleg 4 =
+  960 ms kitérési ablak) a `GraftedWingBreakerAnimations.ts`-ben. A becsapódó oszlop sötét,
+  a tintelt katedrális-háttér előtt lehet, hogy kevésbé olvasható — ilyenkor a `BACKGROUND_TINT`
+  vagy egy világító particle a következő lépés.

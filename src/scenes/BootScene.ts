@@ -11,6 +11,13 @@ import {
   FRAME_SIZE as HARVESTER_FRAME_SIZE,
   TEXTURE_KEY as HARVESTER_TEXTURE_KEY,
 } from '../enemies/CrowHarvesterAnimations';
+import {
+  createGraftedWingBreakerAnimations,
+  CLEAN_TEXTURE_KEY as BOSS_CLEAN_TEXTURE_KEY,
+  FRAME_HEIGHT as BOSS_FRAME_HEIGHT,
+  FRAME_WIDTH as BOSS_FRAME_WIDTH,
+  TEXTURE_KEY as BOSS_TEXTURE_KEY,
+} from '../bosses/GraftedWingBreakerAnimations';
 // Vite-on át importálva (nem `public/`-ból): így az asset hash-elve bekerül a buildbe,
 // a base path (GitHub Pages) magától helyes lesz, és HIÁNYZÓ fájl esetén a build elszáll
 // ahelyett, hogy néma 404 lenne futásidőben.
@@ -27,6 +34,13 @@ import knightClimbUrl from '../../assets/sprites/knight/Climb.png';
 import knightCastUrl from '../../assets/sprites/knight/Health.png';
 // CrowHarvester (Enemy 1): egyetlen 1792x64-es csík, 28 db 64x64-es frame.
 import crowHarvesterSheetUrl from '../../assets/sprites/crow-harvester/enemy04_sheet.png';
+// Boss (The Grafted Wing-Breaker): a "Bringer of Death" csomag (Clembod — személyes és
+// kereskedelmi használat + módosítás engedélyezett, újraértékesítés nem). Mindkét sheet
+// 1120x744 = 8x8 db 140x93-as frame, AZONOS elrendezéssel; a `_no-Effect` változatból
+// pontosan egy frame kell (a dash póz), lásd GraftedWingBreakerAnimations.DASH_FRAME.
+// Az eredeti fájlnevek megmaradtak: ez köti vissza az assetet a forráscsomaghoz.
+import bossSheetUrl from '../../assets/sprites/grafted-wing-breaker/Bringer-of-Death-SpritSheet.png';
+import bossCleanSheetUrl from '../../assets/sprites/grafted-wing-breaker/Bringer-of-Death-SpritSheet_no-Effect.png';
 // Level 1 parallax háttér-rétegek. Forrás: PixelPlatformerSet1 v1.1 (Szadi art) —
 // "License for Everyone / public domain, personal or commercial". A fájlok át lettek
 // nevezve (`01 background.png` -> `01-sky.png` stb.), mert a Vite-import szóközös
@@ -88,6 +102,16 @@ export default class BootScene extends Phaser.Scene {
       frameHeight: HARVESTER_FRAME_SIZE,
     });
 
+    for (const sheet of [
+      { key: BOSS_TEXTURE_KEY, url: bossSheetUrl },
+      { key: BOSS_CLEAN_TEXTURE_KEY, url: bossCleanSheetUrl },
+    ]) {
+      this.load.spritesheet(sheet.key, sheet.url, {
+        frameWidth: BOSS_FRAME_WIDTH,
+        frameHeight: BOSS_FRAME_HEIGHT,
+      });
+    }
+
     for (const image of BACKGROUND_IMAGES) {
       this.load.image(image.key, image.url);
     }
@@ -98,6 +122,7 @@ export default class BootScene extends Phaser.Scene {
     // és minden későbbi scene (Level1Scene, BossScene) ugyanazt használja.
     createPlayerAnimations(this);
     createCrowHarvesterAnimations(this);
+    createGraftedWingBreakerAnimations(this);
 
     this.scene.start('Level1Scene');
   }
@@ -129,7 +154,8 @@ export default class BootScene extends Phaser.Scene {
     });
   }
 
-  // A player és a CrowHarvester NEM szerepel itt: nekik már valódi sprite sheetjeik vannak.
+  // A player, a CrowHarvester és a boss NEM szerepel itt: nekik már valódi sprite
+  // sheetjeik vannak.
   private createPlaceholderTextures(): void {
     const groundGfx = this.make.graphics({ x: 0, y: 0 }, false);
     groundGfx.fillStyle(0x3a3a3a, 1);
@@ -173,17 +199,6 @@ export default class BootScene extends Phaser.Scene {
     doorGfx.fillRect(0, 0, 48, 72);
     doorGfx.generateTexture('door-placeholder', 48, 72);
     doorGfx.destroy();
-
-    // Boss (The Grafted Wing-Breaker) placeholder: 64x96, a CrowHarvesternél jóval nagyobb.
-    // A vállnál lévő sötétvörös sáv adja a "hozzávarrt szárnyak" utalást, és egyben
-    // láthatóvá teszi a tintelést (támadás-windup, charge telegraph).
-    const bossGfx = this.make.graphics({ x: 0, y: 0 }, false);
-    bossGfx.fillStyle(0x53304f, 1);
-    bossGfx.fillRect(0, 0, 64, 96);
-    bossGfx.fillStyle(0x7a2233, 1);
-    bossGfx.fillRect(0, 18, 64, 12);
-    bossGfx.generateTexture('boss-placeholder', 64, 96);
-    bossGfx.destroy();
 
     // Boss lövedék: nagyobb és lilás, hogy egyértelműen elváljon a player tűzgolyójától.
     const bossProjectileGfx = this.make.graphics({ x: 0, y: 0 }, false);

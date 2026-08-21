@@ -87,6 +87,88 @@ function createMockTween() {
   return { stop: vi.fn() };
 }
 
+/**
+ * Az `add.image()` minimális mása az AfterImageTrail-hez: minden setter láncolható, és a
+ * beállított értékek visszaolvashatók, hogy a teszt ellenőrizhesse a forrás sprite
+ * geometriájának (origin, flip, scale) átmásolását.
+ */
+export interface MockImage {
+  x: number;
+  y: number;
+  texture: string;
+  frame: string | number;
+  originX: number;
+  originY: number;
+  flipX: boolean;
+  scaleX: number;
+  scaleY: number;
+  depth: number;
+  alpha: number;
+  tint: number | null;
+  destroyed: boolean;
+  setOrigin(x: number, y: number): MockImage;
+  setFlipX(v: boolean): MockImage;
+  setScale(x: number, y: number): MockImage;
+  setDepth(v: number): MockImage;
+  setAlpha(v: number): MockImage;
+  setTint(v: number): MockImage;
+  destroy(): void;
+}
+
+export function createMockImage(
+  x: number,
+  y: number,
+  texture: string,
+  frame: string | number
+): MockImage {
+  const image: MockImage = {
+    x,
+    y,
+    texture,
+    frame,
+    originX: 0.5,
+    originY: 0.5,
+    flipX: false,
+    scaleX: 1,
+    scaleY: 1,
+    depth: 0,
+    alpha: 1,
+    tint: null,
+    destroyed: false,
+    setOrigin(ox, oy) {
+      image.originX = ox;
+      image.originY = oy;
+      return image;
+    },
+    setFlipX(v) {
+      image.flipX = v;
+      return image;
+    },
+    setScale(sx, sy) {
+      image.scaleX = sx;
+      image.scaleY = sy;
+      return image;
+    },
+    setDepth(v) {
+      image.depth = v;
+      return image;
+    },
+    setAlpha(v) {
+      image.alpha = v;
+      return image;
+    },
+    setTint(v) {
+      image.tint = v;
+      return image;
+    },
+    destroy() {
+      image.destroyed = true;
+    },
+  };
+
+  return image;
+}
+
 function createMockText() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const text: any = {
@@ -104,6 +186,9 @@ export function createMockScene() {
       existing: vi.fn(),
       zone: vi.fn(() => createMockZone()),
       text: vi.fn(() => createMockText()),
+      image: vi.fn((x: number, y: number, texture: string, frame: string | number) =>
+        createMockImage(x, y, texture, frame)
+      ),
     },
     physics: {
       add: {
@@ -114,7 +199,9 @@ export function createMockScene() {
     },
     // NEM fut le automatikusan — a teszt dönti el, mikor "telik el" az idő
     // a felvett callback(ok) manuális meghívásával (lásd a helperek lentebb).
-    time: { delayedCall: vi.fn() },
+    // A `now` sima, ÍRHATÓ mező: az AfterImageTrail ebből throttle-öl, a teszt pedig
+    // ennek léptetésével szimulálja az idő múlását.
+    time: { delayedCall: vi.fn(), now: 0 },
     // A tween mock tweent AD VISSZA (nem undefined-ot), mert az AudioManager eltárolja és
     // `stop()`-olja a futó fade-et. A `flushLastTween()` a hívás ARGUMENTUMAIBÓL olvas,
     // ezért ez a többi tesztet nem érinti.
@@ -179,6 +266,37 @@ export function createDelayedCallStepper(scene: MockScene, skipExisting = false)
         const [, callback] = calls[cursor] as [number, () => void];
         callback();
       }
+    },
+  };
+}
+
+/**
+ * KÉSLELTETÉS SZERINTI, szelektív delayedCall-futtatás.
+ *
+ * A `createDelayedCallStepper` REGISZTRÁCIÓS sorrendben halad, ami néhány forgatókönyvben
+ * túl merev: a boss egy támadásnál több, KÜLÖNBÖZŐ hosszúságú callbacket is ütemez
+ * egyszerre (pl. a lövedék 500ms-os startupját ÉS a 2200ms-os újratöltését), és a teszt
+ * pont azt akarja megnézni, mi történik, ha az egyik már lefutott, a másik még nem —
+ * mert így jut el a boss a lövedékről a Shadow Spellre.
+ *
+ * A `run(delayMs)` mindig a megadott késleltetéssel ütemezett, még LE NEM FUTTATOTT első
+ * callbacket süti el, tehát ugyanazzal a hosszal ütemezett hívások időrendben jönnek.
+ */
+export function createDelayedCallRunner(scene: MockScene) {
+  const fired = new Set<number>();
+
+  return {
+    run(delayMs: number): void {
+      const calls = scene.time.delayedCall.mock.calls as Array<[number, () => void]>;
+
+      for (let i = 0; i < calls.length; i++) {
+        if (fired.has(i) || calls[i][0] !== delayMs) continue;
+        fired.add(i);
+        calls[i][1]();
+        return;
+      }
+
+      throw new Error(`Nincs le nem futtatott delayedCall ${delayMs}ms késleltetéssel.`);
     },
   };
 }

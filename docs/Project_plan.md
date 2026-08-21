@@ -473,6 +473,11 @@ Példa:
 
 - sword slash
 - távoli projectile attack, amit a player át tud ugrani
+- **Shadow Spell** *(Phase 8-ban hozzáadva)* — a boss a kaszáját a magasba emelve
+  árny-oszlopot idéz a player **akkori** pozíciójára. Az oszlop előbb izzásként lebeg a
+  player feje fölött (~1 mp), és csak utána csap le, tehát **oldalra kilépve kikerülhető**
+  (ugrással nem). A becsapódás helye a castolás pillanatában rögzül, nem követi a playert.
+  Mindkét fázisban elérhető, saját 5 mp-es cooldownnal.
 - basic movement
 
 ### Phase 2
@@ -503,6 +508,37 @@ A cél egy olyan boss, amely:
 > A közelharci találat — a CrowHarvester-hoz hasonlóan — nem külön hitbox-zóna, hanem
 > távolság-ellenőrzés a windup végén. A charge roham közben legfeljebb **egyszer** sebez,
 > és a pálya falának ütközve idő előtt véget ér.
+
+> **Implementációs megjegyzés (Phase 8, 6. iteráció) — boss sprite + a hiányzó dash:**
+>
+> A boss megkapta a valódi pixel artját (a *Bringer of Death* csomag, Clembod), és ezzel a
+> state machine egy negyedik támadással bővült. A csomagban lévő animációk így oszlanak el:
+>
+> | boss akció | animáció | megjegyzés |
+> |---|---|---|
+> | közelítés | walk / idle | |
+> | slash | attack (10 frame) | a sebzés a csapás frame-jén |
+> | projectile | cast (9 frame) | a lövedék az energia csúcsán születik |
+> | **Shadow Spell** | cast + a csomag **különálló spell effektje** | a `Cast` végén varjak röppennek fel — a téma szempontjából ideális |
+> | charge windup | attack f16–19, megtartva | + a piros telegraph-tint |
+> | **charge (dash)** | a sheet effekt nélküli változatának **megtartott kitörés-póza** + afterimage-csík | lásd lentebb |
+> | falnak ütközés | hurt (3 frame) = stagger | a player punish-ablaka |
+> | halál | death (10 frame) | |
+>
+> **A csomagban NINCS dash animáció.** A megoldás nem egy felgyorsított sétaciklus, hanem a
+> klasszikus 2D "smear": a támadás-animáció legmélyebb, előredőlt kitörés-pózán megállunk
+> (az effekt nélküli sheetről, mert az effektes ugyanezen a frame-en egy hatalmas sötét
+> félholdat is rajzol, ami 1,2 mp-en át megtartva statikus folttá válna), és a sebességet
+> 50 ms-onként egy halványuló másolat adja hozzá. A windup (hátrahúzott kasza) és a dash póz
+> **animáció-folytonos**: a boss összehúzódik, majd ebből a pózból lendül előre.
+>
+> **A boss NEM flinchel találatra.** A hurt animáció minden ütésnél megszakítaná a
+> telegraph-jait, ami bossnál olvashatatlan; a visszajelzés egy fehér sziluett-villanás.
+>
+> A hatótávok **az animációból származnak, nem kézi hangolásból** (ugyanaz az elv, mint a
+> player támadás-hitboxainál): a slash hatótávja a kasza mért nyúlása a csapás frame-jén.
+> Ez a placeholderhez képest megduplázta a közelharci hatótávot — a fight ettől nehezebb,
+> a hangolás manuális játszás után következik.
 
 ---
 
@@ -626,6 +662,15 @@ A boss belépése és a zene fontos része a játékélménynek.
 >   ismét az arénába. A teljes `systems/GameState.ts` továbbra is későbbi fázis.
 > - **Zene:** a boss theme és az átvezető zenéje a Phase 8 – Atmosphere része; a kódban
 >   jelenleg csak dokumentált beakasztási pontok (`TODO (Phase 8)`) vannak.
+
+> **Kiegészítés (Phase 8, 6. iteráció) — az aréna padlója üres lett:**
+>
+> Az eredetileg betett két alacsony oldalsó platform **törölve**. Indok: a boss valódi
+> sprite-jával mindhárom kikerülhető támadás vízszintes mozgást kíván (charge = kitérés vagy
+> átugrás, Shadow Spell = oldalra lépés), amihez akadálymentes padló kell; a platformok
+> ráadásul beszorították volna a most 108 px magas bosst. Az aréna így egyetlen tiszta
+> talajszint, ami a Shadow Spell találat-ellenőrzését is egyszerűvé teszi (csak vízszintes
+> távolság).
 
 ---
 

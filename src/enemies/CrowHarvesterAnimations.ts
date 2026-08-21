@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { FacingGeometry } from '../systems/SpriteFacing';
 // CSAK típusként — a CrowHarvester.ts ebből a modulból ÉRTÉKEKET importál, tehát egy
 // runtime-import visszafelé kört csinálna. A CrowHarvesterState string enum, ezért a
 // tagjai literál kulcsokat adnak, és az alábbi switch enum-hivatkozás nélkül is típushelyes.
@@ -17,7 +18,6 @@ export const BODY_WIDTH = 20;
 export const BODY_HEIGHT = 40;
 export const BODY_OFFSET_X = 4;
 export const BODY_OFFSET_Y = 24;
-const BODY_CENTER_X = 14;
 
 /**
  * A talp a `sprite.y + 23`-nál — pontosan ott, ahol a korábbi 30x46-os placeholderé volt.
@@ -26,17 +26,22 @@ const BODY_CENTER_X = 14;
 export const ORIGIN_Y = (FRAME_SIZE - 23) / FRAME_SIZE; // 0.640625
 
 // --- Facing-kompenzáció -----------------------------------------------------
-// A sprite natívan JOBBRA néz. Mivel a test a frame bal oldalán ül, egy sima setFlipX()
-// a testet 2 * (32 - 14) = 36px-t ugrasztaná oldalra minden fordulásnál (a flipX a
-// FRAME közepére tükröz, nem az originre). Ezért forduláskor az origint ÉS a body
-// offsetjét EGYÜTT tükrözzük — így a test mindkét irányban pontosan a sprite.x-en marad.
+// A sprite natívan JOBBRA néz. Mivel a test a frame bal oldalán ül (közepe x=14), egy sima
+// setFlipX() a testet 2 * (32 - 14) = 36px-t ugrasztaná oldalra minden fordulásnál — a flipX
+// ugyanis a FRAME közepére tükröz, nem az originre. A kompenzációt (origin + body offset
+// EGYÜTTES tükrözése) a megosztott `systems/SpriteFacing.ts` végzi, mert a boss sheetje
+// ugyanezt igényli, csak fordított natív iránnyal.
 //
 //   jobbra: quad bal széle x-14, body x-10..x+10, az art köpenye (frame 4..24) ugyanide esik
 //   balra:  quad bal széle x-50, body x-10..x+10, a tükrözött art (quad-lokális 40..60) is
-
-export const ORIGIN_X = BODY_CENTER_X / FRAME_SIZE; // 0.21875
-export const ORIGIN_X_FLIPPED = 1 - ORIGIN_X; // 0.78125
-export const BODY_OFFSET_X_FLIPPED = FRAME_SIZE - BODY_OFFSET_X - BODY_WIDTH; // 40
+export const CROW_HARVESTER_FACING: FacingGeometry = {
+  frameWidth: FRAME_SIZE,
+  bodyWidth: BODY_WIDTH,
+  bodyOffsetX: BODY_OFFSET_X,
+  bodyOffsetY: BODY_OFFSET_Y,
+  originY: ORIGIN_Y,
+  nativeFacing: 'right',
+};
 
 // --- Kulcsok ----------------------------------------------------------------
 
