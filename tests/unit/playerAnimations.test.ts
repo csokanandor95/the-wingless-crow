@@ -12,7 +12,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Player, { PlayerState, MAX_HP } from '../../src/player/Player';
 import { animKeyForState, PLAYER_ANIMS } from '../../src/player/PlayerAnimations';
-import { AttackType } from '../../src/combat/Attack';
 import {
   createMockScene,
   getBody,
@@ -49,28 +48,17 @@ describe('animKeyForState', () => {
     [PlayerState.RUN, PLAYER_ANIMS.RUN],
     [PlayerState.JUMP, PLAYER_ANIMS.JUMP],
     [PlayerState.FALL, PLAYER_ANIMS.FALL],
+    [PlayerState.ATTACK, PLAYER_ANIMS.ATTACK],
     [PlayerState.CAST, PLAYER_ANIMS.CAST],
     [PlayerState.HURT, PLAYER_ANIMS.HURT],
     [PlayerState.CLIMB, PLAYER_ANIMS.CLIMB],
     [PlayerState.DEAD, PLAYER_ANIMS.DEAD],
   ])('%s -> %s', (state, expected) => {
-    expect(animKeyForState(state, AttackType.LIGHT)).toBe(expected);
-  });
-
-  it('ATTACK a legutóbbi támadás-típus szerint ágazik el', () => {
-    expect(animKeyForState(PlayerState.ATTACK, AttackType.LIGHT)).toBe(
-      PLAYER_ANIMS.ATTACK_LIGHT
-    );
-    expect(animKeyForState(PlayerState.ATTACK, AttackType.HEAVY)).toBe(
-      PLAYER_ANIMS.ATTACK_HEAVY
-    );
+    expect(animKeyForState(state)).toBe(expected);
   });
 
   it('minden state külön animáció-kulcsot kap (nincs véletlen ütközés)', () => {
-    const keys = Object.values(PlayerState).map((state) =>
-      animKeyForState(state, AttackType.LIGHT)
-    );
-    // Az ATTACK light/heavy párját a fenti teszt fedi; itt a light ágat számoljuk.
+    const keys = Object.values(PlayerState).map((state) => animKeyForState(state));
     expect(new Set(keys).size).toBe(keys.length);
   });
 });
@@ -117,15 +105,28 @@ describe('Player animáció-vezérlés', () => {
     expect(anims(player).currentKey).toBe(PLAYER_ANIMS.IDLE);
   });
 
-  it('a light és a heavy támadás külön animációt indít', () => {
+  it('a támadás a saját animációját indítja', () => {
     setGrounded(player, true);
 
-    player.attackLight();
-    expect(anims(player).currentKey).toBe(PLAYER_ANIMS.ATTACK_LIGHT);
+    player.attack();
+    expect(anims(player).currentKey).toBe(PLAYER_ANIMS.ATTACK);
+  });
+
+  it('egymás utáni támadások ÚJRAINDÍTJÁK a nem loopoló attack animációt', () => {
+    // A cooldown (350ms) alig hosszabb az animációnál (330ms), tehát a state-reset és a
+    // cooldown lejárta ugyanabba a frame-közbe eshet — ilyenkor a playAnim() guardja
+    // "ugyanaz a kulcs" alapon átugorná az újraindítást, és a kard a csapás utolsó
+    // frame-jén ragadna. Ezt előzi meg a performAttack() currentAnimKey-nullázása.
+    setGrounded(player, true);
+
+    player.attack();
+    const playsAfterFirst = anims(player).playedKeys.length;
 
     flushAllDelayedCalls(scene);
-    player.attackHeavy();
-    expect(anims(player).currentKey).toBe(PLAYER_ANIMS.ATTACK_HEAVY);
+    player.attack();
+
+    expect(anims(player).currentKey).toBe(PLAYER_ANIMS.ATTACK);
+    expect(anims(player).playedKeys.length).toBeGreaterThan(playsAfterFirst);
   });
 
   it('a cast a saját animációját indítja', () => {

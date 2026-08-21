@@ -64,8 +64,6 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   private attackHitboxBody: Phaser.Physics.Arcade.Body;
   private hitTargetsThisAttack: Set<Phaser.GameObjects.GameObject> = new Set();
 
-  /** Az ATTACK state animációja ebből dől el (light vagy heavy vágás). */
-  private lastAttackType: AttackType = AttackType.LIGHT;
   /** Az épp lejátszott animáció kulcsa — lásd playAnim(). */
   private currentAnimKey: string | null = null;
 
@@ -208,26 +206,25 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
 
   // ----------------------------------------------------------------------
 
-  attackLight(): void {
-    this.performAttack(AttackType.LIGHT);
+  /** A player egyetlen kardtámadása (J / bal egérgomb). */
+  attack(): void {
+    this.performAttack(AttackType.SWORD);
   }
 
-  attackHeavy(): void {
-    this.performAttack(AttackType.HEAVY);
-  }
-
+  // Paraméteres marad, hogy egy jövőbeli második támadás-típus bekötése egy hívás legyen.
   private performAttack(type: AttackType): void {
     if (this.isLocked() || this.climbing || !this.canAttack) return;
 
     const config = ATTACK_CONFIGS[type];
     this.isAttacking = true;
     this.canAttack = false;
-    this.lastAttackType = type;
     this.playerState = PlayerState.ATTACK;
     this.hitTargetsThisAttack.clear();
     this.setVelocityX(0);
 
     // A korábbi sárga attack-tint elmaradt: a támadás-animáció önmagában közli az infót.
+    // Nullázás a playAnim() guardja miatt: két gyors csapás között a kulcs nem változna.
+    this.currentAnimKey = null;
     this.updateAnimation();
 
     this.scene.time.delayedCall(config.startupDelayMs, () => {
@@ -423,7 +420,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   }
 
   private updateAnimation(): void {
-    this.playAnim(animKeyForState(this.playerState, this.lastAttackType));
+    this.playAnim(animKeyForState(this.playerState));
 
     // Létrán állva (nincs függőleges input) a mászás-animáció fagyjon ki, ne pörögjön
     // a helyben álló lovag alatt.

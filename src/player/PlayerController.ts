@@ -14,18 +14,18 @@ export default class PlayerController {
     }
 
     this.cursors = scene.input.keyboard.createCursorKeys();
-    this.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,J,K,F') as {
+    this.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,J,F') as {
       [key: string]: Phaser.Input.Keyboard.Key;
     };
 
-    this.keys.J.on('down', () => this.player.attackLight());
-    this.keys.K.on('down', () => this.player.attackHeavy());
+    this.keys.J.on('down', () => this.player.attack());
     this.keys.F.on('down', () => this.player.castFireball());
 
+    // A jobb gomb már nem támad, de a context menü letiltása marad: a canvas fölött
+    // felugró böngésző-menü akkor is zavaró, ha a kattintásnak nincs játékbeli hatása.
     scene.input.mouse?.disableContextMenu();
     scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (pointer.leftButtonDown()) this.player.attackLight();
-      if (pointer.rightButtonDown()) this.player.attackHeavy();
+      if (pointer.leftButtonDown()) this.player.attack();
     });
   }
 

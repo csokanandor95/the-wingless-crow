@@ -43,8 +43,7 @@ export const PLAYER_ANIMS = {
   RUN: 'player-run',
   JUMP: 'player-jump',
   FALL: 'player-fall',
-  ATTACK_LIGHT: 'player-attack-light',
-  ATTACK_HEAVY: 'player-attack-heavy',
+  ATTACK: 'player-attack',
   CAST: 'player-cast',
   HURT: 'player-hurt',
   CLIMB: 'player-climb',
@@ -70,9 +69,8 @@ const DEATH_ANIM_MS = 520;
 // --- Frame-tartományok ------------------------------------------------------
 // Az Attacks.png 40 frame-je valójában 20 JOBBRA néző + ugyanaz 20 TÜKRÖZVE. A player
 // setFlipX()-szel fordul, ezért a 20-39 tartomány nem kell. A 0-19-en belül négy külön
-// csapás van; ebből a legtisztább kettőt használjuk.
-const ATTACK_LIGHT_FRAMES = { start: 0, end: 6 }; // átlós lecsapás
-const ATTACK_HEAVY_FRAMES = { start: 15, end: 19 }; // nagy dupla félhold
+// csapás van; a playernek egyetlen kardtámadása van, ehhez a leglátványosabbat használjuk.
+const ATTACK_FRAMES = { start: 15, end: 19 }; // nagy dupla félhold
 // A Health.png "gyógyital" animációja: a lovag piros izzó gömböt emel (f0-f2), ami
 // szikrákra pattan (f3-f4). A csomagban nincs magic animáció, ez áll legközelebb a
 // fireball castoláshoz — a maradék f5-f7 (elhaló szikrák) már nem kell.
@@ -95,8 +93,7 @@ interface AnimDef {
   repeat: number;
 }
 
-const LIGHT = ATTACK_CONFIGS[AttackType.LIGHT];
-const HEAVY = ATTACK_CONFIGS[AttackType.HEAVY];
+const SWORD = ATTACK_CONFIGS[AttackType.SWORD];
 
 const ANIM_DEFS: AnimDef[] = [
   {
@@ -127,20 +124,13 @@ const ANIM_DEFS: AnimDef[] = [
     durationMs: FALL_ANIM_MS,
     repeat: -1,
   },
-  // A támadás-animációk hossza a támadás TELJES aktív szakasza (startup + active), így a
+  // A támadás-animáció hossza a támadás TELJES aktív szakasza (startup + active), így a
   // kard a hitbox kinyílásának pillanatában van a lendület csúcsán.
   {
-    key: PLAYER_ANIMS.ATTACK_LIGHT,
+    key: PLAYER_ANIMS.ATTACK,
     texture: PLAYER_TEXTURES.ATTACK,
-    frames: ATTACK_LIGHT_FRAMES,
-    durationMs: LIGHT.startupDelayMs + LIGHT.activeDurationMs,
-    repeat: 0,
-  },
-  {
-    key: PLAYER_ANIMS.ATTACK_HEAVY,
-    texture: PLAYER_TEXTURES.ATTACK,
-    frames: ATTACK_HEAVY_FRAMES,
-    durationMs: HEAVY.startupDelayMs + HEAVY.activeDurationMs,
+    frames: ATTACK_FRAMES,
+    durationMs: SWORD.startupDelayMs + SWORD.activeDurationMs,
     repeat: 0,
   },
   {
@@ -195,7 +185,7 @@ export function createPlayerAnimations(scene: Phaser.Scene): void {
  * A state -> animáció leképezés. Szándékosan PURE függvény (nem a Player metódusa), hogy
  * a leképezés Phaser AnimationManager mockolása nélkül unit-tesztelhető legyen.
  */
-export function animKeyForState(state: PlayerState, lastAttack: AttackType): string {
+export function animKeyForState(state: PlayerState): string {
   switch (state) {
     case 'RUN':
       return PLAYER_ANIMS.RUN;
@@ -204,9 +194,9 @@ export function animKeyForState(state: PlayerState, lastAttack: AttackType): str
     case 'FALL':
       return PLAYER_ANIMS.FALL;
     case 'ATTACK':
-      return lastAttack === AttackType.HEAVY
-        ? PLAYER_ANIMS.ATTACK_HEAVY
-        : PLAYER_ANIMS.ATTACK_LIGHT;
+      // Egyetlen kardtámadás van. Ha a repertoár bővül, itt egy támadás-típus paraméter
+      // szerinti elágazás a következő lépés (ATTACK_CONFIGS már most is Record).
+      return PLAYER_ANIMS.ATTACK;
     case 'CAST':
       return PLAYER_ANIMS.CAST;
     case 'HURT':

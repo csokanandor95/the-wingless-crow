@@ -308,21 +308,18 @@ A combat egyszerű marad.
 
 ## Kard
 
-Első verzióban maximum két támadás:
+A playernek **egyetlen kardtámadása** van:
 
-### Light Attack
+### Sword Attack
 
-Gyorsabb, kisebb sebzés.
-
-### Heavy Attack
-
-Lassabb, nagyobb sebzés.
+Nagy ívű csapás, közepes tempó. (Korábban a terv két támadást — Light és Heavy — írt le;
+a kettő egyetlen támadássá vonódott össze: a nagy ív animációját és hitboxát kapta meg,
+a kisebb, "light" sebzéssel és közepes cooldownnal.)
 
 Példa input:
 
 ```text
-Left Mouse / J → Light Attack
-Right Mouse / K → Heavy Attack
+Left Mouse / J → Sword Attack
 ```
 
 A pontos input később módosítható.
@@ -1068,8 +1065,7 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 ## Phase 3 – Combat
 
 - sword
-- light attack
-- heavy attack
+- sword attack
 - damage
 - hitbox
 - player HP
@@ -1176,8 +1172,7 @@ Tesztelendő komponensek:
 
 ## Combat
 
-- light attack damage
-- heavy attack damage
+- sword attack damage
 - fireball damage
 - cooldown
 - attack state

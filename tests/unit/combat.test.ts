@@ -1,10 +1,10 @@
 // Combat unit tesztek — Project_plan.md §23 "Unit testing / Combat" bontása szerint:
-// light attack damage, heavy attack damage, fireball damage, cooldown, attack state.
+// sword attack damage, fireball damage, cooldown, attack state.
 //
 // A sebzés-adat ténylegesen a Player attack-hitboxán landol (ATTACK_CONFIGS csak
-// statikus konfiguráció), ezért a light/heavy/cooldown/attack state teszteket a
-// megosztott harness-szel létrehozott Player-en keresztül végezzük — ugyanaz a minta,
-// mint a player.test.ts-ben.
+// statikus konfiguráció), ezért a sebzés/cooldown/attack state teszteket a megosztott
+// harness-szel létrehozott Player-en keresztül végezzük — ugyanaz a minta, mint a
+// player.test.ts-ben.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type Phaser from 'phaser';
 import { AttackType, ATTACK_CONFIGS } from '../../src/combat/Attack';
@@ -24,19 +24,24 @@ vi.mock('phaser', async () => {
 });
 
 describe('ATTACK_CONFIGS invariánsok', () => {
-  // Attack.ts saját kommentje szerint: "Light Attack: gyorsabb, kisebb sebzés.
-  // Heavy Attack: lassabb, nagyobb sebzés." — ez a tervezési szándékot ellenőrzi,
-  // nem a konkrét (hangolható) számokat, hogy egy véletlen felcserélést elkapjon.
-  const light = ATTACK_CONFIGS[AttackType.LIGHT];
-  const heavy = ATTACK_CONFIGS[AttackType.HEAVY];
+  // Nem a konkrét (hangolható) számokat őrzik, hanem az Attack.ts kommentjében rögzített
+  // tervezési szándékot.
+  const sword = ATTACK_CONFIGS[AttackType.SWORD];
 
-  it('a Heavy nagyobb sebzést okoz, mint a Light', () => {
-    expect(heavy.damage).toBeGreaterThan(light.damage);
+  it('a cooldown nem rövidebb az animációnál', () => {
+    // Különben nem a cooldownMs lenne a valódi kapu, hanem az ATTACK state-lock
+    // (startup + active), és a szám félrevezetővé válna.
+    expect(sword.cooldownMs).toBeGreaterThanOrEqual(
+      sword.startupDelayMs + sword.activeDurationMs
+    );
   });
 
-  it('a Heavy lassabb: hosszabb cooldown és startup delay', () => {
-    expect(heavy.cooldownMs).toBeGreaterThan(light.cooldownMs);
-    expect(heavy.startupDelayMs).toBeGreaterThan(light.startupDelayMs);
+  it('a hitbox a player ELŐTT van, nem rajta', () => {
+    expect(sword.hitboxOffsetX).toBeGreaterThan(sword.hitboxWidth / 2);
+  });
+
+  it('a támadás sebez', () => {
+    expect(sword.damage).toBeGreaterThan(0);
   });
 });
 
@@ -49,14 +54,11 @@ describe('Player attack — sebzés, hitbox, state, cooldown', () => {
     player = new Player(scene as unknown as Phaser.Scene, 100, 200);
   });
 
-  it.each([
-    ['attackLight', AttackType.LIGHT] as const,
-    ['attackHeavy', AttackType.HEAVY] as const,
-  ])('%s: ATTACK state, majd a helyes sebzés a hitboxon a startup után', (method, type) => {
-    const config = ATTACK_CONFIGS[type];
+  it('attack(): ATTACK state, majd a helyes sebzés a hitboxon a startup után', () => {
+    const config = ATTACK_CONFIGS[AttackType.SWORD];
     const stepper = createDelayedCallStepper(scene);
 
-    player[method]();
+    player.attack();
     expect(player.playerState).toBe(PlayerState.ATTACK);
 
     stepper.next(); // startupDelayMs elteltével a hitbox engedélyezve
@@ -67,25 +69,25 @@ describe('Player attack — sebzés, hitbox, state, cooldown', () => {
     expect(player.playerState).not.toBe(PlayerState.ATTACK);
   });
 
-  it('cooldown: gyors egymás utáni attackLight() a másodikat blokkolja', () => {
-    player.attackLight();
+  it('cooldown: gyors egymás utáni attack() a másodikat blokkolja', () => {
+    player.attack();
     const callsAfterFirst = scene.time.delayedCall.mock.calls.length;
 
-    player.attackLight(); // még cooldown alatt -> no-op
+    player.attack(); // még cooldown alatt -> no-op
     expect(scene.time.delayedCall.mock.calls.length).toBe(callsAfterFirst);
   });
 
-  it('cooldown letelte után az attackLight() ismét sikeres', () => {
+  it('cooldown letelte után az attack() ismét sikeres', () => {
     const stepper = createDelayedCallStepper(scene);
 
-    player.attackLight();
+    player.attack();
     stepper.next(); // startup
     stepper.next(); // active duration vége
     stepper.next(); // startup+active state reset
     stepper.next(); // cooldownMs -> canAttack = true
 
     const callsBefore = scene.time.delayedCall.mock.calls.length;
-    player.attackLight();
+    player.attack();
 
     expect(scene.time.delayedCall.mock.calls.length).toBeGreaterThan(callsBefore);
     expect(player.playerState).toBe(PlayerState.ATTACK);

@@ -123,7 +123,7 @@ akadálymentes padlón kell kitérni.
 A Phase 8 többi része (environment sprite-ok, SFX, particles, level ambient,
 `ui/` modul) még hátravan.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (10 fájl, 162 teszt — ebből 5 az animáció-/háttér-/VFX-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (10 fájl, 163 teszt — ebből 5 az animáció-/háttér-/VFX-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
 - A `CrowHarvester`/`Player`/`GraftedWingBreaker` `scene.time.delayedCall`-jai **interleave-elhetnek** (pl. `CrowHarvester.resolveAttackHit()` a `Player.takeDamage()`-en keresztül saját delayedCallt ütemez ugyanazon a mock scene-en) — ezért a `createDelayedCallStepper` helper (`tests/unit/helpers/phaserTestUtils.ts`) `.next()` (egy lépés) ÉS `.flushRemaining()` (a kurzortól a végéig, újra-tüzelés nélkül) metódust is ad. A `createDelayedCallStepper(scene, true)` (`skipExisting`) a kurzort a MÁR ütemezett hívások mögé állítja — ez kell, ha a teszt előkészítése maga is ütemez callbackeket (pl. a bosst Phase 2-be sebezzük, ami hit-villanást ütemez).
@@ -199,7 +199,7 @@ the-wingless-crow/
 │   │   ├── AfterImageTrail.ts    # afterimage-csík gyors mozgáshoz (a boss dash-éhez)
 │   │   └── ParallaxBackground.ts # réteges parallax háttér + a Level 1 réteg-terve
 │   └── combat/
-│       ├── Attack.ts             # AttackType enum + ATTACK_CONFIGS (light/heavy sebzés, cooldown, hitbox méret)
+│       ├── Attack.ts             # AttackType enum (egyetlen tag: SWORD) + ATTACK_CONFIGS (sebzés, cooldown, hitbox méret)
 │       ├── Projectile.ts         # Fireball osztály + FIREBALL_CONFIG + ProjectileOptions (boss lövedék)
 │       └── DamageSystem.ts       # Damageable interface + PhysicsOverlapObject típus-alias
 ```
@@ -216,7 +216,7 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - Mozgás: balra/jobbra (nyilak vagy A/D), ugrás (fel/W/Space)
 - State-ek: IDLE, RUN, JUMP, FALL, ATTACK, CAST, HURT, CLIMB, DEAD
 - **Sprite + animációk (Phase 8):** minden state-hez tartozik animáció; a leképezést a
-  `PlayerAnimations.ts` **pure** `animKeyForState(state, lastAttackType)` függvénye adja,
+  `PlayerAnimations.ts` **pure** `animKeyForState(state)` függvénye adja,
   a `Player.updateAnimation()` pedig ezt szinkronizálja minden frame-ben. A sheetek 128×64-es
   frame-ekből állnak, a rajzolt karakter ~28×46 ezen belül:
   - `ORIGIN_Y = 0.625` → a **talp pontosan a `sprite.y + 24`-nél** van, ezért a
@@ -224,21 +224,22 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
     a placeholder óta változatlanul érvényes. **Ha valaha más karakter-sheetre cserélsz,
     ezt a hármast (`ORIGIN_Y`, `BODY_*`, `PLAYER_HALF_HEIGHT`) együtt kell újraszámolni.**
   - Az `Attacks.png` 40 frame-je valójában **20 jobbra néző + ugyanaz 20 tükrözve**; a
-    20–39 tartományt eldobjuk, a fordulást továbbra is a `setFlipX()` intézi. LIGHT = `f0–6`,
-    HEAVY = `f15–19`. A `Hurt.png` 4. frame-je ÜRES (csak `f0–2` használható).
+    20–39 tartományt eldobjuk, a fordulást továbbra is a `setFlipX()` intézi. A kardtámadás
+    `ATTACK_FRAMES = f15–19` (nagy dupla félhold). A `Hurt.png` 4. frame-je ÜRES
+    (csak `f0–2` használható).
   - **A `frameRate` mindig SZÁMÍTÓDIK** (`frames * 1000 / durationMs`), sosem beégetett:
-    a támadás-animációk hossza az `ATTACK_CONFIGS[type].startupDelayMs + activeDurationMs`,
+    a támadás-animáció hossza az `ATTACK_CONFIGS[type].startupDelayMs + activeDurationMs`,
     a cast/hurt lock pedig a `CAST_ANIM_MS` / `HURT_ANIM_MS`-ból származik
     (`CAST_DELAY_MS = CAST_ANIM_MS`). Így az animáció és a gameplay-lock nem tud elcsúszni.
   - **A hitbox MÉRETE is az animációból van levezetve**, nem szabadon hangolt szám: az
-    `ATTACK_CONFIGS[type].hitboxWidth/hitboxOffsetX` az adott támadás AKTÍV frame-jeinek
-    tényleges kiterjedéséhez igazodik (LIGHT: az ív +32px-ig ér → hitbox +6..+30; HEAVY:
-    +63px → +9..+59). **Ha a támadás frame-tartománya változik a `PlayerAnimations.ts`-ben,
-    a hitboxot EGYÜTT kell újraszámolni** — különben a kard láthatóan a levegőt találja el
-    (pontosan ez volt a hiba az első verzióban: a light hitbox 18px-szel tovább ért, mint
-    ameddig a kard elér). Következmény, amivel számolni kell: a light attack effektív
-    hatótávja (+30, plusz az enemy félszélessége) alig van a CrowHarvester `ATTACK_RANGE = 42`-je
-    fölött — a light így szándékosan közelharci, a heavy a biztonságos távolságú opció.
+    `ATTACK_CONFIGS[type].hitboxWidth/hitboxOffsetX` a támadás AKTÍV frame-jeinek
+    (`f17–19`) tényleges kiterjedéséhez igazodik: az ív +63px-ig ér → hitbox +9..+59.
+    **Ha a támadás frame-tartománya változik a `PlayerAnimations.ts`-ben, a hitboxot
+    EGYÜTT kell újraszámolni** — különben a kard láthatóan a levegőt találja el (pontosan
+    ez volt a hiba az első verzióban: a hitbox 18px-szel tovább ért, mint ameddig a kard).
+    Következmény, amivel számolni kell: a támadás effektív hatótávja (+59, plusz az enemy
+    félszélessége) kényelmesen a CrowHarvester `ATTACK_RANGE = 42`-je fölött van, tehát a
+    közelharc a saját sebzésük vétele nélkül is vívható.
   - **Nincs magic animáció a csomagban** — a CAST a `Health.png` "gyógyital" anim `f0–4`
     szakaszát használja (a lovag piros izzó gömböt emel, ami szikrákra pattan). A fireball
     pont a szikrák pillanatában születik, a kéz magasságában (`FIREBALL_SPAWN_OFFSET_Y`).
@@ -260,7 +261,16 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   `die()` ellentéte: HP-t, pozíciót, minden lock-flaget (attack/cast cooldown, mászás,
   ladder-kontaktus) és a physics bodyt visszaállítja — a `Level1Scene` hívja a
   `CheckpointSystem`-től kapott ponttal
-- Kard: Light Attack (J / bal klikk) és Heavy Attack (K / jobb klikk), külön cooldown/damage/hitbox méret (`combat/Attack.ts` konfigból)
+- Kard: **egyetlen** Sword Attack (J / bal klikk), `player.attack()`. A cooldown/damage/hitbox
+  a `combat/Attack.ts` `ATTACK_CONFIGS[AttackType.SWORD]`-jából jön: 10 sebzés, 350ms cooldown,
+  150ms startup + 180ms aktív. A cooldown SZÁNDÉKOSAN nem rövidebb a 330ms-os animációnál,
+  hogy a valódi kapu a cooldown legyen, ne az ATTACK state-lock. Emiatt viszont a
+  `performAttack()` **nullázza a `currentAnimKey`-t**: 20ms rés mellett a state-reset és a
+  cooldown lejárta ugyanabba a frame-közbe eshet, és a `playAnim()` guardja "ugyanaz a kulcs"
+  alapon átugorná az animáció újraindítását (a kard a csapás utolsó frame-jén ragadna).
+  **A korábbi Light/Heavy pár megszűnt** (az `AttackType` enum egyetlen taggal marad, hogy
+  egy jövőbeli bővítés egy tag + egy `ATTACK_CONFIGS` bejegyzés legyen); a K billentyű és a
+  jobb egérgomb már nem támad
 - Fireball: F billentyű, `combat/Projectile.ts` Fireball osztályt hoz létre a Level1Scene-ben egy `fireball-cast` eventen keresztül
 
 ### Enemy — CrowHarvester (`src/enemies/CrowHarvester.ts`, `CrowHarvesterAnimations.ts`)
@@ -589,7 +599,7 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
     elcsúszik a `sprite.x`-től. A `bodyCenterX` **levezetett** érték
     (`bodyOffsetX + bodyWidth / 2`), nem külön hangolható konstans. Ezt a
     `crowHarvesterAnimations.test.ts` és a `bossAnimations.test.ts` egyaránt őrzi.
-17. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/K/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attackLight()` stb.) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
+17. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attack()`, `castFireball()`) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
@@ -678,8 +688,8 @@ Nyitott, nem blokkoló polish-tételek:
 - **A boss balanszát újra kell nézni a sprite-csere után.** A `SLASH_RANGE` 70 → **138**,
   mert a hitboxot a projekt elve szerint az animációból vezetjük le (a kasza mért nyúlása
   2×-es skálán). A boss így 70–138 px között is slashelhet, ahol a player még nem éri el
-  (a light attack +30, a heavy +59 a player középpontjától) — a fight ettől érdemben
-  nehezebb. Első hangolandó knobok: `SLASH_DAMAGE` (18), `ACTION_COOLDOWN_MS` (900).
+  (a player kardja +59-ig ér a saját középpontjától) — a fight ettől érdemben nehezebb.
+  Első hangolandó knobok: `SLASH_DAMAGE` (18), `ACTION_COOLDOWN_MS` (900).
   A többi boss-szám (HP 240, sebzések, cooldownok) továbbra is az első, hangolatlan érték.
 - **A charge sebzése a boss TESTÉHEZ kötött** (`CHARGE_HIT_RANGE = 54` sugár), miközben a
   dash pózban a kasza ~60 világ-pixellel a test előtt jár. 420 px/s mellett ez ~143 ms
