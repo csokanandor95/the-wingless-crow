@@ -115,6 +115,19 @@ export const ACTION_COOLDOWN_MS = 900;
  */
 export const DIRECTION_DEADZONE = 6;
 
+/**
+ * A boss "elkötelezett" támadásainak KÖRFORGÁSA. A slash szándékosan NEM része: az reaktív,
+ * közelharci távolságon belül mindig felülírja a rotációt.
+ *
+ * Miért rotáció és nem prioritási sor? Mert egy prioritási sorban a legelöl álló támadás
+ * MONOPOLIZÁLJA a fázist, amint a cooldownja a state-lockkal egyszerre jár le — pontosan ez
+ * történt Phase 2-ben a charge-dzsal: a `canCharge` ugyanabban a delayedCall-ban állt vissza,
+ * ami a bosst APPROACH-ba vitte, tehát a döntés pillanatában mindig kész volt, és a
+ * projectile/spell soha nem jutott szóhoz.
+ */
+export const ATTACK_ROTATION = ['PROJECTILE', 'SPELL', 'CHARGE'] as const;
+type RotatedAttack = (typeof ATTACK_ROTATION)[number];
+
 const HIT_FLASH_MS = 100;
 const HIT_FLASH_TINT = 0xffffff;
 const CHARGE_TELEGRAPH_TINT = 0xff2222;
@@ -134,6 +147,9 @@ export default class GraftedWingBreaker
   private canCharge = false; // csak Phase 2-ben nyílik meg
   private chargeDirection: 1 | -1 = 1;
   private hasHitThisCharge = false;
+
+  /** Hol tart a támadás-körforgás. Phase 1 a lövedékkel nyit. */
+  private rotationIndex = 0;
 
   private playerRef: Player | null = null;
 
@@ -209,8 +225,9 @@ export default class GraftedWingBreaker
    * Támadás-választás. SZÁNDÉKOSAN determinisztikus (nincs véletlen), hogy a unit tesztek
    * ne legyenek flaky-k, és hogy a player fel tudja ismerni a boss mintáit.
    *
-   * A spell a projectile MÖGÖTT áll a sorban: így a projectile 2.2 mp-es cooldownja alatt
-   * a spell tölti ki a ritmust (~5 mp-enként), a boss pedig nem áll be egyetlen mintába.
+   * A slash reaktív: közelharci távolságon belül mindig ő nyer. A többi támadás KÖRFORGÁSBAN
+   * jön (lásd ATTACK_ROTATION) — a cooldown-kapuk és a távolsági feltételek csak SZŰRŐK a
+   * rotáción belül, nem prioritás-döntők.
    */
   private updateApproach(
     player: Player,
@@ -225,23 +242,19 @@ export default class GraftedWingBreaker
       return;
     }
 
-    if (
-      this.phase === 2 &&
-      this.canCharge &&
-      horizontalDistance > CHARGE_MIN_RANGE &&
-      verticalDistance <= CHARGE_VERTICAL_TOLERANCE
-    ) {
-      this.startChargeWindup(player);
-      return;
-    }
+    // A rotációt ott vesszük fel, ahol legutóbb abbahagytuk, és az első ELÉRHETŐ támadást
+    // indítjuk. A nem elérhetőket átugorjuk — a mutató csak a ténylegesen elsütött
+    // támadás mögé lép, tehát az átugrott támadások a következő körben előbb jönnek sorra.
+    for (let step = 0; step < ATTACK_ROTATION.length; step++) {
+      const index = (this.rotationIndex + step) % ATTACK_ROTATION.length;
+      const attack = ATTACK_ROTATION[index];
 
-    if (this.canShoot && distanceToPlayer > PROJECTILE_MIN_RANGE) {
-      this.startProjectile();
-      return;
-    }
+      if (!this.canUse(attack, horizontalDistance, verticalDistance, distanceToPlayer)) {
+        continue;
+      }
 
-    if (this.canSpell && distanceToPlayer > SPELL_MIN_RANGE) {
-      this.startSpell();
+      this.rotationIndex = (index + 1) % ATTACK_ROTATION.length;
+      this.startRotatedAttack(attack, player);
       return;
     }
 
@@ -257,6 +270,42 @@ export default class GraftedWingBreaker
     const direction = player.x < this.x ? -1 : 1;
     this.setVelocityX(this.moveSpeed() * direction);
     this.setFacing(direction < 0);
+  }
+
+  /** A rotáció szűrői: távolság + a támadás saját cooldown-kapuja. */
+  private canUse(
+    attack: RotatedAttack,
+    horizontalDistance: number,
+    verticalDistance: number,
+    distanceToPlayer: number
+  ): boolean {
+    switch (attack) {
+      case 'PROJECTILE':
+        return this.canShoot && distanceToPlayer > PROJECTILE_MIN_RANGE;
+      case 'SPELL':
+        return this.canSpell && distanceToPlayer > SPELL_MIN_RANGE;
+      case 'CHARGE':
+        return (
+          this.phase === 2 &&
+          this.canCharge &&
+          horizontalDistance > CHARGE_MIN_RANGE &&
+          verticalDistance <= CHARGE_VERTICAL_TOLERANCE
+        );
+    }
+  }
+
+  private startRotatedAttack(attack: RotatedAttack, player: Player): void {
+    switch (attack) {
+      case 'PROJECTILE':
+        this.startProjectile();
+        return;
+      case 'SPELL':
+        this.startSpell();
+        return;
+      case 'CHARGE':
+        this.startChargeWindup(player);
+        return;
+    }
   }
 
   private updateCharge(distanceToPlayer: number): void {
@@ -521,6 +570,9 @@ export default class GraftedWingBreaker
   private enterPhase2(): void {
     this.phase = 2;
     this.canCharge = true;
+    // A fázis a szignatúra-mozdulatával nyit: a rotációt egyből a roham slotjára állítjuk,
+    // hogy a "PHASE II" felirat után ne egy lövedék jöjjön.
+    this.rotationIndex = ATTACK_ROTATION.indexOf('CHARGE');
     this.emit('boss-phase-change', 2);
   }
 

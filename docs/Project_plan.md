@@ -501,9 +501,20 @@ A cél egy olyan boss, amely:
 > A `DORMANT` a boss entrance (15. pont) alatt aktív: a boss ilyenkor nem mozog, nem támad
 > és **nem is sebezhető**, csak a belépő-animáció végén kapcsol be.
 >
-> A támadás-választás **szándékosan determinisztikus** (nincs véletlen): távolság + saját
-> cooldown-kapuk döntenek. Ez egyszerre szolgálja a tesztelhetőséget (nem flaky unit teszt)
-> és a játékélményt — a player fel tudja ismerni a boss mintáit.
+> A támadás-választás **szándékosan determinisztikus** (nincs véletlen). Ez egyszerre szolgálja
+> a tesztelhetőséget (nem flaky unit teszt) és a játékélményt — a player fel tudja ismerni a
+> boss mintáit.
+>
+> **Kiegészítés (Phase 8): körforgás, nem prioritási sor.** A slash reaktív (közelharci
+> távolságon belül mindig ő nyer), a másik három támadás viszont **rotációban** következik:
+> `projectile → spell → charge → elölről`. A távolsági feltételek és a cooldownok csak
+> *szűrők* a körön belül — a nem elérhető támadást a boss átugorja. A fázisváltás a rotációt
+> egyből a roham slotjára állítja, tehát a Phase 2 a szignatúra-mozdulatával nyit.
+>
+> Ez egy kézi teszten talált hibára válasz: prioritási sorral a Phase 2 `charge → slash`
+> hurokra egyszerűsödött. Az ok általánosítható — **ha egy támadás cooldownja ugyanakkor jár
+> le, amikor az őt követő állapot-lock, akkor a prioritási sor élén garantáltan monopolizál**,
+> mert a döntés pillanatában mindig kész.
 >
 > A közelharci találat — a CrowHarvester-hoz hasonlóan — nem külön hitbox-zóna, hanem
 > távolság-ellenőrzés a windup végén. A charge roham közben legfeljebb **egyszer** sebez,

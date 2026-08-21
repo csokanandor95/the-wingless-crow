@@ -20,7 +20,12 @@ import GraftedWingBreaker, {
   CHARGE_MIN_RANGE,
   CHARGE_SPEED,
   CHARGE_DAMAGE,
+  CHARGE_WINDUP_MS,
+  CHARGE_MAX_MS,
+  CHARGE_COOLDOWN_MS,
   ACTION_COOLDOWN_MS,
+  ATTACK_ROTATION,
+  SLASH_STARTUP_MS,
   SPELL_MIN_RANGE,
   SPELL_CAST_MS,
   SPELL_DAMAGE,
@@ -394,6 +399,101 @@ describe('GraftedWingBreaker (Boss)', () => {
 
       expect(boss.bossState).toBe(BossState.COOLDOWN);
       expect(getBody(boss).velocity.x).toBe(0);
+    });
+  });
+
+  // A támadás-KÖRFORGÁS (ATTACK_ROTATION) tesztjei. Ez a blokk egy valódi, kézi teszten
+  // talált hibára válaszol: Phase 2-ben a boss KIZÁRÓLAG charge-ot és slash-t használt.
+  // Ok: a charge egy prioritási sor élén állt, a `canCharge` pedig ugyanabban a
+  // delayedCall-ban állt vissza, ami a bosst APPROACH-ba vitte — tehát a döntés
+  // pillanatában mindig kész volt, és a projectile/spell soha nem jutott szóhoz.
+  describe('támadás-rotáció', () => {
+    // Elég messze mindhárom rotált támadáshoz (a charge 200-as vízszintes küszöbe fölött).
+    const FAR_PLAYER_X = BOSS_X + CHARGE_MIN_RANGE + 80;
+
+    /** Egy teljes roham végigfuttatása a windup-tól a cooldown végéig. */
+    function runFullCharge(runner: ReturnType<typeof createDelayedCallRunner>): void {
+      runner.run(CHARGE_WINDUP_MS); // -> CHARGE
+      runner.run(CHARGE_MAX_MS); // -> endCharge -> COOLDOWN
+      runner.run(CHARGE_COOLDOWN_MS); // -> APPROACH (és canCharge vissza)
+    }
+
+    /** Egy cast-alapú támadás (projectile vagy spell) végigfuttatása. */
+    function runCastAttack(runner: ReturnType<typeof createDelayedCallRunner>): void {
+      runner.run(PROJECTILE_STARTUP_MS); // == SPELL_CAST_MS -> a lövés/idézés + COOLDOWN
+      runner.run(ACTION_COOLDOWN_MS); // -> APPROACH
+    }
+
+    it('Phase 2-ben körbeér: charge -> projectile -> spell -> charge', () => {
+      // EZ a bejelentett hiba regressziós tesztje. Prioritási sorral a 2. lépésnél újra
+      // charge jönne, és a két távolsági támadás soha nem sülne el.
+      boss.takeDamage(DAMAGE_TO_PHASE2);
+      const player = createPlayerAt(scene, FAR_PLAYER_X, BOSS_Y);
+      const runner = createDelayedCallRunner(scene);
+
+      boss.update(player);
+      expect(boss.bossState).toBe(BossState.CHARGE_WINDUP);
+      runFullCharge(runner);
+
+      boss.update(player);
+      expect(boss.bossState).toBe(BossState.PROJECTILE);
+      runCastAttack(runner);
+
+      boss.update(player);
+      expect(boss.bossState).toBe(BossState.SPELL);
+      runCastAttack(runner);
+
+      // A kör bezárul: a roham újra sorra kerül.
+      boss.update(player);
+      expect(boss.bossState).toBe(BossState.CHARGE_WINDUP);
+    });
+
+    it('a fázisváltás a charge slotjára állítja a rotációt', () => {
+      // Phase 1-ben a rotáció a lövedékkel nyit...
+      const player = createPlayerAt(scene, FAR_PLAYER_X, BOSS_Y);
+      boss.update(player);
+      expect(boss.bossState).toBe(BossState.PROJECTILE);
+
+      // ...Phase 2 viszont a szignatúra-mozdulatával, nem ott folytatva, ahol abbahagyta.
+      const fresh = new GraftedWingBreaker(scene as unknown as Phaser.Scene, BOSS_X, BOSS_Y);
+      fresh.activate();
+      fresh.takeDamage(DAMAGE_TO_PHASE2);
+
+      fresh.update(player);
+      expect(fresh.bossState).toBe(BossState.CHARGE_WINDUP);
+      expect(ATTACK_ROTATION.indexOf('CHARGE')).toBeGreaterThanOrEqual(0);
+    });
+
+    it('a nem elérhető támadást átugorja: a charge küszöbén belül lövedék jön', () => {
+      // A charge vízszintesen >200-at kíván; 180-nál Phase 2-ben is a rotáció következő
+      // ELÉRHETŐ eleme jön, nem áll be a boss.
+      boss.takeDamage(DAMAGE_TO_PHASE2);
+      const player = createPlayerAt(scene, BOSS_X + SPELL_MIN_RANGE + 20, BOSS_Y);
+
+      boss.update(player);
+
+      expect(boss.getPhase()).toBe(2);
+      expect(boss.bossState).toBe(BossState.PROJECTILE);
+    });
+
+    it('a slash NEM forgatja a rotációt: közelharci közjáték után ott folytatódik', () => {
+      boss.takeDamage(DAMAGE_TO_PHASE2);
+      const runner = createDelayedCallRunner(scene);
+      const far = createPlayerAt(scene, FAR_PLAYER_X, BOSS_Y);
+
+      boss.update(far); // rotáció: charge -> a mutató a projectile-re lép
+      runFullCharge(runner);
+
+      // Közelharci közjáték: a player bemegy, a boss slashel.
+      const near = createPlayerAt(scene, BOSS_X + SLASH_RANGE - 10, BOSS_Y);
+      boss.update(near);
+      expect(boss.bossState).toBe(BossState.SLASH);
+      runner.run(SLASH_STARTUP_MS);
+      runner.run(ACTION_COOLDOWN_MS); // -> APPROACH
+
+      // A player újra eltávolodik: a rotáció ott folytatódik, ahol abbamaradt.
+      boss.update(far);
+      expect(boss.bossState).toBe(BossState.PROJECTILE);
     });
   });
 

@@ -123,7 +123,7 @@ akadálymentes padlón kell kitérni.
 A Phase 8 többi része (environment sprite-ok, SFX, particles, level ambient,
 `ui/` modul) még hátravan.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (10 fájl, 156 teszt — ebből 5 az animáció-/háttér-/VFX-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (10 fájl, 162 teszt — ebből 5 az animáció-/háttér-/VFX-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
 - A `CrowHarvester`/`Player`/`GraftedWingBreaker` `scene.time.delayedCall`-jai **interleave-elhetnek** (pl. `CrowHarvester.resolveAttackHit()` a `Player.takeDamage()`-en keresztül saját delayedCallt ütemez ugyanazon a mock scene-en) — ezért a `createDelayedCallStepper` helper (`tests/unit/helpers/phaserTestUtils.ts`) `.next()` (egy lépés) ÉS `.flushRemaining()` (a kurzortól a végéig, újra-tüzelés nélkül) metódust is ad. A `createDelayedCallStepper(scene, true)` (`skipExisting`) a kurzort a MÁR ütemezett hívások mögé állítja — ez kell, ha a teszt előkészítése maga is ütemez callbackeket (pl. a bosst Phase 2-be sebezzük, ami hit-villanást ütemez).
@@ -407,9 +407,9 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - HP: 240 (`MAX_HP`). **Phase 2 a 50%-nál** (`PHASE2_HP_RATIO`): gyorsabb mozgás
   (`MOVE_SPEED_P1` 70 → `MOVE_SPEED_P2` 120) + megnyílik a charge támadás. A váltás egyszer
   emittál `'boss-phase-change'`-t, a scene erre rak "PHASE II" szöveget + camera shake-et
-- **Támadás-választás determinisztikus** (NINCS `Phaser.Math.Between`): slash → charge →
-  projectile → közelítés prioritási sorrend, saját cooldown-kapukkal (`canShoot`, `canCharge`).
-  Ez egyszerre teszi nem-flaky-vá a unit teszteket és felismerhetővé a boss mintáit
+- **Támadás-választás determinisztikus** (NINCS `Phaser.Math.Between`): reaktív slash +
+  körforgás a többi támadáson — a részleteket lásd lentebb. Ez egyszerre teszi nem-flaky-vá a
+  unit teszteket és felismerhetővé a boss mintáit
 - A **projectile és a charge saját cooldownnal** rendelkezik — enélkül a boss távolról
   végtelenül tüzelne, és soha nem indulna el a player felé
 - **A boss nem hozza létre a lövedéket**, hanem `'boss-projectile'` eventet emittál (x, y, irány),
@@ -427,9 +427,24 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   Sebzés 20, cooldown 5 mp. A boss — a lövedékhez hasonlóan — csak a `'boss-spell'` eventet
   emittálja (célpont x + talaj y), a sprite-ot a `BossScene` rakja ki; a **sebzés viszont a
   boss osztályban marad**, hogy unit-tesztelhető legyen
-- **A támadás-választás sorrendje**: `slash (≤138) → charge (P2, >200 vízsz.) → projectile (>160)
-  → spell (>160) → közelítés`. A spell szándékosan a projectile MÖGÖTT áll: így a lövedék
-  2,2 mp-es újratöltése alatt tölti ki a ritmust, és a boss nem áll be egyetlen mintába
+- **A támadás-választás KÖRFORGÁS, nem prioritási sor.** A slash reaktív: `≤ SLASH_RANGE`
+  (138) távolságon belül mindig ő nyer, és **nem forgatja** a rotációt. A másik három,
+  „elkötelezett" támadás az `ATTACK_ROTATION = ['PROJECTILE', 'SPELL', 'CHARGE']` körön megy
+  végig: a boss ott veszi fel, ahol legutóbb abbahagyta, és az első ELÉRHETŐT indítja. A
+  cooldown-kapuk (`canShoot`, `canSpell`, `canCharge`) és a távolsági feltételek
+  (`>160`, `>160`, `>200` vízszintesen + Phase 2) csak **szűrők** a rotáción belül. A nem
+  elérhető támadást átugorja, és a mutató **csak a ténylegesen elsütött** támadás mögé lép,
+  tehát az átugrott a következő körben előbb jön sorra
+- **Az `enterPhase2()` a rotációt a charge slotjára állítja**: a „PHASE II" felirat után
+  azonnal a fázis szignatúra-mozdulata jön, nem egy lövedék
+- **Miért nem prioritási sor (fontos tanulság):** eredetileg az volt, és Phase 2-ben a boss
+  KIZÁRÓLAG charge-ot és slash-t használt. A `canCharge` ugyanis pontosan abban a
+  `delayedCall`-ban áll vissza `true`-ra, ami a bosst `COOLDOWN`-ból `APPROACH`-ba viszi —
+  vagyis a 3 mp-es „charge cooldown" **maga az állapot-lock**, nem külön kapu, tehát a döntés
+  pillanatában a charge mindig kész volt. A sor élén álló támadás így monopolizálta a fázist,
+  a projectile/spell pedig csak a 160–200 px-es sávban tudott volna elsülni — ahová a roham
+  után soha nem került a boss. **Ha egy támadás cooldownja a state-lockkal egyszerre jár le,
+  prioritási sorban garantáltan monopolizál**
 - Charge: `CHARGE_WINDUP_MS` (1000ms) piros telegraph-tint, az **irány a windup ELEJÉN rögzül**
   (egyenes vonalú roham, nem követi a playert), roham közben `hasHitThisCharge` miatt
   legfeljebb egyszer sebez, falnak ütközve (`body.blocked.left/right`) idő előtt véget ér,
