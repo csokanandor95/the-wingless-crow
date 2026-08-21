@@ -7,6 +7,7 @@ import CheckpointSystem from '../systems/CheckpointSystem';
 import ParallaxBackground, {
   LEVEL1_BACKGROUND_LAYERS,
 } from '../systems/ParallaxBackground';
+import AudioManager, { SFX_KEYS } from '../systems/AudioManager';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 
 const WORLD_WIDTH = 3200;
@@ -78,6 +79,7 @@ export default class Level1Scene extends Phaser.Scene {
   private controller!: PlayerController;
   private playerHpText!: Phaser.GameObjects.Text;
   private background!: ParallaxBackground;
+  private audio!: AudioManager;
 
   private ladderZone!: Phaser.GameObjects.Zone;
   private ladderContact!: LadderContact;
@@ -118,6 +120,11 @@ export default class Level1Scene extends Phaser.Scene {
     // A háttér mindent megelőz: a rétegei -30..-20 depth-en ülnek, tehát a scene minden
     // további eleme (létra hátfal -2, létra/ajtó -1, a többi 0) előttük rajzolódik.
     this.background = new ParallaxBackground(this, LEVEL1_BACKGROUND_LAYERS);
+
+    // Egyelőre CSAK SFX-hez: a level ambient külön Phase 8 iteráció (és ahhoz az
+    // AudioManagert game-szintűvé kell emelni, mert most a scene shutdownja elvágja).
+    // Kézi takarítás nem kell — maga iratkozik fel a shutdownra.
+    this.audio = new AudioManager(this);
 
     this.createDecor();
 
@@ -164,6 +171,8 @@ export default class Level1Scene extends Phaser.Scene {
       const fireball = new Fireball(this, x, y, direction);
       this.fireballs.push(fireball);
     });
+
+    this.player.on('sword-swing', () => this.audio.playSfx(SFX_KEYS.SWORD_SWING));
 
     this.physics.add.overlap(
       this.fireballs,
@@ -364,6 +373,9 @@ export default class Level1Scene extends Phaser.Scene {
     const damage = (hitbox as Phaser.GameObjects.Zone).getData('damage') as number;
     enemy.takeDamage(damage);
     this.player.registerHit(enemy);
+    // A fenti hasHitTarget()/isDead() guard miatt ez csapásonként PONTOSAN egyszer szól,
+    // akkor is, ha az overlap több frame-en át fennáll.
+    this.audio.playSfx(SFX_KEYS.SWORD_IMPACT);
   }
 
   private handleFireballHitEnemy(

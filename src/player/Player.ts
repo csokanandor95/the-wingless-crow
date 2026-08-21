@@ -222,6 +222,16 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.hitTargetsThisAttack.clear();
     this.setVelocityX(0);
 
+    // A suhintás hangját a SCENE játssza le (ugyanaz a minta, mint a 'fireball-cast'):
+    // a Player így nem függ az AudioManagertől, a kibocsátás pedig unit-tesztben
+    // megfigyelhető. A hívás a fenti guard MÖGÖTT van, tehát a cooldownnal blokkolt vagy
+    // létrán próbált támadás nem ad hangot — hangspam hitbox nélkül nem lehetséges.
+    //
+    // A hang AZONNAL, a gombnyomásra szól, nem a 150ms-os startup után: az azonnali
+    // input-visszajelzés többet ér, mint a képi szinkron — a whoosh a windup alatt fut fel,
+    // és épp a csapás frame-jére ér a csúcsára.
+    this.emit('sword-swing');
+
     // A korábbi sárga attack-tint elmaradt: a támadás-animáció önmagában közli az infót.
     // Nullázás a playAnim() guardja miatt: két gyors csapás között a kulcs nem változna.
     this.currentAnimKey = null;

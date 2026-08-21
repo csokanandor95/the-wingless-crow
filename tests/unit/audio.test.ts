@@ -8,9 +8,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type Phaser from 'phaser';
 import AudioManager, {
   MUSIC_KEYS,
+  SFX_KEYS,
   DEFAULT_MUSIC_VOLUME,
   DEFAULT_FADE_IN_MS,
   DEFAULT_FADE_OUT_MS,
+  DEFAULT_SFX_VOLUME,
+  DEFAULT_SFX_DETUNE_RANGE,
 } from '../../src/systems/AudioManager';
 import {
   createMockScene,
@@ -38,6 +41,12 @@ function lastTweenConfig(scene: MockScene) {
     duration: number;
     onComplete?: () => void;
   };
+}
+
+/** A `scene.sound.play()` legutóbbi hívásának konfigja (volume, detune). */
+function lastSfxConfig(scene: MockScene) {
+  const calls = scene.sound.play.mock.calls;
+  return calls[calls.length - 1][1] as { volume?: number; detune?: number };
 }
 
 /** Egy `once(event, cb)` mockon regisztrált callback kikeresése és lefuttatása. */
@@ -167,6 +176,69 @@ describe('AudioManager', () => {
       freshAudio.stopMusic();
 
       expect(freshScene.tweens.add).not.toHaveBeenCalled();
+    });
+  });
+
+  // A playSfx() SZÁNDÉKOSAN másképp működik, mint a playMusic(): állapot nélküli one-shot,
+  // ami nem exkluzív és nem is vár a feloldásra. Ezek a tesztek pont ezt a különbséget őrzik.
+  describe('playSfx', () => {
+    it('a megadott kulcsot és a default hangerőt adja át', () => {
+      audio.playSfx(SFX_KEYS.SWORD_SWING);
+
+      expect(scene.sound.play).toHaveBeenCalledTimes(1);
+      expect(scene.sound.play.mock.calls[0][0]).toBe(SFX_KEYS.SWORD_SWING);
+      expect(lastSfxConfig(scene).volume).toBe(DEFAULT_SFX_VOLUME);
+    });
+
+    it('az options felülírja a hangerőt', () => {
+      audio.playSfx(SFX_KEYS.SWORD_IMPACT, { volume: 0.9 });
+
+      expect(lastSfxConfig(scene).volume).toBe(0.9);
+    });
+
+    // A legfontosabb regressziós teszt: a playMusic() épp az ELLENKEZŐJÉT csinálja
+    // (hard-stoppolja az előző sávot), az SFX-nek viszont tilos hozzányúlnia a zenéhez.
+    it('NEM exkluzív: nem szakítja meg a szóló zenét, és nem is fadeli', () => {
+      audio.playMusic(MUSIC_KEYS.BOSS_THEME);
+      const tweensBefore = scene.tweens.add.mock.calls.length;
+
+      audio.playSfx(SFX_KEYS.SWORD_SWING);
+      audio.playSfx(SFX_KEYS.SWORD_IMPACT);
+
+      expect(createdSound(scene, 0).destroy).not.toHaveBeenCalled();
+      expect(audio.getCurrentMusicKey()).toBe(MUSIC_KEYS.BOSS_THEME);
+      expect(scene.tweens.add.mock.calls.length).toBe(tweensBefore);
+      // Az SFX one-shot: sound.play(), NEM sound.add() — nincs mit élettartamban kezelni.
+      expect(scene.sound.add).toHaveBeenCalledTimes(1);
+      expect(scene.sound.play).toHaveBeenCalledTimes(2);
+    });
+
+    // A zene UNLOCKED-re vár; egy késve elsülő kardsuhintás viszont rosszabb, mint a csend.
+    it('zárolt SoundManager esetén eldobja a hangot, NEM halasztja el', () => {
+      scene.sound.locked = true;
+
+      audio.playSfx(SFX_KEYS.SWORD_SWING);
+
+      expect(scene.sound.play).not.toHaveBeenCalled();
+      expect(scene.sound.once).not.toHaveBeenCalled();
+    });
+
+    describe('detune (hangmagasság-szórás)', () => {
+      it('default: a ±DEFAULT_SFX_DETUNE_RANGE tartományon belül marad', () => {
+        for (let i = 0; i < 50; i++) {
+          audio.playSfx(SFX_KEYS.SWORD_SWING);
+
+          const detune = lastSfxConfig(scene).detune as number;
+          expect(detune).toBeGreaterThanOrEqual(-DEFAULT_SFX_DETUNE_RANGE);
+          expect(detune).toBeLessThanOrEqual(DEFAULT_SFX_DETUNE_RANGE);
+        }
+      });
+
+      it('detuneRange: 0 esetén pontos lejátszás, nincs elhangolás', () => {
+        audio.playSfx(SFX_KEYS.SWORD_IMPACT, { detuneRange: 0 });
+
+        expect(lastSfxConfig(scene).detune).toBe(0);
+      });
     });
   });
 

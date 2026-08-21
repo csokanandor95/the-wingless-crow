@@ -213,6 +213,10 @@ export function createMockScene() {
       add: vi.fn((key: string, _config?: { loop?: boolean; volume?: number }) =>
         createMockSound(key)
       ),
+      // One-shot SFX (playSfx). Az explicit paramétertípus KÖTELEZŐ: paraméter nélküli
+      // vi.fn() mellett a mock.calls üres tuple-ként (`[]`) tipizálódik, és a tsc --noEmit
+      // elszállna, amikor a teszt kiolvassa belőle a configot (lásd MockTweenConfig).
+      play: vi.fn((_key: string, _config?: { volume?: number; detune?: number }) => true),
       once: vi.fn((_event: string, _callback: () => void) => undefined),
     },
     events: { once: vi.fn((_event: string, _callback: () => void) => undefined) },

@@ -16,7 +16,7 @@ import {
   WING_BREAKER_ANIMS,
 } from '../bosses/GraftedWingBreakerAnimations';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
-import AudioManager, { MUSIC_KEYS } from '../systems/AudioManager';
+import AudioManager, { MUSIC_KEYS, SFX_KEYS } from '../systems/AudioManager';
 import AfterImageTrail from '../systems/AfterImageTrail';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 
@@ -164,6 +164,8 @@ export default class BossScene extends Phaser.Scene {
     this.player.on('fireball-cast', (x: number, y: number, direction: number) => {
       this.fireballs.push(new Fireball(this, x, y, direction));
     });
+
+    this.player.on('sword-swing', () => this.audio.playSfx(SFX_KEYS.SWORD_SWING));
 
     this.physics.add.overlap(this.fireballs, this.boss, this.handleFireballHitBoss, undefined, this);
     this.physics.add.overlap(
@@ -393,6 +395,9 @@ export default class BossScene extends Phaser.Scene {
     const damage = (hitbox as Phaser.GameObjects.Zone).getData('damage') as number;
     boss.takeDamage(damage);
     this.player.registerHit(boss);
+    // Ugyanaz a kard, ugyanaz a becsapódás, mint a CrowHarvesteren — a hasHitTarget()
+    // guard itt is csapásonként egyre korlátozza.
+    this.audio.playSfx(SFX_KEYS.SWORD_IMPACT);
   }
 
   private handleFireballHitBoss(

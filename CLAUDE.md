@@ -120,10 +120,19 @@ mért nyúlásából. Ez érdemi balansz-változás — lásd a "Nyitott polish-
 Az aréna **két lebegő platformja törölve** (user döntés): a charge és a spell elől is tiszta,
 akadálymentes padlón kell kitérni.
 
-A Phase 8 többi része (environment sprite-ok, SFX, particles, level ambient,
+**Phase 8 — 7. iteráció: KARD SFX kész.** Az `AudioManager` megkapta a `playSfx()`-et, és
+ezzel a projekt első hangeffektjeit: a player kardsuhintását és a kard becsapódását
+(`assets/audio/sfx/`, a *Free Fantasy SFX Pack* — TomMusic; a csomag `ReadMe.txt`-je
+**nem tartalmaz licencszöveget**, lásd a nyitott jogi tételeket lentebb).
+- A **suhintás azonnal, a gombnyomásra** szól, nem a 150ms-os startup után (user döntés):
+  az azonnali input-visszajelzés többet ér, mint a képi szinkron.
+- A **becsapódás mindkét scene-ben** szól — a CrowHarvesteren ÉS a bosson.
+- **±120 cent véletlen detune** hívásonként, hogy a sorozatos csapások ne váljanak gépiessé.
+
+A Phase 8 többi része (environment sprite-ok, a többi SFX, particles, level ambient,
 `ui/` modul) még hátravan.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (10 fájl, 163 teszt — ebből 5 az animáció-/háttér-/VFX-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (10 fájl, 171 teszt — ebből 5 az animáció-/háttér-/VFX-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
 - A `CrowHarvester`/`Player`/`GraftedWingBreaker` `scene.time.delayedCall`-jai **interleave-elhetnek** (pl. `CrowHarvester.resolveAttackHit()` a `Player.takeDamage()`-en keresztül saját delayedCallt ütemez ugyanazon a mock scene-en) — ezért a `createDelayedCallStepper` helper (`tests/unit/helpers/phaserTestUtils.ts`) `.next()` (egy lépés) ÉS `.flushRemaining()` (a kurzortól a végéig, újra-tüzelés nélkül) metódust is ad. A `createDelayedCallStepper(scene, true)` (`skipExisting`) a kurzort a MÁR ütemezett hívások mögé állítja — ez kell, ha a teszt előkészítése maga is ütemez callbackeket (pl. a bosst Phase 2-be sebezzük, ami hit-villanást ütemez).
@@ -140,7 +149,10 @@ the-wingless-crow/
 │   └── Project_plan.md
 ├── assets/
 │   ├── audio/
-│   │   └── boss-theme.mp3        # Vite-importtal jön be (nem public/), lásd lentebb
+│   │   ├── boss-theme.mp3        # Vite-importtal jön be (nem public/), lásd lentebb
+│   │   └── sfx/                  # Free Fantasy SFX Pack (TomMusic), WAV — licenc TISZTÁZANDÓ
+│   │       ├── sword-attack-2.wav      # = a csomag "Sword Attack 2"-je (a sorszám a kapocs)
+│   │       └── sword-impact-hit-1.wav  # = a csomag "Sword Impact Hit 1"-e
 │   ├── backgrounds/
 │   │   ├── ruined-city/          # Level 1 parallax rétegek, mind 426x384
 │   │   │   ├── 01-sky.png        # RGB, átlátszatlan ég (#673838 -> #724141)
@@ -164,7 +176,7 @@ the-wingless-crow/
 │       ├── combat.test.ts       # §23 Combat scope (ATTACK_CONFIGS, Player attack, Fireball + ProjectileOptions)
 │       ├── crowHarvester.test.ts # §23 Enemy scope (CrowHarvester HP/damage/death/state transitions)
 │       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, slash/projectile/spell/charge, death)
-│       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown)
+│       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown, SFX)
 │       ├── playerAnimations.test.ts       # state->anim leképezés + a Player animáció-vezérlése
 │       ├── crowHarvesterAnimations.test.ts # state->anim + a facing-kompenzáció regressziós tesztje
 │       ├── bossAnimations.test.ts         # state->anim, facing-kompenzáció SCALE-lel, levezetett konstansok
@@ -194,7 +206,7 @@ the-wingless-crow/
 │   │   └── GraftedWingBreakerAnimations.ts # sheet geometria, anim kulcsok, időzítések forrása
 │   ├── systems/
 │   │   ├── CheckpointSystem.ts   # egyetlen aktív respawn-pont tárolása
-│   │   ├── AudioManager.ts       # egy zenesáv: loop + fade-in/out, scene-shutdown hookkal
+│   │   ├── AudioManager.ts       # egy zenesáv (loop + fade) + állapot nélküli one-shot SFX
 │   │   ├── SpriteFacing.ts       # off-center sprite fordulás-kompenzáció (CrowHarvester + boss)
 │   │   ├── AfterImageTrail.ts    # afterimage-csík gyors mozgáshoz (a boss dash-éhez)
 │   │   └── ParallaxBackground.ts # réteges parallax háttér + a Level 1 réteg-terve
@@ -264,7 +276,9 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - Kard: **egyetlen** Sword Attack (J / bal klikk), `player.attack()`. A cooldown/damage/hitbox
   a `combat/Attack.ts` `ATTACK_CONFIGS[AttackType.SWORD]`-jából jön: 10 sebzés, 350ms cooldown,
   150ms startup + 180ms aktív. A cooldown SZÁNDÉKOSAN nem rövidebb a 330ms-os animációnál,
-  hogy a valódi kapu a cooldown legyen, ne az ATTACK state-lock. Emiatt viszont a
+  hogy a valódi kapu a cooldown legyen, ne az ATTACK state-lock. A `performAttack()` a
+  guardok MÖGÖTT **`'sword-swing'` eventet emittál** (a suhintás SFX-ét a scene játssza le,
+  lásd az Audio szakaszt), így blokkolt csapásra nincs hang. Emiatt viszont a
   `performAttack()` **nullázza a `currentAnimKey`-t**: 20ms rés mellett a state-reset és a
   cooldown lejárta ugyanabba a frame-közbe eshet, és a `playAnim()` guardja "ugyanaz a kulcs"
   alapon átugorná az animáció újraindítását (a kard a csapás utolsó frame-jén ragadna).
@@ -522,6 +536,35 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   a végleges lore a Phase 9-ben készül, a csere egy tömb-szerkesztés
 
 ### Audio (`src/systems/AudioManager.ts`)
+
+Két, **szándékosan eltérő felépítésű** ág él egymás mellett, és nem nyúlnak egymáshoz:
+a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one-shot.
+
+**SFX ág (Phase 8, 7. iteráció):**
+- `playSfx(key, { volume?, detuneRange? })`. Exportált konstansok: `SFX_KEYS`
+  (`SWORD_SWING`, `SWORD_IMPACT`), `DEFAULT_SFX_VOLUME` (0.5),
+  `DEFAULT_SFX_DETUNE_RANGE` (120)
+- **`scene.sound.play(key, config)`, NEM `sound.add()`** — a SoundManager `play()`-e olyan
+  one-shot hangot hoz létre, ami a lejátszás végén magától felszabadul. Ezért az SFX-hez
+  nincs `this.music`-szerű élettartam-kezelés, **nem exkluzív** (több csapás hangja
+  átfedhet), és a `stopMusic()` / `destroy()` / shutdown-hook logikája **nem változott**
+- **Zárolt audio contextnél az SFX-et ELDOBJUK, nem halasztjuk** (szemben a zenével, ami
+  az `UNLOCKED` eseményre vár): egy másodpercekkel később elsülő kardsuhintás rosszabb,
+  mint a néma csapás
+- `DEFAULT_SFX_VOLUME` (0.5) szándékosan a `DEFAULT_MUSIC_VOLUME` (0.45) **fölött** van,
+  hogy a boss theme alatt is átvágjon
+- **Detune-szórás**: hívásonként ±`detuneRange` cent véletlen elhangolás
+  (`Phaser.Math.Between`), így egyetlen fájlból is változatos a sorozat. A default a hívó
+  oldalán elhagyható; `{ detuneRange: 0 }` ad pontos lejátszást
+- **Bekötés**: a `Player` a `performAttack()`-ban — a cooldown-guard MÖGÖTT, tehát blokkolt
+  csapás nem ad hangot — `'sword-swing'` eventet emittál, a scene erre hívja a `playSfx`-et
+  (ugyanaz a minta, mint a `'fireball-cast'`). A becsapódás a scene-ek találat-kezelőiben
+  szól (`Level1Scene.handlePlayerHitEnemy()`, `BossScene.handlePlayerHitBoss()`), ahol a
+  meglévő `hasHitTarget()` guard csapásonként pontosan egyre korlátozza. **A `Level1Scene`
+  emiatt kapott saját `AudioManager` példányt — zenét NEM indít, csak SFX-hez kell.**
+  A fireball-találat szándékosan néma (külön SFX-tétel)
+
+**Zene ág:**
 - **Egyetlen zenesáv** kezelése: `playMusic(key, { volume?, fadeInMs? })`, `stopMusic(fadeOutMs?)`,
   `getCurrentMusicKey()`, `destroy()`. Exportált konstansok: `MUSIC_KEYS`,
   `DEFAULT_MUSIC_VOLUME` (0.45), `DEFAULT_FADE_IN_MS` (800), `DEFAULT_FADE_OUT_MS` (1500)
@@ -532,9 +575,13 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - **Autoplay policy**: ha `scene.sound.locked`, a lejátszás a `Phaser.Sound.Events.UNLOCKED`
   eseményre halasztódik. A gyakorlatban ez sosem kell — a Phaser `WebAudioSoundManager`
   **`keydown`-ra is felold**, a player pedig végigjátssza a Level 1-et, mire ide ér
-- **Az asset Vite-importtal jön** (`import bossThemeUrl from '../../assets/audio/boss-theme.mp3'`),
-  NEM a `public/` mappából. Így a build hash-eli, a GitHub Pages base path magától jó lesz,
-  és **hiányzó fájlnál a build elszáll** néma 404 helyett. Ehhez kell a `src/vite-env.d.ts`
+- **Minden hang-asset Vite-importtal jön** (`import bossThemeUrl from
+  '../../assets/audio/boss-theme.mp3'`, ugyanígy a két SFX WAV), NEM a `public/` mappából.
+  Így a build hash-eli, a GitHub Pages base path magától jó lesz, és **hiányzó fájlnál a
+  build elszáll** néma 404 helyett. Ehhez kell a `src/vite-env.d.ts`
+- **Az SFX WAV, nem OGG** (a csomagban mindkettő megvan): a WAV univerzálisan támogatott
+  böngészőben, és 2×89 KB elhanyagolható a 2 MB-os boss theme mellett. Ha valaha a
+  build-méret szempont lesz, az OGG-re váltás egy import-csere
 - Bekötés a `BossScene`-ben: `create()` → `new AudioManager(this)`, `startEntrance()` →
   `playMusic(MUSIC_KEYS.BOSS_THEME)`, `scheduleVictory()`/`scheduleDefeat()` → `stopMusic()`.
   Kézi takarítás **nincs** — az `AudioManager` maga iratkozik fel a scene shutdownjára
@@ -624,6 +671,13 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   gyűjti, és a projekt végén másolja be őket — ezért nem került licenc fájl a
   `assets/backgrounds/ruined-city/` mellé, a forráscsomagot a `BootScene` importjainál
   lévő komment köti vissza.
+- **NYITOTT JOGI TÉTEL:** a kard SFX-ek forráscsomagja (*Free Fantasy SFX Pack* by
+  **TomMusic**, `2D helper/sounds/...`) `ReadMe.txt`-je **nem tartalmaz licencszöveget**,
+  csak a szerző elérhetőségeit (itch.io / gamedevmarket / e-mail). A feltételeket a
+  letöltési oldalról kell visszakeresni **a repo nyilvánossá tétele / GitHub Pages deploy
+  ELŐTT.** Ezért maradt meg a fájlnevekben a csomagbeli sorszám
+  (`sword-attack-2.wav` = "Sword Attack 2", `sword-impact-hit-1.wav` = "Sword Impact
+  Hit 1") — ez a kapocs a forráshoz, a `BootScene` importjainál lévő komment mellett.
 - **A boss aréna hátterének (`assets/backgrounds/cathedral/boss-arena.png`) licence
   szintén nincs tisztázva** — a forrás a `2D helper/level/Bossbackground_1.png`, ami
   önálló fájlként, licenc nélkül érkezett. A user gyűjtésébe ez is bekerül; publikálás
@@ -654,10 +708,11 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 ## Következő lépés
 
 **Phase 8 – Atmosphere folyamatban.** Az 1. iteráció (boss music) kész; ami még hátravan:
-- **Sound effectek** (Project_plan.md 18. pont listája: sword swing/hit, fireball, hurt,
-  death, jump, checkpoint stb.). Az `AudioManager` jelenleg csak zenét kezel — SFX-hez
-  kap majd egy `playSfx(key)`-t, ami nem exkluzív (több hang egyszerre). A player
-  animációi már megvannak, tehát a hangokat könnyű a megfelelő frame-hez kötni.
+- **A többi sound effect** (Project_plan.md 18. pont listája). A **sword swing/hit KÉSZ**
+  (7. iteráció), és vele az egész `playSfx()` infrastruktúra — a lista maradéka (fireball,
+  hurt, death, jump, checkpoint, boss-támadások) mostantól asset + `SFX_KEYS` bejegyzés +
+  egy `playSfx()` hívás. A player animációi megvannak, tehát a hangokat könnyű a megfelelő
+  frame-hez kötni. Ugyanabban a TomMusic csomagban van magic/impact/UI hang is.
 - **Environment sprite-ok** — a player (2. it.), a CrowHarvester (3. it.), a Level 1 háttere
   (4. it.), a boss aréna háttere (5. it.) és a boss (6. it.) kész; **már csak a tile-ok, a
   létra, a Level 1 ajtaja és a két lövedék** placeholder.

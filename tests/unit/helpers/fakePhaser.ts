@@ -166,6 +166,10 @@ export function createFakePhaserModule() {
     Math: {
       // Ugyanaz a lerp-képlet, mint a valódi Phaser.Math.Linear: p0 + (p1 - p0) * t.
       Linear: (p0: number, p1: number, t: number) => p0 + (p1 - p0) * t,
+      // Az AudioManager.playSfx() detune-szórása hívja. A valódi Phaser.Math.Between
+      // INKLUZÍV mindkét végén — a tesztek tartomány-ellenőrzése erre épül.
+      Between: (min: number, max: number) =>
+        Math.floor(Math.random() * (max - min + 1)) + min,
       Distance: {
         Between: (x1: number, y1: number, x2: number, y2: number) =>
           Math.hypot(x2 - x1, y2 - y1),

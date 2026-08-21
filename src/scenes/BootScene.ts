@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { MUSIC_KEYS } from '../systems/AudioManager';
+import { MUSIC_KEYS, SFX_KEYS } from '../systems/AudioManager';
 import {
   createPlayerAnimations,
   FRAME_HEIGHT,
@@ -22,6 +22,13 @@ import {
 // a base path (GitHub Pages) magától helyes lesz, és HIÁNYZÓ fájl esetén a build elszáll
 // ahelyett, hogy néma 404 lenne futásidőben.
 import bossThemeUrl from '../../assets/audio/boss-theme.mp3';
+// Kard SFX: "Free Fantasy SFX Pack" (TomMusic). A csomag ReadMe.txt-je NEM tartalmaz
+// licencszöveget, csak elérhetőségeket — publikálás előtt tisztázandó (lásd CLAUDE.md
+// nyitott jogi tételek). A fájlnevekben megtartott sorszám (`-2`, `-1`) az egyetlen
+// kapocs a forráscsomag `Sword Attack 2` / `Sword Impact Hit 1` fájljaihoz. WAV, nem OGG:
+// univerzálisan támogatott, és 2x89 KB elhanyagolható a 2 MB-os boss theme mellett.
+import swordSwingUrl from '../../assets/audio/sfx/sword-attack-2.wav';
+import swordImpactUrl from '../../assets/audio/sfx/sword-impact-hit-1.wav';
 // Player sprite sheetek (2D_SL_Knight_v1.0, lásd assets/sprites/knight/license.txt).
 // Mind 128x64-es blokkokra van vágva.
 import knightIdleUrl from '../../assets/sprites/knight/Idle.png';
@@ -71,6 +78,11 @@ const PLAYER_SHEETS: Array<{ key: string; url: string }> = [
   { key: PLAYER_TEXTURES.CAST, url: knightCastUrl },
 ];
 
+const SFX_SOUNDS: Array<{ key: string; url: string }> = [
+  { key: SFX_KEYS.SWORD_SWING, url: swordSwingUrl },
+  { key: SFX_KEYS.SWORD_IMPACT, url: swordImpactUrl },
+];
+
 // Sima képek (nem sprite sheetek): a Level 1 parallax rétegei + a boss aréna álló háttere.
 const BACKGROUND_IMAGES: Array<{ key: string; url: string }> = [
   { key: BACKGROUND_TEXTURES.SKY, url: bgSkyUrl },
@@ -89,6 +101,10 @@ export default class BootScene extends Phaser.Scene {
     this.createLoadingIndicator();
 
     this.load.audio(MUSIC_KEYS.BOSS_THEME, bossThemeUrl);
+
+    for (const sfx of SFX_SOUNDS) {
+      this.load.audio(sfx.key, sfx.url);
+    }
 
     for (const sheet of PLAYER_SHEETS) {
       this.load.spritesheet(sheet.key, sheet.url, {

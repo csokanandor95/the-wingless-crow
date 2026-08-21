@@ -92,6 +92,31 @@ describe('Player attack — sebzés, hitbox, state, cooldown', () => {
     expect(scene.time.delayedCall.mock.calls.length).toBeGreaterThan(callsBefore);
     expect(player.playerState).toBe(PlayerState.ATTACK);
   });
+
+  // A suhintás hangját a scene játssza le egy 'sword-swing' eventre (mint a 'fireball-cast'-ot),
+  // hogy a Player ne függjön az AudioManagertől.
+  describe("'sword-swing' event (a suhintás SFX kiváltója)", () => {
+    it('sikeres attack() pontosan egyszer emittál', () => {
+      const onSwing = vi.fn();
+      player.on('sword-swing', onSwing);
+
+      player.attack();
+
+      expect(onSwing).toHaveBeenCalledTimes(1);
+    });
+
+    // A hang a cooldown-guard MÖGÖTT van: gombnyomkodással nem lehet hangspamet csinálni
+    // olyan csapásokból, amiknek hitboxa sincs.
+    it('a cooldownnal blokkolt attack() NEM emittál', () => {
+      const onSwing = vi.fn();
+      player.on('sword-swing', onSwing);
+
+      player.attack();
+      player.attack(); // még cooldown alatt -> no-op
+
+      expect(onSwing).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe('Fireball damage', () => {
