@@ -10,6 +10,7 @@ import GraftedWingBreaker, {
 import {
   FEET_OFFSET_Y as BOSS_FEET_OFFSET_Y,
   SCALE as BOSS_SCALE,
+  SPELL_IMPACT_MS,
   SPELL_ORIGIN_X,
   SPELL_ORIGIN_Y,
   TEXTURE_KEY as BOSS_TEXTURE_KEY,
@@ -163,6 +164,7 @@ export default class BossScene extends Phaser.Scene {
 
     this.player.on('fireball-cast', (x: number, y: number, direction: number) => {
       this.fireballs.push(new Fireball(this, x, y, direction));
+      this.audio.playSfx(SFX_KEYS.FIREBALL_CAST);
     });
 
     this.player.on('sword-swing', () => this.audio.playSfx(SFX_KEYS.SWORD_SWING));
@@ -197,7 +199,11 @@ export default class BossScene extends Phaser.Scene {
           size: 20,
         })
       );
+      this.audio.playSfx(SFX_KEYS.BOSS_PROJECTILE);
     });
+
+    // Közelharci csapás: a hang a lecsapás pillanatában érkezik (a boss ott emittál).
+    this.boss.on('boss-slash', () => this.audio.playSfx(SFX_KEYS.ENEMY_SWING));
 
     // Shadow Spell: a boss csak a CÉLPONTOT emittálja (a sebzést maga oldja fel), az
     // árny-oszlopot mi rajzoljuk ki. Az origin a Spell frame-ek mért geometriájából jön:
@@ -212,6 +218,18 @@ export default class BossScene extends Phaser.Scene {
 
       pillar.play(WING_BREAKER_ANIMS.SPELL);
       pillar.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => pillar.destroy());
+
+      // A hang a BECSAPÓDÁSKOR indul, nem a telegraph alatt: az izzás 960ms-ig lebeg (ez a
+      // kitérési ablak), és az oszlop csak SPELL_IMPACT_MS-nél (f55) ér földet — pont ott,
+      // ahol a boss a sebzést is feloldja. A konstans az ANIMÁCIÓS modulból jön, tehát a
+      // hang nem csúszhat el a látványtól, ha a SPELL_TELEGRAPH_LOOPS valaha változik.
+      //
+      // Nincs "boss meghalt" guard: az oszlop ilyenkor is végigjátssza a becsapódást, csak
+      // sebzés nélkül — a hangnak a látványt kell követnie. Scene-shutdownnál viszont a
+      // Phaser törli a függő delayedCall-okat, tehát a győzelmi fade alá nem szól be.
+      this.time.delayedCall(SPELL_IMPACT_MS, () =>
+        this.audio.playSfx(SFX_KEYS.BOSS_SPELL_IMPACT)
+      );
     });
 
     this.boss.on('boss-phase-change', () => {

@@ -14,6 +14,7 @@ import AudioManager, {
   DEFAULT_FADE_OUT_MS,
   DEFAULT_SFX_VOLUME,
   DEFAULT_SFX_DETUNE_RANGE,
+  LEVEL_MUSIC_VOLUME,
 } from '../../src/systems/AudioManager';
 import {
   createMockScene,
@@ -63,6 +64,22 @@ describe('AudioManager', () => {
   beforeEach(() => {
     scene = createMockScene();
     audio = new AudioManager(scene as unknown as Phaser.Scene);
+  });
+
+  // Nem a lejátszás-logikát őrzik, hanem a KEVERÉSI SZÁNDÉKOT és a kulcstáblák épségét.
+  describe('hangkeverés (mix) invariánsok', () => {
+    it('minden zene-kulcs egyedi', () => {
+      const keys = Object.values(MUSIC_KEYS);
+      expect(new Set(keys).size).toBe(keys.length);
+    });
+
+    // A level ambient egy több perces szakaszon végig szól -> háttérben kell maradnia;
+    // a harci SFX-nek pedig mindkét zenesáv fölött át kell vágnia. Egy későbbi
+    // "csak feljebb veszem egy kicsit" hangolás nem fordíthatja meg észrevétlenül a sorrendet.
+    it('level ambient < boss theme < SFX', () => {
+      expect(LEVEL_MUSIC_VOLUME).toBeLessThan(DEFAULT_MUSIC_VOLUME);
+      expect(DEFAULT_MUSIC_VOLUME).toBeLessThan(DEFAULT_SFX_VOLUME);
+    });
   });
 
   describe('playMusic', () => {
@@ -182,6 +199,14 @@ describe('AudioManager', () => {
   // A playSfx() SZÁNDÉKOSAN másképp működik, mint a playMusic(): állapot nélküli one-shot,
   // ami nem exkluzív és nem is vár a feloldásra. Ezek a tesztek pont ezt a különbséget őrzik.
   describe('playSfx', () => {
+    // A tábla nő minden SFX-iterációval. Egy másolat-beillesztésből maradt duplikált kulcs
+    // NÉMÁN összeolvasztana két hangot (a BootScene ugyanarra a cache-bejegyzésre töltene),
+    // és semmi nem szólna róla — sem a tsc, sem a build.
+    it('minden SFX kulcs egyedi', () => {
+      const keys = Object.values(SFX_KEYS);
+      expect(new Set(keys).size).toBe(keys.length);
+    });
+
     it('a megadott kulcsot és a default hangerőt adja át', () => {
       audio.playSfx(SFX_KEYS.SWORD_SWING);
 

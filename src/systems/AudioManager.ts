@@ -10,16 +10,40 @@ import Phaser from 'phaser';
 // A kettő nem nyúl egymáshoz: egy SFX soha nem szakítja meg a zenét, és fordítva.
 export const MUSIC_KEYS = {
   BOSS_THEME: 'boss-theme',
+  LEVEL1_THEME: 'level1-theme',
 } as const;
 
 export const SFX_KEYS = {
   SWORD_SWING: 'sfx-sword-swing',
   SWORD_IMPACT: 'sfx-sword-impact',
+  /** A player tűzgolyója — a lövedék születésének pillanatában ('fireball-cast'). */
+  FIREBALL_CAST: 'sfx-fireball-cast',
+  /** A boss lövedéke. SZÁNDÉKOSAN másik hang, mint a playeré: hallani, kié a lövedék. */
+  BOSS_PROJECTILE: 'sfx-boss-projectile',
+  /** A Shadow Spell BECSAPÓDÁSA — nem a cast, és nem is a telegraph alatt. */
+  BOSS_SPELL_IMPACT: 'sfx-boss-spell-impact',
+  /** A CrowHarvester ÉS a boss közelharci csapása — közös hang. */
+  ENEMY_SWING: 'sfx-enemy-swing',
 } as const;
 
 export const DEFAULT_MUSIC_VOLUME = 0.45;
 export const DEFAULT_FADE_IN_MS = 800;
 export const DEFAULT_FADE_OUT_MS = 1500;
+
+/**
+ * A projekt HANGKEVERÉSI hierarchiája, egy helyen (unit teszt őrzi a sorrendet):
+ *   SFX (0.5)  >  boss theme (0.45)  >  level ambient (0.35)
+ * A level-zene egy több perces szakaszon végig szól, ezért marad háttérben; a boss theme
+ * pedig érezhetően felerősödik hozzá képest, amikor a harc kezdődik.
+ */
+export const LEVEL_MUSIC_VOLUME = 0.35;
+/**
+ * Ambient sávhoz hosszabb belépő, mint a boss theme 800ms-a. Ez itt nem esztétikai
+ * finomság: a Level 1 közvetlenül az oldalbetöltés után indul, tehát az audio context
+ * MINDIG zárolt, és a zene csak az első billentyűlenyomásnál kezd szólni — egy hirtelen
+ * berobbanó sáv ott zavaró lenne. Lásd a Level1Scene.create() kommentjét.
+ */
+export const LEVEL_MUSIC_FADE_IN_MS = 2000;
 
 // Szándékosan a zene hangereje FÖLÖTT: a boss theme alatt is át kell vágnia.
 export const DEFAULT_SFX_VOLUME = 0.5;

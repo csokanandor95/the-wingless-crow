@@ -211,4 +211,42 @@ describe('CrowHarvester', () => {
       expect(velocityAfterSecond).toBe(0);
     });
   });
+
+  // A csapás hangját a scene játssza le erre az eventre (mint a Player 'sword-swing'-jét).
+  describe("'harvester-attack' event (a csapás SFX kiváltója)", () => {
+    /** CHASE-en át ATTACK-be viszi a lényt; a startup callback ütemezve marad. */
+    function startAttackOn(harvester: CrowHarvester): Player {
+      const near = createPlayerAt(scene, HARVESTER_X + 50, HARVESTER_Y);
+      harvester.update(near); // CHASE
+      near.x = HARVESTER_X + ATTACK_RANGE - 5;
+      harvester.update(near); // ATTACK
+      return near;
+    }
+
+    // A windup egy MOZDULATLAN, magasba emelt kasza-póz: a hang nem oda tartozik, hanem
+    // a fehér ívhez — vagyis a startup VÉGÉRE, oda, ahol a sebzés is feloldódik.
+    it('a windup alatt NEM szól, csak a csapás lépésénél', () => {
+      const onSwing = vi.fn();
+      crowHarvester.on('harvester-attack', onSwing);
+
+      startAttackOn(crowHarvester);
+      expect(crowHarvester.crowHarvesterState).toBe(CrowHarvesterState.ATTACK);
+      expect(onSwing).not.toHaveBeenCalled();
+
+      createDelayedCallStepper(scene).next(); // ATTACK_STARTUP_MS
+      expect(onSwing).toHaveBeenCalledTimes(1);
+    });
+
+    // Az emit a DEAD guard MÖGÖTT van: a windup alatt megölt lény már nem csap hangosan.
+    it('a windup alatt megölt lény NEM emittál', () => {
+      const onSwing = vi.fn();
+      crowHarvester.on('harvester-attack', onSwing);
+
+      startAttackOn(crowHarvester);
+      crowHarvester.takeDamage(MAX_HP); // DEAD még a startup lejárta előtt
+
+      createDelayedCallStepper(scene).next(); // a csapás callbackje lefut, de korán visszatér
+      expect(onSwing).not.toHaveBeenCalled();
+    });
+  });
 });

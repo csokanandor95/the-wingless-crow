@@ -22,13 +22,22 @@ import {
 // a base path (GitHub Pages) magától helyes lesz, és HIÁNYZÓ fájl esetén a build elszáll
 // ahelyett, hogy néma 404 lenne futásidőben.
 import bossThemeUrl from '../../assets/audio/boss-theme.mp3';
-// Kard SFX: "Free Fantasy SFX Pack" (TomMusic). A csomag ReadMe.txt-je NEM tartalmaz
-// licencszöveget, csak elérhetőségeket — publikálás előtt tisztázandó (lásd CLAUDE.md
-// nyitott jogi tételek). A fájlnevekben megtartott sorszám (`-2`, `-1`) az egyetlen
-// kapocs a forráscsomag `Sword Attack 2` / `Sword Impact Hit 1` fájljaihoz. WAV, nem OGG:
-// univerzálisan támogatott, és 2x89 KB elhanyagolható a 2 MB-os boss theme mellett.
+// Level 1 ambient: "Free Dark Fantasy Music" csomag, `Library of Veles (LOOP)`. A csomagban
+// EGYÁLTALÁN nincs licenc/readme fájl — publikálás előtt tisztázandó (lásd CLAUDE.md nyitott
+// jogi tételek). A forrás-cím megtartása a fájlnévben az egyetlen kapocs a csomaghoz.
+import level1ThemeUrl from '../../assets/audio/library-of-veles.mp3';
+// Harci SFX: "Free Fantasy SFX Pack" (TomMusic), a csomag `Attacks/` és `Spells/`
+// almappáiból. A csomag ReadMe.txt-je NEM tartalmaz licencszöveget, csak elérhetőségeket —
+// publikálás előtt tisztázandó (lásd CLAUDE.md nyitott jogi tételek). A fájlnevekben
+// megtartott sorszám az egyetlen kapocs a forráscsomag fájljaihoz (`Sword Attack 2`,
+// `Sword Impact Hit 1`, `Fireball 2`, `Fireball 3`, `Firebuff 2`, `Sword Attack 3`).
+// WAV, nem OGG: univerzálisan támogatott böngészőben.
 import swordSwingUrl from '../../assets/audio/sfx/sword-attack-2.wav';
 import swordImpactUrl from '../../assets/audio/sfx/sword-impact-hit-1.wav';
+import enemySwingUrl from '../../assets/audio/sfx/sword-attack-3.wav';
+import fireballCastUrl from '../../assets/audio/sfx/fireball-2.wav';
+import bossProjectileUrl from '../../assets/audio/sfx/fireball-3.wav';
+import bossSpellImpactUrl from '../../assets/audio/sfx/firebuff-2.wav';
 // Player sprite sheetek (2D_SL_Knight_v1.0, lásd assets/sprites/knight/license.txt).
 // Mind 128x64-es blokkokra van vágva.
 import knightIdleUrl from '../../assets/sprites/knight/Idle.png';
@@ -78,9 +87,18 @@ const PLAYER_SHEETS: Array<{ key: string; url: string }> = [
   { key: PLAYER_TEXTURES.CAST, url: knightCastUrl },
 ];
 
+const MUSIC_TRACKS: Array<{ key: string; url: string }> = [
+  { key: MUSIC_KEYS.BOSS_THEME, url: bossThemeUrl },
+  { key: MUSIC_KEYS.LEVEL1_THEME, url: level1ThemeUrl },
+];
+
 const SFX_SOUNDS: Array<{ key: string; url: string }> = [
   { key: SFX_KEYS.SWORD_SWING, url: swordSwingUrl },
   { key: SFX_KEYS.SWORD_IMPACT, url: swordImpactUrl },
+  { key: SFX_KEYS.ENEMY_SWING, url: enemySwingUrl },
+  { key: SFX_KEYS.FIREBALL_CAST, url: fireballCastUrl },
+  { key: SFX_KEYS.BOSS_PROJECTILE, url: bossProjectileUrl },
+  { key: SFX_KEYS.BOSS_SPELL_IMPACT, url: bossSpellImpactUrl },
 ];
 
 // Sima képek (nem sprite sheetek): a Level 1 parallax rétegei + a boss aréna álló háttere.
@@ -100,7 +118,9 @@ export default class BootScene extends Phaser.Scene {
     this.createPlaceholderTextures();
     this.createLoadingIndicator();
 
-    this.load.audio(MUSIC_KEYS.BOSS_THEME, bossThemeUrl);
+    for (const track of MUSIC_TRACKS) {
+      this.load.audio(track.key, track.url);
+    }
 
     for (const sfx of SFX_SOUNDS) {
       this.load.audio(sfx.key, sfx.url);

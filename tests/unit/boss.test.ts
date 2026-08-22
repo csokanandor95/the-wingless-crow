@@ -196,6 +196,22 @@ describe('GraftedWingBreaker (Boss)', () => {
 
       expect(player.getHP()).toBe(PLAYER_MAX_HP);
     });
+
+    // A csapás hangját a scene játssza le erre az eventre. A kasza hátrahúzása alatt még
+    // csend van — a hang a lecsapás pillanatához (f20) tartozik, oda, ahol a sebzés is.
+    it("a 'boss-slash'-t a windup VÉGÉN emittálja, nem az elején", () => {
+      const onSlash = vi.fn();
+      boss.on('boss-slash', onSlash);
+      const player = createPlayerAt(scene, BOSS_X + SLASH_RANGE - 10, BOSS_Y);
+      const runner = createDelayedCallRunner(scene);
+
+      boss.update(player);
+      expect(boss.bossState).toBe(BossState.SLASH);
+      expect(onSlash).not.toHaveBeenCalled();
+
+      runner.run(SLASH_STARTUP_MS);
+      expect(onSlash).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('attack state — projectile', () => {

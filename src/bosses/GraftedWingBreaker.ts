@@ -344,6 +344,9 @@ export default class GraftedWingBreaker
 
     this.scene.time.delayedCall(SLASH_STARTUP_MS, () => {
       if (this.bossState === BossState.DEAD) return;
+      // A csapás hangja a lecsapás PILLANATÁBAN szól (f20), nem a kasza hátrahúzásakor —
+      // ugyanaz a delegálási minta, mint a lövedéknél: a scene játssza le.
+      this.emit('boss-slash');
       this.resolveSlashHit();
       this.enterCooldown(ACTION_COOLDOWN_MS);
     });

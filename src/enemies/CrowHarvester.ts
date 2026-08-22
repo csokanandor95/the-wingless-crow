@@ -204,6 +204,11 @@ export default class CrowHarvester extends Phaser.Physics.Arcade.Sprite implemen
 
     this.scene.time.delayedCall(ATTACK_STARTUP_MS, () => {
       if (this.crowHarvesterState === CrowHarvesterState.DEAD) return;
+      // A csapás hangját a scene játssza le (mint a Player 'sword-swing'-jét), és PONTOSAN
+      // itt, a windup VÉGÉN: a windup egy mozdulatlan, magasba emelt kasza-póz, a suhogás
+      // a fehér ívhez (f14) tartozik. A DEAD guard mögött van, tehát a windup alatt megölt
+      // lény már nem csap hangosan.
+      this.emit('harvester-attack');
       this.resolveAttackHit();
 
       this.crowHarvesterState = CrowHarvesterState.COOLDOWN;

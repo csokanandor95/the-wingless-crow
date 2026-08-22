@@ -129,10 +129,40 @@ ezzel a projekt első hangeffektjeit: a player kardsuhintását és a kard becsa
 - A **becsapódás mindkét scene-ben** szól — a CrowHarvesteren ÉS a bosson.
 - **±120 cent véletlen detune** hívásonként, hogy a sorozatos csapások ne váljanak gépiessé.
 
-A Phase 8 többi része (environment sprite-ok, a többi SFX, particles, level ambient,
+**Phase 8 — 8. iteráció: A MARADÉK HARCI HANGOK kész.** Ugyanabból a TomMusic csomagból még
+négy hang, új infrastruktúra nélkül (asset + `SFX_KEYS` bejegyzés + egy `playSfx()` hívás):
+- **player tűzgolyó** (`fireball-2.wav`) — a `'fireball-cast'` pillanatában, mindkét scene-ben;
+- **boss lövedék** (`fireball-3.wav`) — SZÁNDÉKOSAN másik hang, hallani, kié a lövedék;
+- **Shadow Spell** (`firebuff-2.wav`) — a hang a **becsapódáskor** indul (`SPELL_IMPACT_MS`,
+  1140ms), nem a 960ms-os telegraph alatt: a néma lebegés maga a kitérési ablak;
+- **CrowHarvester ÉS boss közelharc** (`sword-attack-3.wav`, közös kulcs) — a **csapás
+  pillanatában** (300 / 400ms), nem a windup elején. A CrowHarvester windupja egy mozdulatlan,
+  magasba emelt kasza-póz; a suhogás a fehér ívhez tartozik. Új időzítő nem kellett: mindkét
+  osztály a meglévő sebzés-`delayedCall`-jában emittál (`'harvester-attack'` / `'boss-slash'`),
+  a `DEAD` guard mögött — a windup alatt megölt lény már nem csap hangosan.
+
+Szándékosan **néma marad** (külön SFX-tételek): a tűzgolyók becsapódása, az enemy→player
+sebzés (hurt), a charge, valamint az ugrás / halál / checkpoint / léptek.
+
+**Phase 8 — 9. iteráció: LEVEL 1 HÁTTÉRZENE kész.** A pálya megkapta a saját ambient sávját
+(`assets/audio/library-of-veles.mp3`, a *Free Dark Fantasy Music* csomag `Library of Veles
+(LOOP)`-ja — **licenc fájl nélkül**, lásd a nyitott jogi tételeket). Loopol, amíg a player
+az ajtón át nem lép a `BossScene`-re.
+- **Új rendszer NEM kellett**: a `Level1Scene`-nek már volt `AudioManager` példánya (7.
+  iteráció, SFX-hez), és az `AudioManager` scene-hatóköre itt PONT a kívánt élettartam —
+  a scene shutdownja elvágja a zenét. *(A korábbi „level ambienthez game-szintűvé kell
+  emelni" megjegyzés csak egy scene-eken ÁTÍVELŐ ambientre igaz, erre a követelményre nem.)*
+- **Az ajtó-átmenet explicit kifadeli a zenét** (`stopMusic(TRANSITION_FADE_MS)`), a
+  kamera-fade-del EGYÜTT, ugyanabból a konstansból — enélkül a shutdown-hook fade nélkül,
+  hirtelen pattintaná le a fekete képernyő pillanatában.
+- **Halál/respawn a pályán nem szakítja meg a zenét** (a scene nem indul újra, csak a
+  `player.respawn()` fut).
+- **Az autoplay-ág mostantól a FŐ út, nem élhelyzet** — lásd lentebb az Audio szakaszban.
+
+A Phase 8 többi része (environment sprite-ok, a maradék SFX, particles,
 `ui/` modul) még hátravan.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (10 fájl, 171 teszt — ebből 5 az animáció-/háttér-/VFX-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (10 fájl, 177 teszt — ebből 5 az animáció-/háttér-/VFX-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
 - A `CrowHarvester`/`Player`/`GraftedWingBreaker` `scene.time.delayedCall`-jai **interleave-elhetnek** (pl. `CrowHarvester.resolveAttackHit()` a `Player.takeDamage()`-en keresztül saját delayedCallt ütemez ugyanazon a mock scene-en) — ezért a `createDelayedCallStepper` helper (`tests/unit/helpers/phaserTestUtils.ts`) `.next()` (egy lépés) ÉS `.flushRemaining()` (a kurzortól a végéig, újra-tüzelés nélkül) metódust is ad. A `createDelayedCallStepper(scene, true)` (`skipExisting`) a kurzort a MÁR ütemezett hívások mögé állítja — ez kell, ha a teszt előkészítése maga is ütemez callbackeket (pl. a bosst Phase 2-be sebezzük, ami hit-villanást ütemez).
@@ -150,9 +180,14 @@ the-wingless-crow/
 ├── assets/
 │   ├── audio/
 │   │   ├── boss-theme.mp3        # Vite-importtal jön be (nem public/), lásd lentebb
+│   │   ├── library-of-veles.mp3  # Level 1 ambient (Free Dark Fantasy Music) — licenc TISZTÁZANDÓ
 │   │   └── sfx/                  # Free Fantasy SFX Pack (TomMusic), WAV — licenc TISZTÁZANDÓ
-│   │       ├── sword-attack-2.wav      # = a csomag "Sword Attack 2"-je (a sorszám a kapocs)
-│   │       └── sword-impact-hit-1.wav  # = a csomag "Sword Impact Hit 1"-e
+│   │       ├── sword-attack-2.wav      # player kardsuhintás (a sorszám a kapocs a csomaghoz)
+│   │       ├── sword-attack-3.wav      # CrowHarvester + boss közelharc (közös hang)
+│   │       ├── sword-impact-hit-1.wav  # a player kardjának becsapódása
+│   │       ├── fireball-2.wav          # player tűzgolyó   (Spells/)
+│   │       ├── fireball-3.wav          # boss lövedék      (Spells/)
+│   │       └── firebuff-2.wav          # boss Shadow Spell becsapódás (Spells/)
 │   ├── backgrounds/
 │   │   ├── ruined-city/          # Level 1 parallax rétegek, mind 426x384
 │   │   │   ├── 01-sky.png        # RGB, átlátszatlan ég (#673838 -> #724141)
@@ -541,9 +576,18 @@ Két, **szándékosan eltérő felépítésű** ág él egymás mellett, és nem
 a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one-shot.
 
 **SFX ág (Phase 8, 7. iteráció):**
-- `playSfx(key, { volume?, detuneRange? })`. Exportált konstansok: `SFX_KEYS`
-  (`SWORD_SWING`, `SWORD_IMPACT`), `DEFAULT_SFX_VOLUME` (0.5),
-  `DEFAULT_SFX_DETUNE_RANGE` (120)
+- `playSfx(key, { volume?, detuneRange? })`. Exportált konstansok: `SFX_KEYS`,
+  `DEFAULT_SFX_VOLUME` (0.5), `DEFAULT_SFX_DETUNE_RANGE` (120)
+- **`SFX_KEYS` — mi mikor szól** (a kulcsok egyediségét unit teszt őrzi):
+
+  | kulcs | asset | mikor |
+  |---|---|---|
+  | `SWORD_SWING` | `sword-attack-2` | a player `performAttack()`-jában, AZONNAL a gombnyomásra |
+  | `SWORD_IMPACT` | `sword-impact-hit-1` | a scene-ek kard-találat kezelőiben (enemy ÉS boss) |
+  | `ENEMY_SWING` | `sword-attack-3` | CrowHarvester + boss közelharc, a CSAPÁS pillanatában |
+  | `FIREBALL_CAST` | `fireball-2` | a player `'fireball-cast'`-jánál, a lövedék születésekor |
+  | `BOSS_PROJECTILE` | `fireball-3` | a `'boss-projectile'`-nél; más hang, mint a playeré |
+  | `BOSS_SPELL_IMPACT` | `firebuff-2` | `SPELL_IMPACT_MS`-nél, amikor az oszlop FÖLDET ÉR |
 - **`scene.sound.play(key, config)`, NEM `sound.add()`** — a SoundManager `play()`-e olyan
   one-shot hangot hoz létre, ami a lejátszás végén magától felszabadul. Ezért az SFX-hez
   nincs `this.music`-szerű élettartam-kezelés, **nem exkluzív** (több csapás hangja
@@ -556,18 +600,51 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 - **Detune-szórás**: hívásonként ±`detuneRange` cent véletlen elhangolás
   (`Phaser.Math.Between`), így egyetlen fájlból is változatos a sorozat. A default a hívó
   oldalán elhagyható; `{ detuneRange: 0 }` ad pontos lejátszást
-- **Bekötés**: a `Player` a `performAttack()`-ban — a cooldown-guard MÖGÖTT, tehát blokkolt
-  csapás nem ad hangot — `'sword-swing'` eventet emittál, a scene erre hívja a `playSfx`-et
-  (ugyanaz a minta, mint a `'fireball-cast'`). A becsapódás a scene-ek találat-kezelőiben
-  szól (`Level1Scene.handlePlayerHitEnemy()`, `BossScene.handlePlayerHitBoss()`), ahol a
-  meglévő `hasHitTarget()` guard csapásonként pontosan egyre korlátozza. **A `Level1Scene`
-  emiatt kapott saját `AudioManager` példányt — zenét NEM indít, csak SFX-hez kell.**
-  A fireball-találat szándékosan néma (külön SFX-tétel)
+- **Bekötés — MINDIG event + scene, sosem közvetlen hanghívás az entitásban.** A `Player`, a
+  `CrowHarvester` és a boss csak eventet emittál (`'sword-swing'`, `'harvester-attack'`,
+  `'boss-slash'`, `'fireball-cast'`, `'boss-projectile'`, `'boss-spell'`), a `playSfx()`-et a
+  scene hívja — ugyanaz a delegálási minta, mint a lövedékek létrehozásánál. Így az entitások
+  nem függnek az `AudioManager`-től, és a kibocsátás unit-tesztben megfigyelhető.
+  **A `Level1Scene` emiatt kapott saját `AudioManager` példányt — zenét NEM indít, csak
+  SFX-hez kell.**
+- **Az emitek a guardok MÖGÖTT vannak**: a cooldownnal blokkolt player-csapás és a windup
+  alatt megölt CrowHarvester/boss nem ad hangot
+- A kard becsapódása a scene-ek találat-kezelőiben szól
+  (`Level1Scene.handlePlayerHitEnemy()`, `BossScene.handlePlayerHitBoss()`), ahol a meglévő
+  `hasHitTarget()` guard csapásonként pontosan egyre korlátozza
+- **A Shadow Spell hangját a `BossScene` ütemezi**, nem a boss: a `'boss-spell'` handlerben
+  egy `delayedCall(SPELL_IMPACT_MS)`. A konstans az ANIMÁCIÓS modulból jön, tehát a hang nem
+  csúszhat el a látványtól, ha a `SPELL_TELEGRAPH_LOOPS` változik. Nincs "boss meghalt"
+  guard (az oszlop ilyenkor is láthatóan lecsap, csak sebzés nélkül), scene-shutdownnál
+  viszont a Phaser törli a függő `delayedCall`-okat — a győzelmi fade alá nem szól be
+- **Távolság-alapú némítás nincs, és nem is kell**: a CrowHarvester csak `ATTACK_RANGE`
+  (42px) belül támad, tehát egy csapkodó lény definíció szerint a player mellett áll. Ez
+  újra kérdés lesz, ha valaha távolsági enemy típus jön
 
 **Zene ág:**
 - **Egyetlen zenesáv** kezelése: `playMusic(key, { volume?, fadeInMs? })`, `stopMusic(fadeOutMs?)`,
   `getCurrentMusicKey()`, `destroy()`. Exportált konstansok: `MUSIC_KEYS`,
-  `DEFAULT_MUSIC_VOLUME` (0.45), `DEFAULT_FADE_IN_MS` (800), `DEFAULT_FADE_OUT_MS` (1500)
+  `DEFAULT_MUSIC_VOLUME` (0.45), `DEFAULT_FADE_IN_MS` (800), `DEFAULT_FADE_OUT_MS` (1500),
+  `LEVEL_MUSIC_VOLUME` (0.35), `LEVEL_MUSIC_FADE_IN_MS` (2000)
+- **A hangkeverési hierarchiát unit teszt őrzi**: `LEVEL_MUSIC_VOLUME (0.35) <
+  DEFAULT_MUSIC_VOLUME (0.45) < DEFAULT_SFX_VOLUME (0.5)`. A level-zene több percen át
+  szól, ezért marad háttérben; a boss theme érezhetően felerősödik hozzá képest; az SFX
+  mindkettő fölött átvág. Egy „csak feljebb veszem egy kicsit" hangolás nem fordíthatja
+  meg észrevétlenül a sorrendet
+- **Két sáv van** (`MUSIC_KEYS`): `BOSS_THEME` (a `BossScene` belépőjétől) és
+  `LEVEL1_THEME` (a `Level1Scene` teljes hosszán). Egyszerre sosem szól kettő: a
+  `playMusic()` hard-stoppolja az előzőt, a `Level1Scene` már az ajtó-fade alatt
+  felszabadítja a sávját, és a Phaser a régi scene SHUTDOWN-ját a következő scene
+  `create()`-je ELŐTT futtatja
+- **AUTOPLAY: a `sound.locked` ág a Level 1-nél a FŐ út, nem élhelyzet.** A `Level1Scene`
+  közvetlenül az oldalbetöltés után indul, bármilyen user-interakció előtt — ott az audio
+  context GARANTÁLTAN zárolt, tehát a `playMusic()` az `UNLOCKED` eseményre halasztja a
+  lejátszást, és a zene **az első billentyűlenyomásnál** kezd szólni. Ez helyes
+  böngésző-viselkedés, nem megkerülhető, és **nem hiba** — ezért kapott a level-sáv
+  hosszabb (2000ms) fade-int, hogy ne robbanjon be hirtelen az első leütésre
+- **Az `AudioManager` scene-hatókörű, és ez a Level 1-nél ELŐNY**: a zenének pont a scene
+  leállásakor (az ajtón átlépve) kell véget érnie. Game-szintűvé emelni csak akkor kell,
+  ha valaha scene-eken ÁTÍVELŐ ambient (pl. menü → pálya) lesz
 - A hang **némán** jön létre (`volume: 0`), a hangerőt egy tween viszi fel — a `stopMusic()`
   a futó fade-in tweent leállítja, hogy a kifadelés az AKTUÁLIS hangerőről induljon
 - `playMusic()` mindig hard-stoppolja az előző sávot → **nem lehet két loop egyszerre**
@@ -580,11 +657,17 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   Így a build hash-eli, a GitHub Pages base path magától jó lesz, és **hiányzó fájlnál a
   build elszáll** néma 404 helyett. Ehhez kell a `src/vite-env.d.ts`
 - **Az SFX WAV, nem OGG** (a csomagban mindkettő megvan): a WAV univerzálisan támogatott
-  böngészőben, és 2×89 KB elhanyagolható a 2 MB-os boss theme mellett. Ha valaha a
-  build-méret szempont lesz, az OGG-re váltás egy import-csere
+  böngészőben (a Vorbis Safariban történetileg bizonytalan). Ára: a 6 hang együtt ~900 KB,
+  szemben az OGG ~250 KB-jával. Ha valaha a build-méret szempont lesz, az OGG-re váltás
+  hat import-csere
 - Bekötés a `BossScene`-ben: `create()` → `new AudioManager(this)`, `startEntrance()` →
   `playMusic(MUSIC_KEYS.BOSS_THEME)`, `scheduleVictory()`/`scheduleDefeat()` → `stopMusic()`.
   Kézi takarítás **nincs** — az `AudioManager` maga iratkozik fel a scene shutdownjára
+- Bekötés a `Level1Scene`-ben: `create()` → `playMusic(MUSIC_KEYS.LEVEL1_THEME, {...})`,
+  `activateCheckpointAndTransition()` → `stopMusic(TRANSITION_FADE_MS)`. A `TRANSITION_FADE_MS`
+  (500) **ugyanaz a konstans, amiből a kamera-fade dolgozik** — a kép és a hang együtt
+  halkul el. Halál/respawn nem szakítja meg (a scene nem indul újra); boss-vereség után
+  visszatérve viszont a `create()` újrafut, tehát a sáv az elejéről indul
 
 ## Fontos technikai tanulságok (ne ismételd meg ezeket a hibákat!)
 
@@ -678,6 +761,14 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   ELŐTT.** Ezért maradt meg a fájlnevekben a csomagbeli sorszám
   (`sword-attack-2.wav` = "Sword Attack 2", `sword-impact-hit-1.wav` = "Sword Impact
   Hit 1") — ez a kapocs a forráshoz, a `BootScene` importjainál lévő komment mellett.
+- **NYITOTT JOGI TÉTEL:** a Level 1 zenéjének forráscsomagja (*Free Dark Fantasy Music*,
+  `2D helper/sounds/...`) **egyáltalán nem tartalmaz licenc/readme fájlt** — csak `MP3/`
+  és `WAV/` mappát. A feltételeket a letöltési oldalról kell visszakeresni **a repo
+  nyilvánossá tétele / GitHub Pages deploy ELŐTT.** Ezért maradt meg a forrás-cím a
+  fájlnévben (`library-of-veles.mp3` = `Library of Veles (LOOP)`) — ez a kapocs a
+  forráshoz. **Megjegyzés:** a csomag másik sávja (`Elkmire Keep (LOOP).mp3`) jó jelölt
+  egy jövőbeli Level 2 / menü zenének. A `boss-theme.mp3` NEM ebből a csomagból való
+  (egyik sáv mérete sem egyezik vele) — annak a forrása külön tisztázandó.
 - **A boss aréna hátterének (`assets/backgrounds/cathedral/boss-arena.png`) licence
   szintén nincs tisztázva** — a forrás a `2D helper/level/Bossbackground_1.png`, ami
   önálló fájlként, licenc nélkül érkezett. A user gyűjtésébe ez is bekerül; publikálás
@@ -708,19 +799,23 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 ## Következő lépés
 
 **Phase 8 – Atmosphere folyamatban.** Az 1. iteráció (boss music) kész; ami még hátravan:
-- **A többi sound effect** (Project_plan.md 18. pont listája). A **sword swing/hit KÉSZ**
-  (7. iteráció), és vele az egész `playSfx()` infrastruktúra — a lista maradéka (fireball,
-  hurt, death, jump, checkpoint, boss-támadások) mostantól asset + `SFX_KEYS` bejegyzés +
-  egy `playSfx()` hívás. A player animációi megvannak, tehát a hangokat könnyű a megfelelő
-  frame-hez kötni. Ugyanabban a TomMusic csomagban van magic/impact/UI hang is.
+- **A maradék sound effectek** (Project_plan.md 18. pont listája). A **teljes harci hangkép
+  KÉSZ** (7–8. iteráció): kardsuhintás + becsapódás, mindkét tűzgolyó, a Shadow Spell és az
+  enemy/boss közelharc. Ami még hiányzik: a **tűzgolyók becsapódása**, az **enemy→player
+  sebzés** (hurt), a **charge**, valamint az ugrás / halál / checkpoint / léptek. Mindegyik
+  ugyanaz a három lépés: asset + `SFX_KEYS` bejegyzés + egy `playSfx()` hívás (a nem-scene
+  helyeken egy event a bevett minta szerint). A TomMusic csomagban van hozzájuk
+  `Footsteps/`, `Spell Impact`, `Doors Gates and Chests` (checkpoint) és `Torch` is.
 - **Environment sprite-ok** — a player (2. it.), a CrowHarvester (3. it.), a Level 1 háttere
   (4. it.), a boss aréna háttere (5. it.) és a boss (6. it.) kész; **már csak a tile-ok, a
   létra, a Level 1 ajtaja és a két lövedék** placeholder.
   A `2D helper/Sprites/` alatt van még Enemy01/02/03/05 és egy "Gino Character" — ha
   bármelyik enemy-jelöltként bejön, számíts rá, hogy szintén off-center lesz; a
   `systems/SpriteFacing.ts` már készen áll rá (lásd a 16. technikai tanulságot).
-- **Level / menü ambient.** Figyelem: az `AudioManager` most **scene-hatókörű** (a scene
-  shutdownja elvágja) — scene-eken átívelő zenéhez game-szintűvé kell emelni.
+- **Menü / átvezető ambient.** A Level 1 és a boss aréna zenéje KÉSZ (1. és 9. iteráció).
+  A `NarrationScene` és a `Level2Scene` még néma. Figyelem: az `AudioManager`
+  **scene-hatókörű** (a scene shutdownja elvágja) — ez a pálya-zenéknél előny, de egy
+  scene-eken ÁTÍVELŐ sávhoz (pl. menü → pálya megszakítás nélkül) game-szintűvé kell emelni.
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),
   narration ambient (`NarrationScene.create()`), victory sting (`BossScene.scheduleVictory()`).
 - A maradék kódból generált placeholder téglalapok cseréje valódi pixel art sprite-okra

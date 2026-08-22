@@ -7,7 +7,12 @@ import CheckpointSystem from '../systems/CheckpointSystem';
 import ParallaxBackground, {
   LEVEL1_BACKGROUND_LAYERS,
 } from '../systems/ParallaxBackground';
-import AudioManager, { SFX_KEYS } from '../systems/AudioManager';
+import AudioManager, {
+  LEVEL_MUSIC_FADE_IN_MS,
+  LEVEL_MUSIC_VOLUME,
+  MUSIC_KEYS,
+  SFX_KEYS,
+} from '../systems/AudioManager';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 
 const WORLD_WIDTH = 3200;
@@ -73,6 +78,8 @@ const DOOR_HEIGHT = 72;
 const CHECKPOINT_X = 3010; // az ajtótól kicsit balra, hogy ne a grafikájában jelenjen meg
 const CHECKPOINT_Y = platformTop(platformById('P9')) - PLAYER_HALF_HEIGHT;
 const RESPAWN_DELAY_MS = 1200; // rövid szünet a halál-tint után, mielőtt visszatér a checkpointra
+/** Az ajtó-átmenet hossza. A kamera-fade ÉS a zene kifadelése is ebből dolgozik. */
+const TRANSITION_FADE_MS = 500;
 
 export default class Level1Scene extends Phaser.Scene {
   private player!: Player;
@@ -121,10 +128,22 @@ export default class Level1Scene extends Phaser.Scene {
     // további eleme (létra hátfal -2, létra/ajtó -1, a többi 0) előttük rajzolódik.
     this.background = new ParallaxBackground(this, LEVEL1_BACKGROUND_LAYERS);
 
-    // Egyelőre CSAK SFX-hez: a level ambient külön Phase 8 iteráció (és ahhoz az
-    // AudioManagert game-szintűvé kell emelni, mert most a scene shutdownja elvágja).
-    // Kézi takarítás nem kell — maga iratkozik fel a shutdownra.
+    // Zene + SFX. Kézi takarítás nem kell: az AudioManager maga iratkozik fel a scene
+    // shutdownjára — és itt ez PONT a kívánt élettartam, mert a zenének az ajtón átlépve
+    // (a scene leállásakor) kell véget érnie.
     this.audio = new AudioManager(this);
+
+    // FIGYELEM — a zene NEM itt kezd szólni, hanem az első billentyűlenyomásnál.
+    // A Level1Scene közvetlenül az oldalbetöltés után indul, bármilyen user-interakció
+    // előtt, tehát az audio context GARANTÁLTAN zárolt: a playMusic() ilyenkor az
+    // UNLOCKED eseményre halasztja a lejátszást (böngésző autoplay-policy, nem kerülhető
+    // meg). Ez a korábban élhelyzetnek szánt ág itt a FŐ út — nem hiba, ha a betöltés
+    // után csend van. Emiatt kap hosszabb (2000ms) fade-int is, hogy ne robbanjon be
+    // hirtelen az első leütésre.
+    this.audio.playMusic(MUSIC_KEYS.LEVEL1_THEME, {
+      volume: LEVEL_MUSIC_VOLUME,
+      fadeInMs: LEVEL_MUSIC_FADE_IN_MS,
+    });
 
     this.createDecor();
 
@@ -170,6 +189,7 @@ export default class Level1Scene extends Phaser.Scene {
     this.player.on('fireball-cast', (x: number, y: number, direction: number) => {
       const fireball = new Fireball(this, x, y, direction);
       this.fireballs.push(fireball);
+      this.audio.playSfx(SFX_KEYS.FIREBALL_CAST);
     });
 
     this.player.on('sword-swing', () => this.audio.playSfx(SFX_KEYS.SWORD_SWING));
@@ -298,6 +318,14 @@ export default class Level1Scene extends Phaser.Scene {
         })
       );
     }
+
+    // Csapás-hang. Távolság-alapú némítás NEM kell, pedig 5 enemy él a 3200px-es pályán:
+    // a CrowHarvester csak ATTACK_RANGE-en (42px) belül támad, tehát egy csapkodó lény
+    // definíció szerint a player mellett áll, és mindig a képernyőn van.
+    // A create() minden futáskor újraépíti az enemies tömböt, így listener sem duplikálódik.
+    for (const enemy of this.enemies) {
+      enemy.on('harvester-attack', () => this.audio.playSfx(SFX_KEYS.ENEMY_SWING));
+    }
   }
 
   update(): void {
@@ -351,6 +379,12 @@ export default class Level1Scene extends Phaser.Scene {
     this.checkpoint.activate(CHECKPOINT_X, CHECKPOINT_Y);
     this.checkpointPromptText.setText('Checkpoint mentve...').setVisible(true);
 
+    // A zene a KÉPPEL EGYÜTT halkul el. A scene shutdownja önmagában is elvágná (az
+    // AudioManager shutdown-hookja), de fade nélkül, hirtelen — pont a fekete képernyő
+    // pillanatában pattanna le. A stopMusicImmediately() idempotens, tehát a két út
+    // egymás után is biztonságos.
+    this.audio.stopMusic(TRANSITION_FADE_MS);
+
     // A legyőzött boss után az ajtó már nem az arénába, hanem a következő pályára visz —
     // különben a Level1-re visszatérve újra a (már teljesített) boss fight indulna.
     const nextScene = this.registry.get('bossDefeated') ? 'Level2Scene' : 'BossScene';
@@ -360,7 +394,7 @@ export default class Level1Scene extends Phaser.Scene {
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       this.scene.start(nextScene);
     });
-    this.cameras.main.fadeOut(500, 0, 0, 0);
+    this.cameras.main.fadeOut(TRANSITION_FADE_MS, 0, 0, 0);
   }
 
   private handlePlayerHitEnemy(
