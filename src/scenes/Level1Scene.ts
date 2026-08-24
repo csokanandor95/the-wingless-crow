@@ -17,7 +17,9 @@ import TutorialHint from '../ui/TutorialHint';
 import HazardDamageGate from '../hazards/HazardDamage';
 import SpikeField, { SPIKE_DAMAGE, SPIKE_KNOCKBACK_Y } from '../hazards/SpikeField';
 import SwingingReaper, { REAPER_DAMAGE } from '../hazards/SwingingReaper';
+import createDecorProps from '../levels/LevelDecor';
 import {
+  DECOR_PROPS,
   DOOR,
   DOOR_CHECKPOINT,
   ENEMY_SPAWNS,
@@ -393,6 +395,9 @@ export default class Level1Scene extends Phaser.Scene {
   private createDecor(): void {
     // A korábbi 5 parallax háttéroszlop (pillar-placeholder, scrollFactor 0.6) törölve:
     // a mélység-illúziót most a ParallaxBackground három valódi rétege adja.
+
+    // Hangulati propok: nem ütköznek, és a DECOR_DEPTH miatt a player/enemyk előttük mennek el.
+    createDecorProps(this, DECOR_PROPS);
 
     // Pálya végi ajtó a felső platform jobb végén — a checkpoint + boss-transition trigger.
     //

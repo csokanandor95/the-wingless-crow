@@ -192,6 +192,34 @@ paletta korrekció nélkül (mért átlagszín: padló `(42,33,33)`, platform `(
 - **Törölt placeholder textúrák**: `ladder-placeholder`, `pillar-placeholder`,
   `door-placeholder`.
 
+**Phase 8 — 11. iteráció: LEVEL 1 HANGULATI PROPOK kész.** A pálya 13 nem ütköző
+háttér-dekorációt kapott (`assets/props/gothic-town/`): utcai lámpa ×3, szekér ×3, kút ×2,
+láda ×2, ládahalom ×3. Forrás: **GothicVania Town** (Luis Zuno / @ansimuz) — **public domain**.
+Új modul: `src/levels/LevelDecor.ts`.
+- **Nincs physics body és nincs osztály**: tiszta díszlet, a gameplay-re nulla hatással. A
+  `DECOR_DEPTH = -10` miatt a player és az enemyk **előttük** mennek el.
+- **1:1-es méret, skálázás NÉLKÜL**: a csomag karakterei 42–47 px magasak, a mi lovagunk 46 —
+  a propok arányai eleve stimmelnek.
+- **`origin (0.5, 1)`**: a prop a TALPÁNÁL van pozicionálva, tehát pontosan a felület
+  felszínén áll; a magasságát nem kell sehol felezni.
+- **KÉT tint, nem egy** (`PROP_ASSETS[...].tint`). A MULTIPLY tint megőrzi a csatorna-arányokat,
+  ezért egy közös érték nem tudja mindkét anyagcsoportot kezelni:
+  - **fa** (szekér, ládák) nyersen `(77,49,60)`, majdnem meleg → `PROP_TINT_WARM_SOURCE`
+    (`0xc0b890`) → `(57,35,33)`;
+  - **kő/vas** (lámpa, kút) nyersen `(49,37,63)`, a kék/zöld arány **1.7** → ugyanettől a
+    tinttől csak szürke lenne. Ezért kap `PROP_TINT_COOL_SOURCE`-t (`0xffdc71`), ami a
+    vöröshöz nem nyúl, a kéket viszont felezi → `(49,31,27)`. **A kettőt ne cseréld fel**:
+    a fa propok a hideg tinttől feltűnően telített narancsra váltanának.
+  - A cél-sáv mindkettőnél ugyanaz: a talaj `(42,33,33)` és a mögöttük lévő `03-ruins`
+    háttérréteg `(74,45,39)` KÖZÖTT — a díszlet legyen sötétebb a gameplay-elemeknél, de ne
+    sötétebb a mögötte lévő rétegnél.
+- **Az elhelyezés unit-tesztelt, nem szemre rakott** (`DECOR_PROPS` a `Level1Layout.ts`-ben):
+  minden lábnyom egyetlen talaj-szegmensen belül marad, nem metsz spike-mezőt, nem lóg a
+  kasza söprési sávjába (ezért van a `G-well` 4790-en és nem 4760-on), nem takarja a létrát
+  vagy a köztes checkpointot, és nem ér bele a fölötte lévő platform aljába.
+- A `D-lamp` **szándékosan közvetlenül a tüskemező elé** (2705) kerül: nem takarja a hazardot,
+  hanem megjelöli.
+
 A Phase 8 többi része (a maradék environment sprite-ok, a maradék SFX, particles,
 `ui/` modul) még hátravan.
 
@@ -272,6 +300,14 @@ the-wingless-crow/
 │   │       ├── platform-edge-right.png # 48x32 /
 │   │       ├── door-gate.png           # 64x128, boltív; nyílás x=14..51, y=48..108
 │   │       └── ladder.png              # 32x16, függőlegesen VARRATMENTES (16px fok-osztás)
+│   ├── props/
+│   │   └── gothic-town/          # Level 1 hangulati propok. GothicVania Town (Luis Zuno) —
+│   │       │                     # PUBLIC DOMAIN. VÁLTOZATLAN másolatok, eredeti fájlnéven.
+│   │       ├── street-lamp.png   # 35x108 \ kő/vas: PROP_TINT_COOL_SOURCE
+│   │       ├── well.png          # 65x65  /
+│   │       ├── wagon.png         # 93x75  \
+│   │       ├── crate.png         # 39x35   > fa: PROP_TINT_WARM_SOURCE
+│   │       └── crate-stack.png   # 73x68  /
 │   └── sprites/
 │       ├── knight/               # player sprite sheetek, mind 128x64-es blokkokra vágva
 │       │   ├── Idle.png Run.png Jump.png Attacks.png
@@ -306,7 +342,8 @@ the-wingless-crow/
 │   │   └── physics.ts            # GRAVITY_Y — a main.ts ÉS a Level1Layout ugrás-számítása ebből dolgozik
 │   ├── levels/
 │   │   ├── Level1Layout.ts       # a Level 1 TELJES geometriája, Phaser-mentes adatmodulként
-│   │   └── LevelTileset.ts       # a terrain-csempék mérete/forrás-rectjei + a depth-rend
+│   │   ├── LevelTileset.ts       # a terrain-csempék mérete/forrás-rectjei + a depth-rend
+│   │   └── LevelDecor.ts         # a hangulati propok kirakása (origin/depth/tint egy helyen)
 │   ├── hazards/
 │   │   ├── HazardDamage.ts       # HazardDamageGate — KÖZÖS i-frame ablak minden hazardnak
 │   │   ├── SpikeField.ts         # statikus tüskemezők (látvány tileSprite + külön hitbox Zone)
@@ -591,8 +628,11 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - **Terrain (Phase 8, 10. iteráció)**: a talaj, a platformok, a létra és az ajtó valódi
   csempéket kapott (`assets/tiles/cathedral/`, lásd `src/levels/LevelTileset.ts`). A fizikai
   static sprite-ok `setVisible(false)`-ok, a látvány külön tileSprite + végzáró képek.
-  Dekoráció külön már nincs: *(az 5 korábbi `pillar-placeholder` parallax oszlopot a valódi
-  háttérrétegek váltották ki, a létra hátfal-oszlopát pedig a 10. iteráció törölte.)*
+  *(Az 5 korábbi `pillar-placeholder` parallax oszlopot a valódi háttérrétegek váltották ki,
+  a létra hátfal-oszlopát pedig a 10. iteráció törölte.)*
+- **Hangulati propok (Phase 8, 11. iteráció)**: 13 nem ütköző háttér-dekoráció
+  (`DECOR_PROPS` a layoutban, `createDecorProps()` a `LevelDecor.ts`-ben). Nincs physics
+  bodyjuk, és a `DECOR_DEPTH = -10` miatt a player/enemyk előttük mennek el
 - Kódból generált placeholder már csak a hazardoké (tüske, reaper, checkpoint-jelölő) és a
   lövedékeké — `BootScene.ts` `createPlaceholderTextures()`
 
@@ -1031,6 +1071,14 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   lévő komment és az **eredeti fájlnevek** (`Bringer-of-Death-SpritSheet*.png`) kötik vissza.
   A csomagban van egy `Contact.txt` is (Clembod: Twitter/Instagram/itch.io/ArtStation) — a
   credit nem kötelező, de a projekt végén illendő.
+- **A Level 1 hangulati propjainak licence RENDBEN VAN** (`assets/props/gothic-town/`): a
+  forráscsomag (`2D helper/level/gothicvania-town-files`, Luis Zuno / @ansimuz)
+  `public-license.txt`-je *"License for Everyone. Public domain and free to use on whatever
+  you want, personal or commercial. Credit is not required but appreciated."*
+  **Ez NEM nyitott jogi tétel.** A fájlok VÁLTOZATLAN másolatok, eredeti fájlnéven — ez a
+  kapocs a forráshoz, a `BootScene` importjainál lévő komment mellett. *(A csomag zenéje
+  külön feltétellel jön — „as long as you give appropriate credit" —, de abból semmit nem
+  használunk.)*
 - **A Level 1 terrainjének licence RENDBEN VAN** (`assets/tiles/cathedral/`): a forráscsomag
   (`2D helper/level/PixelPlatformerSet1v.1.1`, Szadi art) `public-license.txt`-je *"License
   for Everyone. Public domain and free to use, personal or commercial. Credit is not required
@@ -1088,13 +1136,12 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
   A `2D helper/Sprites/` alatt van még Enemy01/02/03/05 és egy "Gino Character" — ha
   bármelyik enemy-jelöltként bejön, számíts rá, hogy szintén off-center lesz; a
   `systems/SpriteFacing.ts` már készen áll rá (lásd a 16. technikai tanulságot).
-- **Hangulati propok a Level 1-re (11. iteráció — KÖVETKEZŐ).** A GothicVania Town csomagból
-  (`2D helper/level/gothicvania-town-files`, Luis Zuno — **public domain**) street-lamp,
-  wagon, well, crate és crate-stack kerül a pályára, nem ütköző háttérelemként
-  (`DECOR_DEPTH = -10`, tehát a player és az enemyk előttük mennek el). A csomag palettája
-  lilás-hideg (`(77,49,60)`), a miénk meleg vörösbarna, ezért futásidejű meleg + sötétítő
-  tintet kapnak — a részletes mapping és a 13 elemes elhelyezési táblázat a jóváhagyott
-  tervben. **A csomag ÚJ a projektben → a `2D helper/Credits.txt`-be felveendő.**
+- **Hangulati propok a Level 1-re (11. iteráció) — KÉSZ**, lásd fentebb. **A GothicVania Town
+  csomag ÚJ a projektben → a user `2D helper/Credits.txt`-jébe felveendő**
+  (`https://opengameart.org/content/gothicvania-town`). A csomagban maradt még használható
+  elem egy jövőbeli körhöz: `barrel.png` (24×30), `sign.png` (37×45), három ház
+  (`house-a/b/c.png`), valamint egy fa állvány-platform készlet
+  (`top-wood` / `wood-legs` / `top-left-wood` / `top-right-wood`).
 - **Menü / átvezető ambient.** A Level 1 és a boss aréna zenéje KÉSZ (1. és 9. iteráció).
   A `NarrationScene` és a `Level2Scene` még néma. Figyelem: az `AudioManager`
   **scene-hatókörű** (a scene shutdownja elvágja) — ez a pálya-zenéknél előny, de egy

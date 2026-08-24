@@ -501,3 +501,118 @@ export const TUTORIAL_HINTS: TutorialHintDef[] = [
   { id: 'movement', triggerX: 0, text: '← → / A D  — mozgás      Space / W  — ugrás' },
   { id: 'combat', triggerX: 1000, text: 'J / bal klikk  — kard      F  — tűzgolyó' },
 ];
+
+// --- Hangulati propok -------------------------------------------------------
+
+/**
+ * Nem ütköző háttér-dekoráció: a `DECOR_DEPTH` (-10) miatt a player és az enemyk ELŐTTÜK
+ * mennek el, és nincs physics bodyjuk sem, tehát a pálya járhatóságát nem érintik.
+ *
+ * Forrás: **GothicVania Town** (Luis Zuno / @ansimuz) — public domain. A csomag karakterei
+ * 42–47 px magasak, a mi lovagunk 46 — ezért a propok 1:1-ben, SKÁLÁZÁS NÉLKÜL használhatók.
+ * A fájlnevek eredetiek; ez a kapocs a forráscsomaghoz.
+ */
+export const PROP_TEXTURES = {
+  STREET_LAMP: 'prop-street-lamp',
+  WAGON: 'prop-wagon',
+  WELL: 'prop-well',
+  CRATE: 'prop-crate',
+  CRATE_STACK: 'prop-crate-stack',
+} as const;
+
+export type PropTexture = (typeof PROP_TEXTURES)[keyof typeof PROP_TEXTURES];
+
+/**
+ * Színkorrekció a FA propokhoz (szekér, ládák). Ezek nyersen már közel melegek
+ * (`(77,49,60)`: a kék alig erősebb a zöldnél), tehát elég visszavenni őket, hogy a
+ * gameplay-elemek mögé süllyedjenek: `(57,35,33)` — pont a talaj `(42,33,33)` és a mögöttük
+ * lévő `03-ruins` háttérréteg `(74,45,39)` KÖZÖTT.
+ */
+export const PROP_TINT_WARM_SOURCE = 0xc0b890;
+
+/**
+ * Színkorrekció a KŐ/VAS propokhoz (utcai lámpa, kút). Ezek nyersen erősen kékesek
+ * (`(49,37,63)` — a kék/zöld arány 1.7), és sötétebbek is a faanyagnál. Ugyanaz a mérsékelt
+ * tint, ami a fát rendbe teszi, itt csak szürkévé mosná őket: a MULTIPLY tint megőrzi a
+ * csatorna-arányokat, tehát a lilás beütés megmaradna.
+ *
+ * Ezért kapnak külön, ERŐSEN kékvágó tintet, ami a vörös csatornához nem nyúl:
+ * `(49,31,27)` — meleg, sötét vas/kő. **Ne cseréld le a fa tintjére**, és fordítva sem: a
+ * fa propok ettől a tinttől feltűnően telített narancsra váltanának.
+ */
+export const PROP_TINT_COOL_SOURCE = 0xffdc71;
+
+/**
+ * A PNG-k tényleges mérete + a hozzájuk tartozó tint. Azért itt van, és nem a render-oldalon,
+ * mert a LÁBNYOM ebből számítódik: a `level1Layout.test.ts` ezzel bizonyítja, hogy egyetlen
+ * prop sem lóg szakadékba, tüskemezőbe vagy a kasza söprési sávjába — GameObject-mock nélkül.
+ *
+ * A `tint` szándékosan KÖTELEZŐ mező, nincs default: a két csoport (fa / kő-vas) érdemben más
+ * korrekciót kíván, és egy hallgatólagos default mellett egy új prop némán a rossz csoportba
+ * kerülne.
+ */
+export const PROP_ASSETS: Record<
+  PropTexture,
+  { width: number; height: number; tint: number }
+> = {
+  [PROP_TEXTURES.STREET_LAMP]: { width: 35, height: 108, tint: PROP_TINT_COOL_SOURCE },
+  [PROP_TEXTURES.WELL]: { width: 65, height: 65, tint: PROP_TINT_COOL_SOURCE },
+  [PROP_TEXTURES.WAGON]: { width: 93, height: 75, tint: PROP_TINT_WARM_SOURCE },
+  [PROP_TEXTURES.CRATE]: { width: 39, height: 35, tint: PROP_TINT_WARM_SOURCE },
+  [PROP_TEXTURES.CRATE_STACK]: { width: 73, height: 68, tint: PROP_TINT_WARM_SOURCE },
+};
+
+export interface DecorPropDef {
+  id: string;
+  texture: PropTexture;
+  /** A prop VÍZSZINTES középpontja; a talpa a `surfaceId` felszínére kerül. */
+  x: number;
+  /** Ground szegmens VAGY platform id — lásd `surfaceSpan()`. */
+  surfaceId: string;
+  /** Vízszintes tükrözés — ugyanabból a textúrából ad változatosságot. */
+  flipX?: boolean;
+}
+
+/**
+ * 13 elem a 6000px-es pályán (kb. 460 px-enként egy), hogy a díszlet ne váljon zsúfolttá.
+ *
+ * Az elhelyezés NEM szabad: a `level1Layout.test.ts` őrzi, hogy minden lábnyom egyetlen
+ * talaj-szegmensen BELÜL marad, és nem takarja a hazardokat (tüskemező, kasza-söprés) sem a
+ * két checkpointot. Konkrétan ezért van a `G-well` 4790-en és nem 4760-on: ott még a kasza
+ * `REAPER_ENEMY_CLEARANCE`-es biztonsági sávjába lógna.
+ */
+export const DECOR_PROPS: DecorPropDef[] = [
+  // A — start: a láda-halom a spawntól balra keretezi a pálya elejét.
+  { id: 'A-crates', texture: PROP_TEXTURES.CRATE_STACK, x: 52, surfaceId: 'G1' },
+
+  // B — első enemy: tágas, sík terep, a két prop a két végén ül.
+  { id: 'B-lamp', texture: PROP_TEXTURES.STREET_LAMP, x: 1010, surfaceId: 'G2' },
+  { id: 'B-wagon', texture: PROP_TEXTURES.WAGON, x: 1600, surfaceId: 'G2' },
+
+  // C — a platforming-szakasz alatt, a C2 platform elé.
+  { id: 'C-well', texture: PROP_TEXTURES.WELL, x: 1858, surfaceId: 'G3' },
+
+  // D — spike-tutorial. A lámpa KÖZVETLENÜL a tüskemező elé kerül (2740): nem takarja,
+  // hanem megjelöli. A láda-halom a mező UTÁN, a köztes checkpoint (3000) elé.
+  { id: 'D-crate', texture: PROP_TEXTURES.CRATE, x: 2445, surfaceId: 'G4' },
+  { id: 'D-lamp', texture: PROP_TEXTURES.STREET_LAMP, x: 2705, surfaceId: 'G4' },
+  { id: 'D-crates', texture: PROP_TEXTURES.CRATE_STACK, x: 2920, surfaceId: 'G4', flipX: true },
+
+  // E — kombinált kihívás. A szekér az E2 platform ALATT fér el (teteje 343 > a lap alja 324).
+  { id: 'E-wagon', texture: PROP_TEXTURES.WAGON, x: 3310, surfaceId: 'G5', flipX: true },
+  { id: 'E-crate', texture: PROP_TEXTURES.CRATE, x: 3600, surfaceId: 'G5' },
+
+  // G — a kasza utáni partot a kút jelöli meg ("átértél"), majd a záró harc díszlete.
+  { id: 'G-well', texture: PROP_TEXTURES.WELL, x: 4790, surfaceId: 'G6' },
+  { id: 'G-crates', texture: PROP_TEXTURES.CRATE_STACK, x: 5195, surfaceId: 'G6' },
+  { id: 'G-wagon', texture: PROP_TEXTURES.WAGON, x: 5490, surfaceId: 'G6' },
+
+  // H — a létra után, az ajtóhoz vezető úton.
+  { id: 'H-lamp', texture: PROP_TEXTURES.STREET_LAMP, x: 5640, surfaceId: 'G6' },
+];
+
+/** A prop lábnyoma a talajon — a tesztek és az ütközés-vizsgálatok ebből dolgoznak. */
+export function decorPropFootprint(def: DecorPropDef): { left: number; right: number } {
+  const half = PROP_ASSETS[def.texture].width / 2;
+  return { left: def.x - half, right: def.x + half };
+}

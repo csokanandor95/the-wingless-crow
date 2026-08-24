@@ -10,6 +10,8 @@
 // buknak — ugyanaz a szerep, mint a parallaxBackground.test.ts réteg-invariánsainál.
 import { describe, it, expect, vi } from 'vitest';
 import {
+  DECOR_PROPS,
+  decorPropFootprint,
   DOOR,
   DOOR_CHECKPOINT,
   ENEMY_SPAWNS,
@@ -34,6 +36,7 @@ import {
   platformLeft,
   platformRight,
   platformTop,
+  PROP_ASSETS,
   REAPER_ENEMY_CLEARANCE,
   REAPERS,
   reaperSweep,
@@ -567,6 +570,114 @@ describe('köztes checkpoint', () => {
   it('a pálya közepe táján van — nem a start és nem a vég közelében', () => {
     expect(MID_CHECKPOINT.x).toBeGreaterThan(WORLD_WIDTH * 0.25);
     expect(MID_CHECKPOINT.x).toBeLessThan(WORLD_WIDTH * 0.75);
+  });
+});
+
+// --- Hangulati propok -------------------------------------------------------
+//
+// A propok NEM ütköznek és nincs physics bodyjuk, tehát a pálya járhatóságát nem tudják
+// elrontani. Amit el TUDNAK rontani, az a hazardok olvashatósága: egy 93px-es szekér a
+// tüskemező vagy a lengő kasza elé állítva pont azt a telegraph-ot takarná ki, amire a
+// player reagálni akar. Ez a blokk erre való.
+
+describe('DECOR_PROPS', () => {
+  it('a prop-id-k egyediek', () => {
+    const ids = DECOR_PROPS.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('minden használt textúrához tartozik deklarált méret', () => {
+    // A méret NEM automatikusan a PNG-ből jön (az `@types/node` nélküli fájlrendszer-olvasás
+    // elszállasztaná a `tsc --noEmit`-et), tehát a `PROP_ASSETS` kézzel karbantartott tábla.
+    // Legalább azt garantáljuk, hogy minden hivatkozott textúrának VAN mérete, és az pozitív.
+    for (const prop of DECOR_PROPS) {
+      const size = PROP_ASSETS[prop.texture];
+      expect(size, `${prop.id}: nincs méret a(z) ${prop.texture} textúrához`).toBeDefined();
+      expect(size.width).toBeGreaterThan(0);
+      expect(size.height).toBeGreaterThan(0);
+    }
+  });
+
+  it('minden prop TELJES lábnyoma egyetlen talaj-szegmensen belül van', () => {
+    for (const prop of DECOR_PROPS) {
+      const surface = surfaceSpan(prop.surfaceId);
+      const { left, right } = decorPropFootprint(prop);
+
+      expect(left, `${prop.id} bal fele lelóg a felületről`).toBeGreaterThanOrEqual(
+        surface.left
+      );
+      expect(right, `${prop.id} jobb fele lelóg a felületről`).toBeLessThanOrEqual(
+        surface.right
+      );
+    }
+  });
+
+  it('egyetlen prop sem takarja a tüskemezőt', () => {
+    for (const prop of DECOR_PROPS) {
+      const { left, right } = decorPropFootprint(prop);
+
+      for (const field of SPIKE_FIELDS) {
+        const overlaps = right >= field.startX && field.endX >= left;
+        expect(overlaps, `${prop.id} átfedi a(z) ${field.id} mezőt`).toBe(false);
+      }
+    }
+  });
+
+  it('egyetlen prop sem lóg a kasza söprési sávjába', () => {
+    for (const prop of DECOR_PROPS) {
+      const { left, right } = decorPropFootprint(prop);
+
+      for (const def of REAPERS) {
+        const sweep = reaperSweep(def);
+        const overlaps =
+          right >= sweep.left - REAPER_ENEMY_CLEARANCE &&
+          sweep.right + REAPER_ENEMY_CLEARANCE >= left;
+
+        expect(overlaps, `${prop.id} a(z) ${def.id} söprési sávjában van`).toBe(false);
+      }
+    }
+  });
+
+  it('egyetlen prop sem takarja a létrát vagy a köztes checkpointot', () => {
+    const interactives = [
+      { id: 'létra', left: LADDER.x - LADDER.width / 2, right: LADDER.x + LADDER.width / 2 },
+      {
+        id: 'köztes checkpoint',
+        left: MID_CHECKPOINT.x - MID_CHECKPOINT.zoneWidth / 2,
+        right: MID_CHECKPOINT.x + MID_CHECKPOINT.zoneWidth / 2,
+      },
+    ];
+
+    for (const prop of DECOR_PROPS) {
+      const { left, right } = decorPropFootprint(prop);
+
+      for (const zone of interactives) {
+        const overlaps = right >= zone.left && zone.right >= left;
+        expect(overlaps, `${prop.id} átfedi: ${zone.id}`).toBe(false);
+      }
+    }
+  });
+
+  it('a propok nem érnek bele a fölöttük lévő platformok aljába', () => {
+    // A prop a talpánál van pozicionálva, tehát a teteje `GROUND_TOP - height`. Ha ez egy
+    // platform ALJA fölé érne, a prop átdöfné a lapot — a -10-es depth miatt mögötte, de
+    // láthatóan.
+    for (const prop of DECOR_PROPS) {
+      const surface = surfaceSpan(prop.surfaceId);
+      const propTop = surface.top - PROP_ASSETS[prop.texture].height;
+      const { left, right } = decorPropFootprint(prop);
+
+      for (const platform of PLATFORMS) {
+        const span = platformSpan(platform);
+        if (right < span.left || span.right < left) continue;
+
+        const platformBottom = span.top + PLATFORM_TILE_HEIGHT;
+        expect(
+          propTop,
+          `${prop.id} beleér a(z) ${platform.id} platformba`
+        ).toBeGreaterThanOrEqual(platformBottom);
+      }
+    }
   });
 });
 

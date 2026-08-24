@@ -82,8 +82,17 @@ import platformEdgeLeftUrl from '../../assets/tiles/cathedral/platform-edge-left
 import platformEdgeRightUrl from '../../assets/tiles/cathedral/platform-edge-right.png';
 import doorGateUrl from '../../assets/tiles/cathedral/door-gate.png';
 import ladderUrl from '../../assets/tiles/cathedral/ladder.png';
+// Hangulati propok. Forrás: GothicVania Town (Luis Zuno / @ansimuz) — "License for Everyone.
+// Public domain and free to use on whatever you want, personal or commercial." A csomag
+// `PNG/environment/props-sliced/` mappájából VÁLTOZATLANUL másolva, eredeti fájlnéven (ez a
+// kapocs a forráshoz). A lilás-hideg palettát a `PROP_TINT` korrigálja futásidőben.
+import streetLampUrl from '../../assets/props/gothic-town/street-lamp.png';
+import wagonUrl from '../../assets/props/gothic-town/wagon.png';
+import wellUrl from '../../assets/props/gothic-town/well.png';
+import crateUrl from '../../assets/props/gothic-town/crate.png';
+import crateStackUrl from '../../assets/props/gothic-town/crate-stack.png';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
-import { SPIKE_HEIGHT, SPIKE_TILE_WIDTH } from '../levels/Level1Layout';
+import { PROP_TEXTURES, SPIKE_HEIGHT, SPIKE_TILE_WIDTH } from '../levels/Level1Layout';
 import { TILE_TEXTURES } from '../levels/LevelTileset';
 
 const LOADING_BAR_WIDTH = 320;
@@ -137,6 +146,15 @@ const TILE_IMAGES: Array<{ key: string; url: string }> = [
   { key: TILE_TEXTURES.LADDER, url: ladderUrl },
 ];
 
+// Level 1 hangulati propok — nem ütköző háttér-dekoráció (lásd src/levels/LevelDecor.ts).
+const PROP_IMAGES: Array<{ key: string; url: string }> = [
+  { key: PROP_TEXTURES.STREET_LAMP, url: streetLampUrl },
+  { key: PROP_TEXTURES.WAGON, url: wagonUrl },
+  { key: PROP_TEXTURES.WELL, url: wellUrl },
+  { key: PROP_TEXTURES.CRATE, url: crateUrl },
+  { key: PROP_TEXTURES.CRATE_STACK, url: crateStackUrl },
+];
+
 export default class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene');
@@ -176,7 +194,7 @@ export default class BootScene extends Phaser.Scene {
       });
     }
 
-    for (const image of [...BACKGROUND_IMAGES, ...TILE_IMAGES]) {
+    for (const image of [...BACKGROUND_IMAGES, ...TILE_IMAGES, ...PROP_IMAGES]) {
       this.load.image(image.key, image.url);
     }
   }
