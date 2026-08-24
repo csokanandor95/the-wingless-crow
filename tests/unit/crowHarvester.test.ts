@@ -210,25 +210,72 @@ describe('CrowHarvester', () => {
       expect(crowHarvester.crowHarvesterState).toBe(CrowHarvesterState.CHASE);
     });
 
-    it('clampChaseToBounds: platform-kötött CrowHarvester megáll a peremnél, nem sétál tovább', () => {
+    it('chaseMaxX: a felület peremén megáll üldözés közben, nem sétál le', () => {
       // A mock nem szimulálja a fizikai integrációt (velocity -> pozíció), ezért a
       // CrowHarvester pozícióját explicit a perem-határra állítjuk — ez felel meg annak, mint
       // ha korábbi frame-eken a valódi fizika már odavitte volna a CHASE mozgás során.
-      const boundedCrowHarvester = new CrowHarvester(scene as unknown as Phaser.Scene, HARVESTER_X, HARVESTER_Y, {
-        patrolMinX: HARVESTER_X - 40,
-        patrolMaxX: HARVESTER_X + 40,
-        clampChaseToBounds: true,
-      });
+      const boundedCrowHarvester = new CrowHarvester(
+        scene as unknown as Phaser.Scene,
+        HARVESTER_X,
+        HARVESTER_Y,
+        {
+          patrolMinX: HARVESTER_X - 40,
+          patrolMaxX: HARVESTER_X + 40,
+          chaseMinX: HARVESTER_X - 40,
+          chaseMaxX: HARVESTER_X + 40,
+        }
+      );
       boundedCrowHarvester.crowHarvesterState = CrowHarvesterState.CHASE;
       boundedCrowHarvester.x = HARVESTER_X + 40; // már a jobb oldali peremen áll
 
       // A player tovább jobbra van, de nem elég közel az ATTACK_RANGE-hez, és
-      // LOSE_RANGE-en belül marad -> a clamp-ágnak kell aktiválódnia.
+      // LOSE_RANGE-en belül marad -> a perem-ágnak kell aktiválódnia.
       const beyondBounds = createPlayerAt(scene, HARVESTER_X + 40 + ATTACK_RANGE + 20, HARVESTER_Y);
       boundedCrowHarvester.update(beyondBounds);
 
       expect(boundedCrowHarvester.crowHarvesterState).toBe(CrowHarvesterState.CHASE);
       expect(getBody(boundedCrowHarvester).velocity.x).toBe(0);
+    });
+
+    it('az üldözés a PATROL körzeten TÚL is folytatódik, a chase-határig', () => {
+      // Ez a finomhangolás lényege: a séta-körzet szűk, az üldözés viszont a felület
+      // pereméig tart. Korábban a kettő egybe volt mosva, ezért a földi enemy a saját
+      // patrol-határán (a pálya közepén) láthatatlan falba ütközött.
+      const wideChase = new CrowHarvester(
+        scene as unknown as Phaser.Scene,
+        HARVESTER_X,
+        HARVESTER_Y,
+        {
+          patrolMinX: HARVESTER_X - 40,
+          patrolMaxX: HARVESTER_X + 40,
+          chaseMinX: HARVESTER_X - 400,
+          chaseMaxX: HARVESTER_X + 400,
+        }
+      );
+      wideChase.crowHarvesterState = CrowHarvesterState.CHASE;
+      wideChase.x = HARVESTER_X + 40; // a patrol-körzet jobb peremén
+
+      const ahead = createPlayerAt(scene, HARVESTER_X + 40 + ATTACK_RANGE + 20, HARVESTER_Y);
+      wideChase.update(ahead);
+
+      // Nem áll meg: a patrol-határ már nem kapu az üldözésnek.
+      expect(getBody(wideChase).velocity.x).toBeGreaterThan(0);
+    });
+
+    it('üldözési határ NÉLKÜL korlátlanul üldöz (a default nem zár be senkit)', () => {
+      const unbounded = new CrowHarvester(
+        scene as unknown as Phaser.Scene,
+        HARVESTER_X,
+        HARVESTER_Y,
+        { patrolMinX: HARVESTER_X - 40, patrolMaxX: HARVESTER_X + 40 }
+      );
+      unbounded.crowHarvesterState = CrowHarvesterState.CHASE;
+      unbounded.x = HARVESTER_X + 5000;
+
+      const farAhead = createPlayerAt(scene, HARVESTER_X + 5000 + ATTACK_RANGE + 20, HARVESTER_Y);
+      unbounded.update(farAhead);
+
+      expect(getBody(unbounded).velocity.x).toBeGreaterThan(0);
     });
 
     it('DIRECTION_DEADZONE: elérhetetlen, de vízszintesen közel álló player nem okoz sebesség-oszcillációt', () => {

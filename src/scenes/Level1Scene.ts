@@ -21,6 +21,7 @@ import {
   DOOR,
   DOOR_CHECKPOINT,
   ENEMY_SPAWNS,
+  enemyChaseBounds,
   FALL_DEATH_Y,
   FALL_DEPTH,
   GROUND_CENTER_Y,
@@ -377,15 +378,15 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   /**
-   * MINDEN enemy explicit patrol-határt és `clampChaseToBounds`-ot kap (a szakadékok
-   * bevezetése előtt ez csak a platformon állókra volt igaz): enélkül egy üldöző földi
-   * enemy lesétálna a szakadék peremén, és a D szakaszban belesétálna a tüskékbe.
-   * A határok a Level1Layout ENEMY_SPAWNS adattömbjéből jönnek, ahol unit teszt őrzi,
-   * hogy mindegyik a saját felületén belül marad.
+   * A séta-körzet (`patrolMinX/MaxX`) és az ÜLDÖZÉSI határ két külön dolog: az előbbi az
+   * `ENEMY_SPAWNS` adata, az utóbbit az `enemyChaseBounds()` VEZETI LE a felület pereméből
+   * és a spike-mezőkből. Így a földi enemy a szakadék szélééig követi a playert (nem ütközik
+   * láthatatlan falba a pálya közepén), de nem esik le és nem lép a tüskékre.
    */
   private spawnEnemies(): void {
     for (const def of ENEMY_SPAWNS) {
       const surface = surfaceSpan(def.surfaceId);
+      const chase = enemyChaseBounds(def);
       const enemy = new CrowHarvester(
         this,
         def.x,
@@ -393,7 +394,8 @@ export default class Level1Scene extends Phaser.Scene {
         {
           patrolMinX: def.patrolMinX,
           patrolMaxX: def.patrolMaxX,
-          clampChaseToBounds: true,
+          chaseMinX: chase.min,
+          chaseMaxX: chase.max,
         }
       );
 

@@ -45,11 +45,20 @@ export const DIRECTION_DEADZONE = 4; // ha vízszintesen szinte egy vonalban van
 const HP_TEXT_OFFSET_Y = 46;
 
 export interface CrowHarvesterConfig {
-  /** Abszolút világ-X határok a patrol mozgáshoz. Ha nincs megadva: spawn ± PATROL_RANGE. */
+  /** Abszolút világ-X határok a NYUGALMI sétához. Ha nincs megadva: spawn ± PATROL_RANGE. */
   patrolMinX?: number;
   patrolMaxX?: number;
-  /** Ha true, CHASE közben sem lép ki a határokon (platformon álló enemy nem esik le). */
-  clampChaseToBounds?: boolean;
+  /**
+   * Abszolút világ-X határok az ÜLDÖZÉSHEZ — jellemzően a felület (talaj-szegmens vagy
+   * platform) pereme, behúzva. Megadás nélkül az üldözés korlátlan.
+   *
+   * SZÁNDÉKOSAN tágabb lehet a patrolnál: az enemy a szakadék peremééig követi a playert,
+   * a séta-körzete ettől még kicsi marad — és a player lehagyásakor (LOSE_RANGE) oda tér
+   * vissza. A kettő összemosása („csak a patrol-körén belül üldözhet") azt eredményezné,
+   * hogy az enemy láthatatlan falba ütközik a pálya közepén.
+   */
+  chaseMinX?: number;
+  chaseMaxX?: number;
 }
 
 export default class CrowHarvester extends Phaser.Physics.Arcade.Sprite implements Damageable {
@@ -61,7 +70,8 @@ export default class CrowHarvester extends Phaser.Physics.Arcade.Sprite implemen
 
   private readonly patrolMinX: number;
   private readonly patrolMaxX: number;
-  private readonly clampChaseToBounds: boolean;
+  private readonly chaseMinX: number;
+  private readonly chaseMaxX: number;
   private patrolDirection: 1 | -1 = 1;
   private isAttackBusy = false;
   private playerRef: Player | null = null;
@@ -80,7 +90,10 @@ export default class CrowHarvester extends Phaser.Physics.Arcade.Sprite implemen
 
     this.patrolMinX = config.patrolMinX ?? x - PATROL_RANGE;
     this.patrolMaxX = config.patrolMaxX ?? x + PATROL_RANGE;
-    this.clampChaseToBounds = config.clampChaseToBounds ?? false;
+    // A végtelen default miatt nem kell külön "van-e határ?" flag: a korlátlan üldözés
+    // egyszerűen az, amikor a perem végtelen messze van.
+    this.chaseMinX = config.chaseMinX ?? Number.NEGATIVE_INFINITY;
+    this.chaseMaxX = config.chaseMaxX ?? Number.POSITIVE_INFINITY;
 
     // A body a köpenyhez igazodik, nem a 64x64-es frame-hez. Közvetlenül a bodyn hívjuk,
     // mert az Arcade.Sprite-on a Components.Size verziója árnyékolja a GameObject-ét
@@ -170,11 +183,11 @@ export default class CrowHarvester extends Phaser.Physics.Arcade.Sprite implemen
 
     const direction = player.x < this.x ? -1 : 1;
 
-    // Platformon álló enemy: a peremnél megáll üldözés közben is, nem sétál le.
+    // A felület peremén megáll: a szakadék szélééig (vagy a tüskékig) követi a playert,
+    // de nem lép le. A határ a PATROL körzettől független és jellemzően jóval tágabb.
     if (
-      this.clampChaseToBounds &&
-      ((direction < 0 && this.x <= this.patrolMinX) ||
-        (direction > 0 && this.x >= this.patrolMaxX))
+      (direction < 0 && this.x <= this.chaseMinX) ||
+      (direction > 0 && this.x >= this.chaseMaxX)
     ) {
       this.setVelocityX(0);
       this.setFacing(direction < 0);

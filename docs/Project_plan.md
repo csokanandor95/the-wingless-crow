@@ -638,7 +638,28 @@ Főbb elemek:
 > 8 CrowHarvester, zuhanás-halál, enemy-respawn, köztes checkpoint, tutorial feliratok.
 > **2. iteráció — KÉSZ:** spike-ok (D szakasz), lásd lentebb. **3. iteráció — KÉSZ:**
 > Swinging Reaper (F szakasz), lásd lentebb. **A blokk ettől még nyitva marad:** a Phase 8-ra
-> visszatérés előtt egy finomhangolási kör következik a teljes pályán.
+> visszatérés előtt finomhangolási körök futnak a teljes pályán.
+>
+> **Finomhangolás, 1. kör — az A szakasz mostantól VALÓDI ugrás-tutorial.** Az eredeti
+> változatban a három lebegő platform folyamatos talaj FÖLÖTT lógott, tehát a player
+> egyszerűen alattuk elfutott, és a pálya soha nem kényszerítette ugrásra — a tutorial
+> dekoráció volt. Most egy 640 px-es szakadék van alattuk (start pad 0–320, talaj újra
+> 960-tól), és a három platform hidalja át.
+>
+> **Ez ELTÉR a `level1-layout.md` specifikációjától**, ami az A szakaszra *„No environmental
+> hazards"*-t és *„Player can safely test movement"*-et ír elő. Tudatos user-döntés: a lecke
+> csak akkor tanít, ha az elvétett ugrásnak következménye van. A büntetés szándékosan
+> minimális — a checkpoint a pálya eleje, tehát egy hibázás ~1,2 mp respawn + ~1,1 mp
+> visszafutás. Következmény a spec szakasz-szerepeire: **az első platforming-kihívás
+> mostantól az A szakasz**, a C pedig az első SZÉLES, talajszintű szakadék.
+>
+> **Finomhangolás, 1. kör — a földi enemyk üldözési modellje.** A Redesign 1. iterációjában
+> minden enemy szűk patrol-határt + `clampChaseToBounds`-ot kapott; ez megakadályozta a
+> szakadékba sétálást, de a földi lény üldözés közben is a kis sétakörzetébe volt zárva, és
+> a pálya közepén láthatatlan falba ütközött. A séta-körzet és az üldözési határ mostantól
+> **két külön dolog**: az utóbbi a felület pereméből (és a spike-mezőkből) van levezetve, így
+> az enemy a szakadék széléig követi a playert, de nem esik le és nem lép a tüskékre. A
+> „lehagyom, kikerülök a detection range-ből, visszatér a körzetébe" viselkedés változatlan.
 >
 > **Kiegészítés (2. iteráció) — a környezeti hazardok külön sebzés-modellt igényelnek.**
 > A `Player.takeDamage()` szándékosan nem néz HURT állapotot, csak DEAD-et: egy enemy-csapás
@@ -1176,8 +1197,9 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 > layout túl egyszerű volt (3200 px, folyamatos talaj, hazard nélkül). Az új, nyolc szakaszos
 > 6000 px-es pálya részletei a 14. pontnál. Az 1. iteráció (layout-váz + gap + zuhanás-halál
 > + enemy-respawn + köztes checkpoint + tutorial feliratok), a 2. iteráció (spike-ok + a
-> minden hazardra közös i-frame kapu) és a 3. iteráció (Swinging Reaper) **kész**.
-> A blokk egy **finomhangolási körig nyitva marad**, mielőtt a Phase 8 folytatódna.
+> minden hazardra közös i-frame kapu) és a 3. iteráció (Swinging Reaper) **kész**, ahogy a
+> finomhangolás 1. köre is (A szakasz gödre + a földi enemyk üldözési modellje). A blokk
+> **nyitva marad** további hangolásra, mielőtt a Phase 8 folytatódna.
 
 ## Phase 7 – Boss
 

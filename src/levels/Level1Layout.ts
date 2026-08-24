@@ -127,11 +127,15 @@ export interface GroundSegmentDef {
  * elmozdítása automatikusan átméretezi a szomszédos szakadékot.
  */
 export const GROUND_SEGMENTS: GroundSegmentDef[] = [
-  { id: 'G1', startX: 0, endX: 1660 }, // A (start) + B (első enemy)
-  { id: 'G2', startX: 1820, endX: 2260 }, // C — gap1 mögött
-  { id: 'G3', startX: 2420, endX: 3120 }, // D (spike-tutorial) + köztes checkpoint
-  { id: 'G4', startX: 3250, endX: 4300 }, // E (kombinált kihívás)
-  { id: 'G5', startX: 4700, endX: WORLD_WIDTH }, // F vége + G (záró harc) + H (boss-ajtó)
+  // A start pad SZÁNDÉKOSAN rövid: a mögötte nyíló gödör és mind a három tutorial-platform
+  // belefér a kezdőképernyőbe (a kamera x=0..800-at mutat), tehát a player egy pillantásra
+  // érti a feladatot — nem egy váratlan lyukba sétál bele.
+  { id: 'G1', startX: 0, endX: 320 }, // A — start pad (mozgás-tutorial)
+  { id: 'G2', startX: 960, endX: 1660 }, // A vége + B (első enemy) — gapA mögött
+  { id: 'G3', startX: 1820, endX: 2260 }, // C
+  { id: 'G4', startX: 2420, endX: 3120 }, // D (spike-tutorial) + köztes checkpoint
+  { id: 'G5', startX: 3250, endX: 4300 }, // E (kombinált kihívás)
+  { id: 'G6', startX: 4700, endX: WORLD_WIDTH }, // F vége + G (záró harc) + H (boss-ajtó)
 ];
 
 // --- Platformok -------------------------------------------------------------
@@ -148,10 +152,13 @@ export interface PlatformDef {
 }
 
 export const PLATFORMS: PlatformDef[] = [
-  // --- A: mozgás-tutorial (veszélytelen) ---
-  { id: 'A1', x: 380, y: 350, tiles: 3 }, // első ugrás a talajról
-  { id: 'A2', x: 620, y: 292, tiles: 2 }, // magasabb lépés
-  { id: 'A3', x: 830, y: 340, tiles: 2 }, // visszalépcső a talajra
+  // --- A: mozgás- és UGRÁS-tutorial ---
+  // A három platform a `gapA` (320–960) fölött lóg, tehát nem lehet alattuk elfutni: a
+  // player kénytelen végigugrálni rajtuk. Minden ugrás bőven a hatótávon belül van (lásd
+  // a level1Layout.test.ts elérhetőség-BFS-ét) — itt a KÉNYSZERÍTÉS a cél, nem a nehézség.
+  { id: 'A1', x: 460, y: 350, tiles: 3 }, // széles, megbocsátó első célpont (+76)
+  { id: 'A2', x: 700, y: 292, tiles: 2 }, // magasabb lépés (+58)
+  { id: 'A3', x: 910, y: 340, tiles: 2 }, // 14px-t ÁTLÓG a G2 fölé -> biztonságos kilépés
 
   // --- C: első platforming-kihívás ---
   { id: 'C1', x: 1740, y: 356, tiles: 1 }, // lépőkő a gap1-ben (alternatív útvonal)
@@ -277,7 +284,7 @@ export interface SpikeFieldDef {
  * ugrás. A `level1Layout.test.ts` ezt őrzi.
  */
 export const SPIKE_FIELDS: SpikeFieldDef[] = [
-  { id: 'D-spikes', startX: 2740, endX: 2868, surfaceId: 'G3' },
+  { id: 'D-spikes', startX: 2740, endX: 2868, surfaceId: 'G4' },
 ];
 
 // --- Swinging Reaper (F szakasz) --------------------------------------------
@@ -369,29 +376,60 @@ export interface EnemySpawnDef {
 }
 
 /**
- * MINDEN enemy explicit patrol-határt kap (és a scene mindnek `clampChaseToBounds: true`-t
- * ad) — nem csak a platformon állók, mint a szakadékok bevezetése előtt. Enélkül egy üldöző
- * földi enemy lesétálna a szakadék peremén, a D szakaszban pedig belesétálna a tüskékbe.
+ * A `patrolMinX/patrolMaxX` KIZÁRÓLAG a nyugalmi séta-körzet — az ÜLDÖZÉS határa ennél
+ * jóval tágabb, és nem itt van felsorolva, hanem az `enemyChaseBounds()` számítja a
+ * felületből. Így az enemy a szakadék peremééig követi a playert, de a körzete kicsi marad,
+ * és a player lehagyásakor oda tér vissza.
  */
 export const ENEMY_SPAWNS: EnemySpawnDef[] = [
   // B — az első, magányos enemy: tágas, sík terep a harc megtanulásához.
-  { id: 'B-1', x: 1250, surfaceId: 'G1', patrolMinX: 1120, patrolMaxX: 1400 },
+  { id: 'B-1', x: 1250, surfaceId: 'G2', patrolMinX: 1120, patrolMaxX: 1400 },
 
-  // D — a spike-mező ELŐTT áll, a határa nem éri el a tüskéket (lásd SPIKE_FIELDS,
-  // 2. iteráció): így a spec "CrowHarvester does not walk into spikes" pontja
-  // enemy-kódváltozás nélkül teljesül.
-  { id: 'D-1', x: 2560, surfaceId: 'G3', patrolMinX: 2460, patrolMaxX: 2700 },
+  // D — a spike-mező ELŐTT áll. Az üldözési határát az enemyChaseBounds() vágja el a
+  // tüskéknél, így a spec "CrowHarvester does not walk into spikes" pontja akkor is
+  // teljesül, hogy az üldözés a teljes szegmensre kiterjed.
+  { id: 'D-1', x: 2560, surfaceId: 'G4', patrolMinX: 2460, patrolMaxX: 2700 },
 
   // E — kombinált kihívás: két földi + két platformon álló.
-  { id: 'E-ground-1', x: 3350, surfaceId: 'G4', patrolMinX: 3280, patrolMaxX: 3460 },
+  { id: 'E-ground-1', x: 3350, surfaceId: 'G5', patrolMinX: 3280, patrolMaxX: 3460 },
   { id: 'E-platform-1', x: 3420, surfaceId: 'E2', patrolMinX: 3348, patrolMaxX: 3492 },
   { id: 'E-platform-2', x: 3960, surfaceId: 'E4', patrolMinX: 3888, patrolMaxX: 4032 },
-  { id: 'E-ground-2', x: 4120, surfaceId: 'G4', patrolMinX: 4030, patrolMaxX: 4210 },
+  { id: 'E-ground-2', x: 4120, surfaceId: 'G5', patrolMinX: 4030, patrolMaxX: 4210 },
 
   // G — a létrát őrző pár, a boss-ajtó előtti utolsó harc.
-  { id: 'G-1', x: 5050, surfaceId: 'G5', patrolMinX: 4930, patrolMaxX: 5170 },
-  { id: 'G-2', x: 5350, surfaceId: 'G5', patrolMinX: 5230, patrolMaxX: 5470 },
+  { id: 'G-1', x: 5050, surfaceId: 'G6', patrolMinX: 4930, patrolMaxX: 5170 },
+  { id: 'G-2', x: 5350, surfaceId: 'G6', patrolMinX: 5230, patrolMaxX: 5470 },
 ];
+
+/**
+ * Az enemy ÜLDÖZÉSI határa: meddig követheti a playert anélkül, hogy leesne vagy hazardba
+ * lépne. LEVEZETETT érték, nem kézzel írt szám — egy platform elmozdítása vagy egy új
+ * spike-mező automatikusan átméretezi a pórázt.
+ *
+ * Két korlát metszete:
+ *   1. a felület (talaj-szegmens vagy platform) pereme, `EDGE_INSET`-tel behúzva;
+ *   2. a spawnját tartalmazó, TÜSKEMENTES szabad sáv — a mezők elvágják a mozgásteret.
+ *
+ * A platformon állóknál ez pontosan a régi, kézzel írt patrol-határt adja vissza, tehát az
+ * ő viselkedésük bitre változatlan.
+ */
+export function enemyChaseBounds(def: EnemySpawnDef): { min: number; max: number } {
+  const surface = surfaceSpan(def.surfaceId);
+  let min = surface.left + EDGE_INSET;
+  let max = surface.right - EDGE_INSET;
+
+  for (const field of SPIKE_FIELDS) {
+    if (field.surfaceId !== def.surfaceId) continue;
+
+    if (field.endX <= def.x) {
+      min = Math.max(min, field.endX + EDGE_INSET);
+    } else if (field.startX >= def.x) {
+      max = Math.min(max, field.startX - EDGE_INSET);
+    }
+  }
+
+  return { min, max };
+}
 
 // --- Létra / ajtó / checkpointok --------------------------------------------
 

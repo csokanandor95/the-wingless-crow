@@ -13,6 +13,7 @@ import {
   DOOR,
   DOOR_CHECKPOINT,
   ENEMY_SPAWNS,
+  enemyChaseBounds,
   FALL_DEATH_Y,
   FALL_DEPTH,
   GROUND_SEGMENTS,
@@ -148,24 +149,41 @@ describe('szakadékok', () => {
     }
   });
 
-  it('mindegyik átjutható — vagy közvetlen ugrással, vagy a benne álló platformon át', () => {
+  it('mindegyik átjutható — közvetlen ugrással vagy a benne álló platformok LÁNCÁN', () => {
     for (const gap of groundGaps()) {
       if (gap.width <= MAX_SAFE_GAP) continue;
 
-      // Szélesebb szakadék CSAK akkor megengedett, ha áll benne egy platform, amire
-      // mindkét partról át lehet ugrani (ez a gap4 a Swinging Reaper alatt).
-      const bridge = PLATFORMS.map(platformSpan).find(
-        (span) => span.left > gap.startX && span.right < gap.endX
-      );
-      expect(
-        bridge,
-        `a ${gap.width}px-es szakadék (${gap.startX}) nem ugorható át és nincs áthidalva`
-      ).toBeDefined();
-
+      // Szélesebb szakadék CSAK akkor megengedett, ha a benne álló platformokon
+      // VÉGIG lehet jutni a bal partról a jobbra. Nem elég EGY áthidaló platform: az
+      // A szakasz 640px-es tutorial-gödrét három platform lánca hidalja át (A1->A2->A3),
+      // a gap4-et a Swinging Reaper alatt viszont egyetlen (F1).
       const leftBank: Span = { left: gap.startX - 1, right: gap.startX, top: GROUND_TOP };
       const rightBank: Span = { left: gap.endX, right: gap.endX + 1, top: GROUND_TOP };
-      expect(canJump(leftBank, bridge!)).toBe(true);
-      expect(canJump(bridge!, rightBank)).toBe(true);
+      const stones = PLATFORMS.map(platformSpan).filter(
+        (span) => span.right > gap.startX && span.left < gap.endX
+      );
+
+      const reached: Span[] = [leftBank];
+      const queue: Span[] = [leftBank];
+      let crossed = false;
+
+      while (queue.length > 0 && !crossed) {
+        const current = queue.shift()!;
+        if (canJump(current, rightBank)) {
+          crossed = true;
+          break;
+        }
+        for (const stone of stones) {
+          if (reached.includes(stone) || !canJump(current, stone)) continue;
+          reached.push(stone);
+          queue.push(stone);
+        }
+      }
+
+      expect(
+        crossed,
+        `a ${gap.width}px-es szakadék (${gap.startX}–${gap.endX}) nem jutható át`
+      ).toBe(true);
     }
   });
 });
@@ -256,6 +274,73 @@ describe('ENEMY_SPAWNS', () => {
       expect(enemy.x, `${enemy.id} spawn a patrol-tartományon kívül`).toBeLessThanOrEqual(
         enemy.patrolMaxX
       );
+    }
+  });
+
+  it('az üldözési határ TARTALMAZZA a patrol-körzetet', () => {
+    // Ha szűkebb lenne, az enemy a saját sétakörzetében ütközne láthatatlan falba.
+    for (const enemy of ENEMY_SPAWNS) {
+      const chase = enemyChaseBounds(enemy);
+      expect(chase.min, `${enemy.id} üldözési határa balra szűkebb a patrolnál`).toBeLessThanOrEqual(
+        enemy.patrolMinX
+      );
+      expect(
+        chase.max,
+        `${enemy.id} üldözési határa jobbra szűkebb a patrolnál`
+      ).toBeGreaterThanOrEqual(enemy.patrolMaxX);
+    }
+  });
+
+  it('az üldözési határ a felületen BELÜL marad (a testével együtt)', () => {
+    for (const enemy of ENEMY_SPAWNS) {
+      const surface = surfaceSpan(enemy.surfaceId);
+      const chase = enemyChaseBounds(enemy);
+
+      expect(
+        chase.min - HARVESTER_HALF_BODY_WIDTH,
+        `${enemy.id} üldözés közben balra lelép a peremről`
+      ).toBeGreaterThanOrEqual(surface.left);
+      expect(
+        chase.max + HARVESTER_HALF_BODY_WIDTH,
+        `${enemy.id} üldözés közben jobbra lelép a peremről`
+      ).toBeLessThanOrEqual(surface.right);
+    }
+  });
+
+  it('az üldözési határ SEM engedi tüskébe lépni', () => {
+    // Ez a 2. iteráció óta a spec követelménye ("does not walk into spikes"), és az
+    // üldözés kitágítása után is állnia kell — a chase-határt a spike-mezők elvágják.
+    for (const enemy of ENEMY_SPAWNS) {
+      const chase = enemyChaseBounds(enemy);
+
+      for (const field of SPIKE_FIELDS) {
+        const reachesLeft = chase.min - HARVESTER_HALF_BODY_WIDTH;
+        const reachesRight = chase.max + HARVESTER_HALF_BODY_WIDTH;
+        const overlaps = reachesRight > field.startX && reachesLeft < field.endX;
+
+        expect(overlaps, `${enemy.id} üldözés közben belesétál a(z) ${field.id} mezőbe`).toBe(
+          false
+        );
+      }
+    }
+  });
+
+  it('a FÖLDI enemyk üldözési határa érdemben tágabb a patroljuknál', () => {
+    // Ez a finomhangolás lényege: a földi enemy ne a szűk sétakörében ütközzön falba,
+    // hanem a szakadék peremééig kövesse a playert. (A platformon állóknál a kettő
+    // szándékosan egybeesik — ott a platform pereme MAGA a patrol-határ.)
+    const groundEnemies = ENEMY_SPAWNS.filter((e) =>
+      GROUND_SEGMENTS.some((g) => g.id === e.surfaceId)
+    );
+    expect(groundEnemies.length).toBeGreaterThan(0);
+
+    for (const enemy of groundEnemies) {
+      const chase = enemyChaseBounds(enemy);
+      const patrolWidth = enemy.patrolMaxX - enemy.patrolMinX;
+      expect(
+        chase.max - chase.min,
+        `${enemy.id} üldözési tere nem tágabb a patroljánál`
+      ).toBeGreaterThan(patrolWidth);
     }
   });
 
@@ -465,10 +550,22 @@ describe('TUTORIAL_HINTS', () => {
     }
   });
 
-  it('mind a veszélytelen bevezető szakaszban vannak (az első szakadék előtt)', () => {
-    const firstGap = groundGaps()[0];
+  it('mind SZILÁRD TALAJON váltódnak ki — nem a levegőben, zuhanás közben', () => {
+    // A trigger a player X-ére néz, függetlenül attól, hol van függőlegesen: egy szakadék
+    // fölé tett trigger a beleesés pillanatában villanna fel.
     for (const hint of TUTORIAL_HINTS) {
-      expect(hint.triggerX, `${hint.id} túl későn jelenik meg`).toBeLessThan(firstGap.startX);
+      expect(() => groundSegmentIdAt(hint.triggerX), `${hint.id} szakadék fölött van`).not.toThrow();
+    }
+  });
+
+  it('mind az első valódi HAZARD (spike-mező) előtt vannak', () => {
+    // Korábban ez "az első szakadék előtt"-et állított, de az A szakasz tutorial-gödrének
+    // bevezetése óta a legelső szakadék MAGA a tutorial — a harc-súgó szükségszerűen
+    // mögötte van. Az állítás eredeti SZÁNDÉKA (a súgók a bevezetőben szólnak, nem harc
+    // vagy hazard közben) így a spike-mezőhöz van kötve.
+    const firstHazardX = Math.min(...SPIKE_FIELDS.map((f) => f.startX));
+    for (const hint of TUTORIAL_HINTS) {
+      expect(hint.triggerX, `${hint.id} túl későn jelenik meg`).toBeLessThan(firstHazardX);
     }
   });
 });

@@ -179,9 +179,14 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 - **3. iteráció (KÉSZ):** Swinging Reaper az F szakaszban — `src/hazards/SwingingReaper.ts`.
   Determinisztikus inga a gap4 fölött, 20 sebzés, a meglévő megosztott i-frame kapun át.
 
-**A blokk MÉG NYITVA VAN.** Mind a három tervezett iteráció implementálva, de a Phase 8-ra
-visszatérés ELŐTT egy **finomhangolási kör** következik a most újragondolt pályán — a
-jelöltekhez lásd a „Következő lépés" szakaszt a dokumentum végén.
+**A blokk MÉG NYITVA VAN** — a Phase 8-ra visszatérés előtt finomhangolási körök futnak.
+
+**Finomhangolás, 1. kör (KÉSZ)** — két user által jelzett hiba:
+- **Az A szakasz nem tanított semmit:** a három platform folyamatos talaj fölött lógott, a
+  player alattuk elfutott. Most **640 px-es gödör** van alattuk (lásd a Level1Scene szakaszt).
+- **A földi enemyk láthatatlan falba ütköztek:** az üldözés a szűk patrol-körzetre volt
+  clampelve. A `clampChaseToBounds` flag helyett most **külön `chaseMinX`/`chaseMaxX`** van,
+  amit az `enemyChaseBounds()` vezet le a felület pereméből + a spike-mezőkből.
 
 **Két viselkedés-változás a korábban dokumentálthoz képest (user-döntés):**
 1. **A player halálakor az enemyk is újraélednek** (`Level1Scene.resetEnemies()`). Korábban
@@ -190,7 +195,7 @@ jelöltekhez lásd a „Következő lépés" szakaszt a dokumentum végén.
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**12 fájl, 243 teszt** — ebből 5 az animáció-/háttér-/VFX-vezérlést, 1 a **Level 1 pálya-geometriát**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**12 fájl, 250 teszt** — ebből 5 az animáció-/háttér-/VFX-vezérlést, 1 a **Level 1 pálya-geometriát**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -410,11 +415,20 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   "a padlón át" eltalálni egy másik platformon álló playert. A `DIRECTION_DEADZONE` (4px)
   megakadályozza, hogy egy vertikálisan elérhetetlen, de vízszintesen majdnem egy vonalban
   lévő cél felé az enemy balra-jobbra pörögjön (irány-flip minden frame-ben nulla körül)
-- **`CrowHarvesterConfig`** (opcionális 4. konstruktor-paraméter): `patrolMinX` / `patrolMaxX`
-  abszolút világ-X határok, és `clampChaseToBounds` — utóbbi hatására CHASE közben sem
-  lép ki a határokon. Ez teszi lehetővé a platformon álló enemyt, ami nem sétál le a
-  peremről. A flag nélkül (default false) a földi enemyk szabadon üldöznek — ez fontos,
-  különben ±80px-be szorulnának.
+- **`CrowHarvesterConfig`** (opcionális 4. konstruktor-paraméter): **KÉT, EGYMÁSTÓL FÜGGETLEN
+  határpár.** A `patrolMinX`/`patrolMaxX` a nyugalmi séta-körzet; a `chaseMinX`/`chaseMaxX`
+  az ÜLDÖZÉS pereme, és szándékosan jóval tágabb — jellemzően a felület (talaj-szegmens vagy
+  platform) széle, behúzva. Megadás nélkül mindkettő „nincs korlát" (`∓Infinity`), ezért
+  külön „van-e határ?" flag nem kell.
+  - **Ez a kettő korábban EGYBE volt mosva** (`clampChaseToBounds: true` a patrol-határokra
+    clampelt), és az hibás volt: a földi enemy a saját, szűk sétakörzetének peremén állt meg
+    a pálya közepén — a player egyszerűen kisétált belőle, és a lény láthatatlan falba
+    ütközött. Most a szakadék (vagy a tüskemező) széléig követi a playert.
+  - A **PATROL érintetlen**: a `updatePatrol()` továbbra is a `patrolMinX/MaxX`-hez képest
+    állítja az irányt, tehát a körzetén kívülről magától visszasétál, ha a player lehagyta
+    (`LOSE_RANGE`). A gyakorlatban ez a valódi póráz: a player 200 px/s-mal lehagyja a
+    100 px/s-os üldözőt, és 320 px után az üldözés megszakad — a szegmens hossza így ritkán
+    számít.
 
 ### Level1Scene (`src/scenes/Level1Scene.ts` + `src/levels/Level1Layout.ts`)
 
@@ -427,10 +441,18 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 
 - **6000×450-es pálya** (a magasság szándékosan = canvas magasság, így csak vízszintes
   kameragörgetés van; a létra is belefér a sávba). Nyolc szakasz: A–H, lásd fentebb
-- **A talaj NEM folyamatos:** öt `GROUND_SEGMENTS` szegmens, a köztük lévő **négy hézag
-  a szakadék** (160 / 160 / 130 / 400 px). A `groundGaps()` SZÁMÍTJA őket a szegmensekből,
-  tehát nincsenek külön felsorolva — egy szegmens elmozdítása automatikusan átméretezi a
-  szomszédos szakadékot
+- **A talaj NEM folyamatos:** hat `GROUND_SEGMENTS` szegmens, a köztük lévő **öt hézag
+  a szakadék** (640 / 160 / 160 / 130 / 400 px). A `groundGaps()` SZÁMÍTJA őket a
+  szegmensekből, tehát nincsenek külön felsorolva — egy szegmens elmozdítása automatikusan
+  átméretezi a szomszédos szakadékot
+- **Az A szakasz gödre (320–960) a mozgás-tutorial lényege.** A start pad SZÁNDÉKOSAN rövid
+  (0–320): a gödör és a három tutorial-platform belefér a kezdőképernyőbe, tehát a player
+  egy pillantásra érti a feladatot, nem egy váratlan lyukba sétál. Eredetileg mind a három
+  platform folyamatos talaj FÖLÖTT lógott — a player alattuk elfutott, és sosem kényszerült
+  ugrani, vagyis a tutorial dekoráció volt. Az `A3` (846–974) 14 px-t **átlóg a `G2` fölé**,
+  így a szakasz végén nem kell egy negyedik ugrás: a peremén lelépve biztonságosan ér földet.
+  *Ez ELTÉR a layout-spectől* („Section A: no environmental hazards") — tudatos user-döntés,
+  a `Project_plan.md` 14. pontja frissítve
 - **Zuhanás-halál:** a FIZIKAI világ mélyebb a canvasnál (`WORLD_HEIGHT + FALL_DEPTH`),
   a KAMERA bounds-a viszont 450 marad → nincs függőleges görgetés, de a player láthatóan
   kizuhan a képből. A `FALL_DEATH_Y` (520) átlépésekor `takeDamage(getHP())` — nincs új
@@ -446,10 +468,12 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - **13 platform** a `PLATFORMS` tömbben (adatvezérelt: az enemy patrol-határok ugyanebből a
   forrásból származnak, `platformTop/Left/Right` helperekkel). `H1` `oneWay: true` →
   `checkCollision.down = false`, a létra ezen megy át
-- **8 CrowHarvester**, és **MINDEGYIK explicit patrol-határt + `clampChaseToBounds: true`-t
-  kap** — nem csak a platformon állók, mint korábban. Enélkül egy üldöző földi enemy
-  lesétálna a szakadék peremén (a 2. iterációban pedig belesétálna a tüskékbe). A
-  `CrowHarvester`-ben ez **kódváltozás nélkül** megvolt
+- **8 CrowHarvester.** A séta-körzetük (`patrolMinX/MaxX`) az `ENEMY_SPAWNS` adata, az
+  ÜLDÖZÉSI határuk viszont **levezetett**: az `enemyChaseBounds()` a felület pereméből
+  (`EDGE_INSET`-tel behúzva) számítja, majd **elvágja a spike-mezőkkel**. Így egy platform
+  elmozdítása vagy egy új tüskemező automatikusan átméretezi a pórázt, és nem lehet elrontani.
+  A platformon állóknál a kettő egybeesik (a platform pereme MAGA a patrol-határ), tehát az
+  ő viselkedésük változatlan
 - **Enemy-respawn:** a player halálakor a `resetEnemies()` megsemmisíti és a layout-adatból
   újraspawnolja az összes lényt (a `clearFireballs()` a lövedékeket is). **A tömb
   IDENTITÁSA nem változhat** (splice + push, sosem új tömb): a `create()`-ben regisztrált
@@ -459,11 +483,12 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - **Két checkpoint:** a pálya végi ajtó (**E** billentyű) és egy **köztes** (x=3000, a
   spike-szakasz után), ami **ÉRINTÉSRE** aktiválódik. Utóbbi szándékosan más input, hogy ne
   versenyezzen az ajtó promptjával; a visszajelzés a jelölő kivilágosodása + egy rövid felirat
-- **Tutorial feliratok** (`src/ui/TutorialHint.ts`): a mozgás-súgó `triggerX: 0`, tehát
-  AZONNAL, a spawn pillanatában megjelenik — egy `START_X` fölötti küszöb csapda lenne
-  (csak azután jönne, hogy a játékos magától már elindult). A súgók CSAK friss játékban
-  jelennek meg: boss-vereség után az ajtó-checkpointon éledünk újra, ahol mindkét trigger
-  átlépettnek számítana
+- **Tutorial feliratok** (`src/ui/TutorialHint.ts`): a mozgás-súgó `triggerX: 140`, tehát
+  gyakorlatilag azonnal megjelenik (a player `START_X = 100`-on éled), és 4 mp-ig áll — a
+  gödör pereméig (320) csak ~1,1 mp, tehát a `Space / W — ugrás` MÉG A KÉPERNYŐN VAN, amikor
+  a player odaér. Ezért nem kell külön „ugorj" felirat a peremre. A súgók CSAK friss
+  játékban jelennek meg: boss-vereség után az ajtó-checkpointon éledünk újra, ahol mindkét
+  trigger átlépettnek számítana
 - **Létra** a pálya végén (x=5570): `tileSprite` a vizuál, külön `Zone` statikus bodyval
   a fizika. A scene `update()`-je **szinkron** `this.physics.overlap(player, ladderZone)`-t
   használ, NEM `physics.add.overlap` callbacket — utóbbi csak a scene `update()` UTÁN
@@ -966,12 +991,11 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 
 ## Következő lépés
 
-**LEVEL 1 FINOMHANGOLÁS.** Ez az aktuális feladat. A redesign mindhárom iterációja
-implementálva (layout-váz + gap, spike-ok, Swinging Reaper), a pálya START-tól a bossig
-végigjátszható — de a Phase 8-ra visszatérés ELŐTT a user finomhangolni akarja az egészet.
-**A blokk addig nyitva marad.**
+**LEVEL 1 FINOMHANGOLÁS — 2. kör.** Ez az aktuális feladat. Az 1. kör (A szakasz gödre +
+földi enemy üldözés) KÉSZ, lásd fentebb. **A blokk addig nyitva marad**, amíg a user
+elégedett nem lesz a pályával.
 
-A hangolás a user vezetésével történik. Amit a 3. iteráció manuális végigjátszása FELVETETT
+A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FELVETETTEK
 (megfigyelés, nem javaslat — a döntés a useré):
 
 - **HP-mérleg a pálya hosszán.** Egy végigfutásban a player ~50–70 HP-val ért az F szakaszhoz
