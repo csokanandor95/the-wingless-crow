@@ -69,8 +69,22 @@ import bgRuinsUrl from '../../assets/backgrounds/ruined-city/03-ruins.png';
 // (bal-felső sarok: 103, 0) lett 800x450-re kicsinyítve. A kivágás nem esztétikai döntés:
 // ez teszi a rajzolt padlóélt PONTOSAN a BossScene GROUND_TOP-jára (418). Lásd CLAUDE.md.
 import bossArenaUrl from '../../assets/backgrounds/cathedral/boss-arena.png';
+// Level 1 terrain-csempék. Forrás: UGYANAZ a PixelPlatformerSet1 v1.1 csomag (Szadi art,
+// public domain), amiből a fenti parallax háttér is jön — ezért illeszkedik a paletta
+// korrekció nélkül. Származtatott assetek: kivágások a csomag `main_lev_build.png` és
+// `other_and_decorative.png` lapjairól, ÁTMÉRETEZÉS NÉLKÜL. A forrás-rectek táblázata a
+// `src/levels/LevelTileset.ts` fejlécében van.
+import groundFloorUrl from '../../assets/tiles/cathedral/ground-floor.png';
+import groundEdgeLeftUrl from '../../assets/tiles/cathedral/ground-edge-left.png';
+import groundEdgeRightUrl from '../../assets/tiles/cathedral/ground-edge-right.png';
+import platformMidUrl from '../../assets/tiles/cathedral/platform-mid.png';
+import platformEdgeLeftUrl from '../../assets/tiles/cathedral/platform-edge-left.png';
+import platformEdgeRightUrl from '../../assets/tiles/cathedral/platform-edge-right.png';
+import doorGateUrl from '../../assets/tiles/cathedral/door-gate.png';
+import ladderUrl from '../../assets/tiles/cathedral/ladder.png';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 import { SPIKE_HEIGHT, SPIKE_TILE_WIDTH } from '../levels/Level1Layout';
+import { TILE_TEXTURES } from '../levels/LevelTileset';
 
 const LOADING_BAR_WIDTH = 320;
 const LOADING_BAR_HEIGHT = 14;
@@ -108,6 +122,19 @@ const BACKGROUND_IMAGES: Array<{ key: string; url: string }> = [
   { key: BACKGROUND_TEXTURES.MOUNTAINS, url: bgMountainsUrl },
   { key: BACKGROUND_TEXTURES.RUINS, url: bgRuinsUrl },
   { key: BACKGROUND_TEXTURES.BOSS_ARENA, url: bossArenaUrl },
+];
+
+// Level 1 terrain. A `GROUND_FLOOR`, a `PLATFORM_MID` és a `LADDER` tileSprite-ként
+// ismétlődik (az első kettő vízszintesen, a létra függőlegesen); a többi egyszeri kép.
+const TILE_IMAGES: Array<{ key: string; url: string }> = [
+  { key: TILE_TEXTURES.GROUND_FLOOR, url: groundFloorUrl },
+  { key: TILE_TEXTURES.GROUND_EDGE_LEFT, url: groundEdgeLeftUrl },
+  { key: TILE_TEXTURES.GROUND_EDGE_RIGHT, url: groundEdgeRightUrl },
+  { key: TILE_TEXTURES.PLATFORM_MID, url: platformMidUrl },
+  { key: TILE_TEXTURES.PLATFORM_EDGE_LEFT, url: platformEdgeLeftUrl },
+  { key: TILE_TEXTURES.PLATFORM_EDGE_RIGHT, url: platformEdgeRightUrl },
+  { key: TILE_TEXTURES.DOOR_GATE, url: doorGateUrl },
+  { key: TILE_TEXTURES.LADDER, url: ladderUrl },
 ];
 
 export default class BootScene extends Phaser.Scene {
@@ -149,7 +176,7 @@ export default class BootScene extends Phaser.Scene {
       });
     }
 
-    for (const image of BACKGROUND_IMAGES) {
+    for (const image of [...BACKGROUND_IMAGES, ...TILE_IMAGES]) {
       this.load.image(image.key, image.url);
     }
   }
@@ -191,9 +218,13 @@ export default class BootScene extends Phaser.Scene {
     });
   }
 
-  // A player, a CrowHarvester és a boss NEM szerepel itt: nekik már valódi sprite
-  // sheetjeik vannak.
+  // A player, a CrowHarvester, a boss, valamint a Level 1 talaja/platformjai/létrája/ajtaja
+  // NEM szerepel itt: nekik már valódi pixel art assetjük van.
   private createPlaceholderTextures(): void {
+    // A `ground-placeholder` és a `platform-placeholder` MEGMARAD, de a Level 1-en már csak
+    // LÁTHATATLAN FIZIKAI TESTKÉNT: a static bodyt vízszintesen skálázzuk (ami a textúrát
+    // megnyújtaná), a látványt pedig külön tileSprite adja. Ugyanaz a szétválasztás, mint a
+    // SpikeFieldnél és a létránál. A `ground-placeholder` ezen felül a BossScene-ben is él.
     const groundGfx = this.make.graphics({ x: 0, y: 0 }, false);
     groundGfx.fillStyle(0x3a3a3a, 1);
     groundGfx.fillRect(0, 0, 64, 32);
@@ -206,36 +237,16 @@ export default class BootScene extends Phaser.Scene {
     fireballGfx.generateTexture('fireball-placeholder', 16, 16);
     fireballGfx.destroy();
 
-    // Lebegő platform: vékonyabb és világosabb, mint a talaj, hogy vizuálisan elváljon.
+    // Lebegő platform — szintén csak láthatatlan fizikai test (lásd fent).
     const platformGfx = this.make.graphics({ x: 0, y: 0 }, false);
     platformGfx.fillStyle(0x4a4a52, 1);
     platformGfx.fillRect(0, 0, 64, 16);
     platformGfx.generateTexture('platform-placeholder', 64, 16);
     platformGfx.destroy();
 
-    // Létra-csempe: két függőleges rúd + egy fok. TileSprite-tal ismételjük függőlegesen.
-    const ladderGfx = this.make.graphics({ x: 0, y: 0 }, false);
-    ladderGfx.fillStyle(0x6b4a2a, 1);
-    ladderGfx.fillRect(0, 0, 5, 32);
-    ladderGfx.fillRect(23, 0, 5, 32);
-    ladderGfx.fillStyle(0x8a6238, 1);
-    ladderGfx.fillRect(0, 12, 28, 6);
-    ladderGfx.generateTexture('ladder-placeholder', 28, 32);
-    ladderGfx.destroy();
-
-    // Háttér-dekoráció (nem ütközik): sötét oszlop.
-    const pillarGfx = this.make.graphics({ x: 0, y: 0 }, false);
-    pillarGfx.fillStyle(0x16161c, 1);
-    pillarGfx.fillRect(0, 0, 40, 160);
-    pillarGfx.generateTexture('pillar-placeholder', 40, 160);
-    pillarGfx.destroy();
-
-    // Pálya végi "kijárat" jelölő — a jövőbeli checkpoint/transition helye, most csak dísz.
-    const doorGfx = this.make.graphics({ x: 0, y: 0 }, false);
-    doorGfx.fillStyle(0x2a1e36, 1);
-    doorGfx.fillRect(0, 0, 48, 72);
-    doorGfx.generateTexture('door-placeholder', 48, 72);
-    doorGfx.destroy();
+    // A `ladder-placeholder`, a `pillar-placeholder` és a `door-placeholder` TÖRÖLVE:
+    // a létra és az ajtó valódi csempét kapott (TILE_IMAGES), a létra mögötti hátfal-oszlop
+    // pedig szándékosan megszűnt — a létra a lebegő platformnak van támasztva.
 
     // Tüskék (Level 1, D szakasz). Egyetlen 32x16-os csempe, amit a SpikeField tileSprite-tal
     // ismétel a mező hosszában. A világos csont-szín szándékos: a spec megköveteli, hogy a

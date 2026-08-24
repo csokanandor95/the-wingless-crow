@@ -22,7 +22,7 @@ const config: Phaser.Types.Core.GameConfig = {
       // Az érték a config/physics.ts-ből jön: a Level1Layout ugyanebből vezeti le a maximális
       // ugrásmagasságot és -távolságot, amikhez a pálya szakadékai méretezve vannak.
       gravity: { x: 0, y: GRAVITY_Y },
-      debug: true,
+      debug: false,
     },
   },
   scene: [BootScene, Level1Scene, BossScene, NarrationScene, Level2Scene],

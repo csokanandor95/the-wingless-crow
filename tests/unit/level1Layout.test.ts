@@ -47,6 +47,15 @@ import {
   type PlatformDef,
   type Span,
 } from '../../src/levels/Level1Layout';
+import {
+  DOOR_HEADER_HEIGHT,
+  DOOR_OPENING_HEIGHT,
+  DOOR_THRESHOLD_PX,
+  DOOR_TILE_HEIGHT,
+  GROUND_EDGE_WIDTH,
+  LADDER_TILE_WIDTH,
+  PLATFORM_TILE_HEIGHT,
+} from '../../src/levels/LevelTileset';
 
 vi.mock('phaser', async () => {
   const { createFakePhaserModule } = await import('./helpers/fakePhaser');
@@ -135,6 +144,17 @@ describe('GROUND_SEGMENTS', () => {
     const first = GROUND_SEGMENTS[0];
     expect(START_X).toBeGreaterThanOrEqual(first.startX);
     expect(START_X).toBeLessThanOrEqual(first.endX);
+  });
+
+  it('mindegyik szegmensre elfér a két végzáró csempe', () => {
+    // A scene a szegmens BELSŐ peremére rajzolja a 16px-es végzárókat. Egy ennél keskenyebb
+    // szegmensen a kettő egymásra csúszna, és a szakadék pereme rosszul olvasna.
+    for (const segment of GROUND_SEGMENTS) {
+      expect(
+        segment.endX - segment.startX,
+        `${segment.id} keskenyebb a két végzárónál`
+      ).toBeGreaterThanOrEqual(2 * GROUND_EDGE_WIDTH);
+    }
   });
 });
 
@@ -502,9 +522,33 @@ describe('létra és boss-ajtó', () => {
     expect(() => groundSegmentIdAt(LADDER.x)).not.toThrow();
   });
 
+  it('a rajzolt létra elfér a csempéjén — a mászási zóna nem lóg túl a grafikán', () => {
+    expect(LADDER.width).toBeLessThanOrEqual(LADDER_TILE_WIDTH);
+  });
+
   it('az ajtó a felső platformon áll', () => {
     expect(DOOR.x - DOOR.width / 2).toBeGreaterThanOrEqual(platformLeft(upper));
     expect(DOOR.x + DOOR.width / 2).toBeLessThanOrEqual(platformRight(upper));
+  });
+
+  // A csempén a boltív nyílása NEM ér le a kép aljáig: alatta egy küszöb-kő van. A scene
+  // ezzel a 19px-szel süllyeszti a képet a platform felszíne alá, hogy az ív padlója a
+  // járható felületre essen. Ha valaki átméretezi az ajtót anélkül, hogy a küszöböt
+  // újraszámolná, a player a kőben állna — ezt fogja meg ez a három állítás.
+  it('az ajtó magassága a három mért rész összege (küszöb + nyílás + felső kőfal)', () => {
+    expect(DOOR_THRESHOLD_PX + DOOR_OPENING_HEIGHT + DOOR_HEADER_HEIGHT).toBe(DOOR_TILE_HEIGHT);
+    expect(DOOR.height).toBe(DOOR_TILE_HEIGHT);
+  });
+
+  it('a boltív nyílása magasabb a playernél — át lehet menni rajta', () => {
+    expect(DOOR.openingHeight).toBeGreaterThan(2 * PLAYER_HALF_HEIGHT);
+  });
+
+  it('a küszöb-kő elbújik a platform mögött — nem lóg le alóla észrevehetően', () => {
+    // A platform 16px vastag; a 19px-es küszöbből legfeljebb néhány px látszik ki alul,
+    // ami lépcsőnek olvasható. Ha a küszöb ennél sokkal mélyebb lenne, a platform alatt
+    // lebegő kőtömbként lógna ki.
+    expect(DOOR_THRESHOLD_PX - PLATFORM_TILE_HEIGHT).toBeLessThanOrEqual(4);
   });
 
   it('az ajtó-checkpointon a player a felső platform felszínén áll', () => {

@@ -1212,15 +1212,20 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 
 ## Phase 8 – Atmosphere
 
-- sprites — *részben kész: a **player** (2. iteráció) és a **CrowHarvester** (3. iteráció)
-  valódi pixel artot és animációkat kapott, lásd 19. pont. A boss és az environment
-  (tile-ok, lövedékek) még placeholder.*
+- sprites — *részben kész: a **player** (2. iteráció), a **CrowHarvester** (3. iteráció) és a
+  **boss** (6. iteráció) valódi pixel artot és animációkat kapott, lásd 19. pont. A **Level 1
+  terrainje** (talaj, platformok, létra, boss-ajtó) a 10. iterációban cserélődött le
+  (`assets/tiles/cathedral/`). Már csak a **hazardok** (tüske, reaper, checkpoint-jelölő) és a
+  **két lövedék** placeholder.*
 - backgrounds — ***kész**: a **Level 1** háromrétegű parallax hátteret (4. iteráció), a
   **boss aréna** pedig egy álló festményt kapott (5. iteráció). Lásd 19. pont.*
 - particles
 - lighting-like effects
-- music — *kész: boss theme (1. iteráció, lásd 18. pont)*
-- sound effects
+- music — *kész: boss theme (1. iteráció) és Level 1 ambient (9. iteráció), lásd 18. pont*
+- sound effects — *kész: a teljes harci hangkép (7–8. iteráció). Hiányzik még a
+  tűzgolyó-becsapódás, a hurt, a charge, az ugrás/halál/checkpoint/léptek.*
+- environment props — *következő (11. iteráció): street-lamp / wagon / well / crate /
+  crate-stack a Level 1-re, nem ütköző háttérelemként (GothicVania Town, public domain).*
 - UI
 
 ## Döntési pont: 

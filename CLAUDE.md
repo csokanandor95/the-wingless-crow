@@ -161,7 +161,38 @@ az ajtón át nem lép a `BossScene`-re.
   `player.respawn()` fut).
 - **Az autoplay-ág mostantól a FŐ út, nem élhelyzet** — lásd lentebb az Audio szakaszban.
 
-A Phase 8 többi része (environment sprite-ok, a maradék SFX, particles,
+**Phase 8 — 10. iteráció: LEVEL 1 TERRAIN kész.** A talaj, a lebegő platformok, a létra és a
+boss-ajtó már nem kódból generált téglalap, hanem valódi pixel art
+(`assets/tiles/cathedral/`). A forrás **ugyanaz a PixelPlatformerSet1 v1.1 csomag**
+(Szadi art, public domain), amiből a Level 1 parallax háttere jön — ezért illeszkedik a
+paletta korrekció nélkül (mért átlagszín: padló `(42,33,33)`, platform `(63,51,50)`, a
+`03-ruins` háttérréteg `(74,45,39)`). Új modul: `src/levels/LevelTileset.ts`.
+- **A fizika és a látvány KÜLÖN objektum** (mint a `SpikeField`-nél és a létránál): a static
+  bodyt vízszintesen skálázzuk, ami a valódi textúrát megnyújtaná, ezért a
+  `ground-placeholder` / `platform-placeholder` sprite **`setVisible(false)`**, a látványt
+  pedig tileSprite adja. Ezért marad meg mindkét placeholder textúra a `BootScene`-ben.
+- **A szegmens-végzárók a szegmensen BELÜL vannak** (16px), nem kifelé lógva: a szakadék fölé
+  nyúlva hamis járható felületet sugallnának — pont ott, ahol a player a legpontosabban méri
+  fel az ugrást.
+- **A platform-végzáró RÁ rajzolódik a lapra, nem helyette**: a 48×32-es csempe felső 16px-e a
+  lap folytatása, alsó 16px-e a lelógó szikla, ami átlósan elfogy — a kifutó részen a lap
+  látszik át alatta. Fordított sorrendben a lap kitakarná a sziklát. **Egycsempés platformra
+  (`C1`, `E1`) nem fér el a két végzáró** (2×48 > 64), és ez nem hiányosság: a csupasz lap
+  vizuálisan elválasztja a „lépőkövet" a valódi platformoktól.
+- **Az ajtó geometriája MÉRT, nem hangolt**: a 64×128-as csempén a boltív nyílása
+  `x = 14..51`, `y = 48..108`, tehát a nyílás alja a kép aljától **19 px**-re van (küszöb-kő).
+  A képet `origin (0.5, 1)`-gyel `platformTop + DOOR_THRESHOLD_PX`-re rakva **a boltív padlója
+  pontosan a járható felszínre esik** — enélkül a player a kőben állna. A küszöb-kő ilyenkor a
+  platform alá lóg, ezért megy az ajtó a terrainnél **hátrébb** (`DOOR_DEPTH = -6` <
+  `TERRAIN_DEPTH = -5`). A trigger-zóna a **nyílást** fedi (61px), nem a teljes csempét.
+- **A létra mögötti `pillar-placeholder` hátfal TÖRÖLVE** (user-döntés): a létra egyszerűen a
+  `H1` platformnak van támasztva, a fokok között a parallax háttér látszik át. A tileSprite a
+  teljes **32px**-es csempeszélességgel rajzol (különben a minta csonkolódna), a mászási zóna
+  viszont marad **28** — az a RAJZOLT létra szélessége, tehát a mászás bitre változatlan.
+- **Törölt placeholder textúrák**: `ladder-placeholder`, `pillar-placeholder`,
+  `door-placeholder`.
+
+A Phase 8 többi része (a maradék environment sprite-ok, a maradék SFX, particles,
 `ui/` modul) még hátravan.
 
 **LEVEL 1 REDESIGN — 1. iteráció KÉSZ (a Phase 8 közé beszúrt, 3 iterációs blokk).**
@@ -229,6 +260,18 @@ the-wingless-crow/
 │   │   │   └── 03-ruins.png      # RGBA sziluett, teteje a forrás y=193..227-nél
 │   │   └── cathedral/
 │   │       └── boss-arena.png    # 800x450, ÁTMÉRETEZETT/KIVÁGOTT — lásd BossScene alább
+│   ├── tiles/
+│   │   └── cathedral/            # Level 1 terrain. PixelPlatformerSet1 v1.1 (Szadi art) —
+│   │       │                     # PUBLIC DOMAIN. Kivágások, ÁTMÉRETEZÉS NÉLKÜL; a
+│   │       │                     # forrás-rectek a src/levels/LevelTileset.ts fejlécében.
+│   │       ├── ground-floor.png        # 224x32, vízszintesen VARRATMENTES
+│   │       ├── ground-edge-left.png    # 16x32  \ szegmens-végzárók (a szegmensen BELÜL)
+│   │       ├── ground-edge-right.png   # 16x32  /
+│   │       ├── platform-mid.png        # 32x16, vízszintesen VARRATMENTES
+│   │       ├── platform-edge-left.png  # 48x32 \ felső 16 = lap, alsó 16 = lelógó szikla
+│   │       ├── platform-edge-right.png # 48x32 /
+│   │       ├── door-gate.png           # 64x128, boltív; nyílás x=14..51, y=48..108
+│   │       └── ladder.png              # 32x16, függőlegesen VARRATMENTES (16px fok-osztás)
 │   └── sprites/
 │       ├── knight/               # player sprite sheetek, mind 128x64-es blokkokra vágva
 │       │   ├── Idle.png Run.png Jump.png Attacks.png
@@ -262,7 +305,8 @@ the-wingless-crow/
 │   ├── config/
 │   │   └── physics.ts            # GRAVITY_Y — a main.ts ÉS a Level1Layout ugrás-számítása ebből dolgozik
 │   ├── levels/
-│   │   └── Level1Layout.ts       # a Level 1 TELJES geometriája, Phaser-mentes adatmodulként
+│   │   ├── Level1Layout.ts       # a Level 1 TELJES geometriája, Phaser-mentes adatmodulként
+│   │   └── LevelTileset.ts       # a terrain-csempék mérete/forrás-rectjei + a depth-rend
 │   ├── hazards/
 │   │   ├── HazardDamage.ts       # HazardDamageGate — KÖZÖS i-frame ablak minden hazardnak
 │   │   ├── SpikeField.ts         # statikus tüskemezők (látvány tileSprite + külön hitbox Zone)
@@ -489,12 +533,16 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   a player odaér. Ezért nem kell külön „ugorj" felirat a peremre. A súgók CSAK friss
   játékban jelennek meg: boss-vereség után az ajtó-checkpointon éledünk újra, ahol mindkét
   trigger átlépettnek számítana
-- **Létra** a pálya végén (x=5570): `tileSprite` a vizuál, külön `Zone` statikus bodyval
-  a fizika. A scene `update()`-je **szinkron** `this.physics.overlap(player, ladderZone)`-t
-  használ, NEM `physics.add.overlap` callbacket — utóbbi csak a scene `update()` UTÁN
-  futna le, ami 1 frame késést okozna a mászásban
+- **Létra** a pálya végén (x=5570): `tileSprite` a vizuál (32px-es csempeszélességgel), külön
+  `Zone` statikus bodyval a fizika (28px — a RAJZOLT létra szélessége). A scene `update()`-je
+  **szinkron** `this.physics.overlap(player, ladderZone)`-t használ, NEM `physics.add.overlap`
+  callbacket — utóbbi csak a scene `update()` UTÁN futna le, ami 1 frame késést okozna a
+  mászásban. **Hátfal nincs** (a `pillar-placeholder` oszlop törölve): a létra a `H1`
+  platformnak van támasztva, a fokok között a parallax háttér látszik át
 - **Checkpoint-ajtó** (x=5840, `H1` jobb vége): ugyanaz a szinkron `physics.overlap()` minta,
-  mint a létránál (`doorZone`). Közelben **E**-re: `checkpoint.activate()` + 500ms
+  mint a létránál (`doorZone`). A zóna a boltív **nyílását** fedi (64×61), nem a teljes
+  csempét — így a prompt pontosan akkor jön elő, amikor a player láthatóan az ajtóban áll.
+  Közelben **E**-re: `checkpoint.activate()` + 500ms
   `cameras.main.fadeOut()` + scene-váltás. A prompt-szöveg csak akkor látszik, ha a player
   a zónában van és még nincs folyamatban a transition (`isTransitioning` flag)
 - **Az ajtó célja a `bossDefeated` registry-flagtől függ**: ha a boss még él → `BossScene`,
@@ -540,9 +588,13 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   - `setBackgroundColor('#673838')` = az ég legfelső sorának színe. A háttér amúgy is
     kitakarja, de így egy letterbox / a `create()` előtti pillanat sem villant feketét.
     A `main.ts` game-szintű `#0a0a0f`-je változatlan — arra a `BossScene` épül.
-- Dekoráció: létra-hátfal. *(Az 5 korábbi `pillar-placeholder` parallax oszlop törölve —
-  a valódi háttérrétegek vették át a szerepüket.)*
-- Placeholder grafikák kódból generálva (`BootScene.ts` `createPlaceholderTextures()`), nem valódi sprite-ok
+- **Terrain (Phase 8, 10. iteráció)**: a talaj, a platformok, a létra és az ajtó valódi
+  csempéket kapott (`assets/tiles/cathedral/`, lásd `src/levels/LevelTileset.ts`). A fizikai
+  static sprite-ok `setVisible(false)`-ok, a látvány külön tileSprite + végzáró képek.
+  Dekoráció külön már nincs: *(az 5 korábbi `pillar-placeholder` parallax oszlopot a valódi
+  háttérrétegek váltották ki, a létra hátfal-oszlopát pedig a 10. iteráció törölte.)*
+- Kódból generált placeholder már csak a hazardoké (tüske, reaper, checkpoint-jelölő) és a
+  lövedékeké — `BootScene.ts` `createPlaceholderTextures()`
 
 ### Boss — The Grafted Wing-Breaker (`src/bosses/GraftedWingBreaker.ts`, `GraftedWingBreakerAnimations.ts`)
 - State machine: `DORMANT → APPROACH → SLASH / PROJECTILE / SPELL / CHARGE_WINDUP → CHARGE → COOLDOWN → DEAD`
@@ -926,9 +978,12 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
-- **A három karakter (player, CrowHarvester, boss) és MINDKÉT háttér (Level 1 + boss aréna)
-  KIVÉTELÉVEL** minden grafika kódból generált színes téglalap/kör (`generateTexture`) — a
-  talaj/platformok, a létra, a Level 1 ajtaja és mindkét lövedék még placeholder
+- A Level 1-en már **csak a hazardok és a lövedékek** kódból generált téglalapok
+  (`generateTexture`): a tüskék, a Swinging Reaper (horgony + penge), a köztes checkpoint
+  jelölője, valamint a player és a boss lövedéke. A három karakter, mindkét háttér és a
+  teljes terrain (talaj, platformok, létra, ajtó) valódi pixel art.
+  A `ground-placeholder` / `platform-placeholder` textúra megmarad, de a Level 1-en már
+  **láthatatlan fizikai testként** (a `ground-placeholder`-t a `BossScene` is használja)
 - CrowHarvester felett lebegő HP szöveg (debug célra, valódi HUD a `ui/` modulban készül majd)
 - A bal felső sarki HUD szöveg a HP mellett a **player state-et is kiírja** (`HP: 100/100 | CLIMB`) — a mászás manuális tesztelését segíti, Phase 8-ban cserélendő
 - A boss találat-visszajelzése **szándékosan** csak fehér sziluett-villanás (`TintModes.FILL`),
@@ -976,8 +1031,13 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   lévő komment és az **eredeti fájlnevek** (`Bringer-of-Death-SpritSheet*.png`) kötik vissza.
   A csomagban van egy `Contact.txt` is (Clembod: Twitter/Instagram/itch.io/ArtStation) — a
   credit nem kötelező, de a projekt végén illendő.
-- `pillar-placeholder` (már csak a létra mögötti hátfal) és `door-placeholder`
-  dekorációk: puszta színes téglalapok
+- **A Level 1 terrainjének licence RENDBEN VAN** (`assets/tiles/cathedral/`): a forráscsomag
+  (`2D helper/level/PixelPlatformerSet1v.1.1`, Szadi art) `public-license.txt`-je *"License
+  for Everyone. Public domain and free to use, personal or commercial. Credit is not required
+  but appreciated. You can edit, but not sell the asset pack."* — ugyanaz a csomag, mint a
+  Level 1 hátteréé. **Ez NEM nyitott jogi tétel.** A user a licenceket külön gyűjti, ezért
+  itt sincs licenc fájl; a forrást a `BootScene` importjainál lévő komment és a
+  `src/levels/LevelTileset.ts` fejlécének forrás-rect táblázata köti vissza
 - A checkpoint-prompt szöveg ("E: Checkpoint" / "Checkpoint mentve...") debug-stílusú `add.text`, a `playerHpText`-hez hasonlóan — valódi UI a `ui/` modulban készül majd
 - A `BossScene` HP-barja nyers `Graphics`-szal rajzolt téglalap (`drawBossHealthBar()`), és a player HP-ja ott is a debug `add.text` — mindkettő a `ui/` modulba költözik Phase 8-ban
 - A boss lövedéke (`boss-projectile-placeholder`) még lila kör. A `Cast` animáció végén
@@ -1022,11 +1082,19 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
   helyeken egy event a bevett minta szerint). A TomMusic csomagban van hozzájuk
   `Footsteps/`, `Spell Impact`, `Doors Gates and Chests` (checkpoint) és `Torch` is.
 - **Environment sprite-ok** — a player (2. it.), a CrowHarvester (3. it.), a Level 1 háttere
-  (4. it.), a boss aréna háttere (5. it.) és a boss (6. it.) kész; **már csak a tile-ok, a
-  létra, a Level 1 ajtaja és a két lövedék** placeholder.
+  (4. it.), a boss aréna háttere (5. it.), a boss (6. it.) és a Level 1 terrainje (10. it.)
+  kész; **már csak a hazardok** (tüske, reaper, checkpoint-jelölő) **és a két lövedék**
+  placeholder.
   A `2D helper/Sprites/` alatt van még Enemy01/02/03/05 és egy "Gino Character" — ha
   bármelyik enemy-jelöltként bejön, számíts rá, hogy szintén off-center lesz; a
   `systems/SpriteFacing.ts` már készen áll rá (lásd a 16. technikai tanulságot).
+- **Hangulati propok a Level 1-re (11. iteráció — KÖVETKEZŐ).** A GothicVania Town csomagból
+  (`2D helper/level/gothicvania-town-files`, Luis Zuno — **public domain**) street-lamp,
+  wagon, well, crate és crate-stack kerül a pályára, nem ütköző háttérelemként
+  (`DECOR_DEPTH = -10`, tehát a player és az enemyk előttük mennek el). A csomag palettája
+  lilás-hideg (`(77,49,60)`), a miénk meleg vörösbarna, ezért futásidejű meleg + sötétítő
+  tintet kapnak — a részletes mapping és a 13 elemes elhelyezési táblázat a jóváhagyott
+  tervben. **A csomag ÚJ a projektben → a `2D helper/Credits.txt`-be felveendő.**
 - **Menü / átvezető ambient.** A Level 1 és a boss aréna zenéje KÉSZ (1. és 9. iteráció).
   A `NarrationScene` és a `Level2Scene` még néma. Figyelem: az `AudioManager`
   **scene-hatókörű** (a scene shutdownja elvágja) — ez a pálya-zenéknél előny, de egy
@@ -1034,8 +1102,8 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),
   narration ambient (`NarrationScene.create()`), victory sting (`BossScene.scheduleVictory()`).
 - A maradék kódból generált placeholder téglalapok cseréje valódi pixel art sprite-okra
-  (`assets/tiles/`, `assets/effects/`): a talaj/platform tile-ok, a létra, a Level 1
-  ajtaja és a két lövedék. **Mindkét háttér és mind a három karakter kész.**
+  (`assets/effects/`): a hazardok (tüske, reaper, checkpoint-jelölő) és a két lövedék.
+  **Mindkét háttér, mind a három karakter és a Level 1 terrainje kész.**
 - `ui/` modul: valódi HUD a debug `add.text`-ek helyett, és a boss HP-bar átköltöztetése
   a `BossScene.drawBossHealthBar()`-ból. Ide kerülhet a `BootScene` betöltésjelzője is.
 - A `main.ts` `arcade.debug: true` kikapcsolása.

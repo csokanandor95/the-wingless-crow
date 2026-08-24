@@ -41,12 +41,31 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
   platformById,
+  platformLeft,
+  platformRight,
   platformTop,
 } from '../levels/Level1Layout';
+import type { PlatformDef } from '../levels/Level1Layout';
+import {
+  DOOR_DEPTH,
+  DOOR_THRESHOLD_PX,
+  GROUND_EDGE_WIDTH,
+  GROUND_TILE_HEIGHT,
+  LADDER_TILE_WIDTH,
+  PLATFORM_EDGE_WIDTH,
+  PLATFORM_MIN_WIDTH_FOR_EDGES,
+  PLATFORM_TILE_HEIGHT,
+  TERRAIN_DEPTH,
+  TILE_TEXTURES,
+} from '../levels/LevelTileset';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 
-/** A ground-placeholder csempe szélessége — a szegmensek ehhez skálázódnak. */
-const GROUND_TILE_WIDTH = 64;
+/**
+ * A LÁTHATATLAN fizikai testek csempemérete (`ground-placeholder` 64x32,
+ * `platform-placeholder` 64x16) — a static bodyk ehhez skálázódnak. A LÁTVÁNY külön
+ * tileSprite, a `LevelTileset` méreteivel; a kettőt ne keverd össze.
+ */
+const PHYSICS_TILE_WIDTH = 64;
 
 const RESPAWN_DELAY_MS = 1200; // rövid szünet a halál-animáció után, mielőtt visszatér a checkpointra
 /** Az ajtó-átmenet hossza. A kamera-fade ÉS a zene kifadelése is ebből dolgozik. */
@@ -248,6 +267,10 @@ export default class Level1Scene extends Phaser.Scene {
    * A talaj NEM folyamatos: a GROUND_SEGMENTS közötti hézagok a szakadékok. Minden szegmens
    * egyetlen, vízszintesen felskálázott static sprite — ugyanaz a minta, mint a korábbi
    * egyetlen, teljes pálya szélességű talajnál, csak most szegmensenként.
+   *
+   * A FIZIKA és a LÁTVÁNY külön objektum (mint a SpikeFieldnél és a létránál): a static
+   * spriteot vízszintesen skálázzuk, ami a valódi csempe textúráját MEGNYÚJTANÁ, ezért az
+   * láthatatlan marad, és a látványt egy tileSprite adja.
    */
   private createGround(): Phaser.Physics.Arcade.StaticGroup {
     const ground = this.physics.add.staticGroup();
@@ -259,7 +282,31 @@ export default class Level1Scene extends Phaser.Scene {
         GROUND_CENTER_Y,
         'ground-placeholder'
       ) as Phaser.Physics.Arcade.Sprite;
-      sprite.setScale(width / GROUND_TILE_WIDTH, 1).refreshBody();
+      sprite.setScale(width / PHYSICS_TILE_WIDTH, 1).refreshBody();
+      sprite.setVisible(false);
+
+      this.add
+        .tileSprite(
+          segment.startX,
+          GROUND_TOP,
+          width,
+          GROUND_TILE_HEIGHT,
+          TILE_TEXTURES.GROUND_FLOOR
+        )
+        .setOrigin(0, 0)
+        .setDepth(TERRAIN_DEPTH);
+
+      // Végzárók a szegmensen BELÜL, a peremére tapadva. Kifelé lógva a szakadék fölé
+      // nyúlnának, és hamis járható felületet sugallnának — pont ott, ahol a player a
+      // legpontosabban méri fel az ugrást.
+      this.add
+        .image(segment.startX, GROUND_TOP, TILE_TEXTURES.GROUND_EDGE_LEFT)
+        .setOrigin(0, 0)
+        .setDepth(TERRAIN_DEPTH);
+      this.add
+        .image(segment.endX - GROUND_EDGE_WIDTH, GROUND_TOP, TILE_TEXTURES.GROUND_EDGE_RIGHT)
+        .setOrigin(0, 0)
+        .setDepth(TERRAIN_DEPTH);
     }
 
     return ground;
@@ -275,14 +322,45 @@ export default class Level1Scene extends Phaser.Scene {
         'platform-placeholder'
       ) as Phaser.Physics.Arcade.Sprite;
       sprite.setScale(def.tiles, 1).refreshBody();
+      sprite.setVisible(false);
 
       if (def.oneWay) {
         // A lenti oldalon nincs ütközés -> a player a létrán alulról átmászhat rajta.
         (sprite.body as Phaser.Physics.Arcade.StaticBody).checkCollision.down = false;
       }
+
+      this.createPlatformVisual(def);
     }
 
     return platforms;
+  }
+
+  /**
+   * Előbb a teljes szélességű lap, UTÁNA a két végzáró — ebben a sorrendben. A végzáró
+   * ugyanis nem helyettesíti a lapot, hanem RÁ rajzolódik: a felső 16px-e a lap folytatása,
+   * az alsó 16px-e a lelógó szikla, ami átlósan elfogy, és a kifutó részen a lap látszik át
+   * alatta. Fordított sorrendben a lap kitakarná a sziklát.
+   */
+  private createPlatformVisual(def: PlatformDef): void {
+    const left = platformLeft(def);
+    const top = platformTop(def);
+    const width = platformRight(def) - left;
+
+    this.add
+      .tileSprite(left, top, width, PLATFORM_TILE_HEIGHT, TILE_TEXTURES.PLATFORM_MID)
+      .setOrigin(0, 0)
+      .setDepth(TERRAIN_DEPTH);
+
+    // Egycsempés platformon (C1, E1) nem fér el a két 48px-es végzáró, és ez nem hiányosság:
+    // a csupasz lap vizuálisan elválasztja a "lépőkövet" a valódi platformoktól.
+    if (width < PLATFORM_MIN_WIDTH_FOR_EDGES) return;
+
+    for (const [x, texture] of [
+      [left, TILE_TEXTURES.PLATFORM_EDGE_LEFT],
+      [platformRight(def) - PLATFORM_EDGE_WIDTH, TILE_TEXTURES.PLATFORM_EDGE_RIGHT],
+    ] as const) {
+      this.add.image(x, top, texture).setOrigin(0, 0).setDepth(TERRAIN_DEPTH);
+    }
   }
 
   private createLadder(): void {
@@ -290,14 +368,14 @@ export default class Level1Scene extends Phaser.Scene {
     const zoneHeight = GROUND_TOP - LADDER.zoneTop;
     const zoneCenterY = LADDER.zoneTop + zoneHeight / 2;
 
-    // Hátfal, hogy a létra ne a semmiben lógjon.
+    // Hátfal NINCS (a korábbi `pillar-placeholder` oszlop törölve): a létra egyszerűen a
+    // felső platformnak van támasztva, mögötte a parallax háttér látszik át a fokok között.
+    //
+    // A tileSprite a TELJES csempeszélességgel (32) rajzol, nem a `LADDER.width`-tel (28) —
+    // különben a minta csonkolódna. A 28 a RAJZOLT létra szélessége, és az marad a mászási
+    // zóna mérete, tehát a mászás viselkedése változatlan (lásd LevelTileset).
     this.add
-      .image(LADDER.x, zoneCenterY, 'pillar-placeholder')
-      .setDisplaySize(64, zoneHeight)
-      .setDepth(-2);
-
-    this.add
-      .tileSprite(LADDER.x, zoneCenterY, LADDER.width, zoneHeight, 'ladder-placeholder')
+      .tileSprite(LADDER.x, zoneCenterY, LADDER_TILE_WIDTH, zoneHeight, TILE_TEXTURES.LADDER)
       .setDepth(-1);
 
     this.ladderZone = this.add.zone(LADDER.x, zoneCenterY, LADDER.width, zoneHeight);
@@ -314,21 +392,32 @@ export default class Level1Scene extends Phaser.Scene {
 
   private createDecor(): void {
     // A korábbi 5 parallax háttéroszlop (pillar-placeholder, scrollFactor 0.6) törölve:
-    // a mélység-illúziót most a ParallaxBackground három valódi rétege adja. A létra
-    // mögötti hátfal-oszlop megmarad (createLadder()), az funkcionális.
+    // a mélység-illúziót most a ParallaxBackground három valódi rétege adja.
 
     // Pálya végi ajtó a felső platform jobb végén — a checkpoint + boss-transition trigger.
+    //
+    // `origin (0.5, 1)` + `DOOR_THRESHOLD_PX`: a csempén a boltív padlója 19px-szel a kép
+    // alja FÖLÖTT van, tehát a képet ennyivel a platform felszíne alá süllyesztve kerül az
+    // ív padlója pontosan a járható felületre. A küszöb-kő ilyenkor a platform alá lóg,
+    // ezért megy az ajtó a terrainnél HÁTRÉBB (DOOR_DEPTH < TERRAIN_DEPTH) — így a platform
+    // takarja ki.
     const upper = platformById('H1');
     this.add
-      .image(DOOR.x, platformTop(upper) - DOOR.height / 2, 'door-placeholder')
-      .setDepth(-1);
+      .image(DOOR.x, platformTop(upper) + DOOR_THRESHOLD_PX, TILE_TEXTURES.DOOR_GATE)
+      .setOrigin(0.5, 1)
+      .setDepth(DOOR_DEPTH);
   }
 
+  /**
+   * A trigger a boltív NYÍLÁSÁT fedi le, nem a teljes csempét: a nyílás alja a platform
+   * felszíne, a teteje `openingHeight`-tel feljebb. Így az `E` prompt pontosan akkor jelenik
+   * meg, amikor a player láthatóan az ajtóban áll.
+   */
   private createDoorZone(): void {
     const upper = platformById('H1');
-    const zoneY = platformTop(upper) - DOOR.height / 2;
+    const zoneY = platformTop(upper) - DOOR.openingHeight / 2;
 
-    this.doorZone = this.add.zone(DOOR.x, zoneY, DOOR.width, DOOR.height);
+    this.doorZone = this.add.zone(DOOR.x, zoneY, DOOR.width, DOOR.openingHeight);
     this.physics.add.existing(this.doorZone, true);
   }
 

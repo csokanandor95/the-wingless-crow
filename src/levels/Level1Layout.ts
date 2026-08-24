@@ -2,6 +2,13 @@ import { GRAVITY_Y } from '../config/physics';
 import { JUMP_VELOCITY, MOVE_SPEED } from '../player/Player';
 import { BODY_WIDTH as PLAYER_BODY_WIDTH } from '../player/PlayerAnimations';
 import { BODY_WIDTH as HARVESTER_BODY_WIDTH } from '../enemies/CrowHarvesterAnimations';
+import {
+  DOOR_OPENING_HEIGHT,
+  DOOR_TILE_HEIGHT,
+  DOOR_TILE_WIDTH,
+  GROUND_TILE_HEIGHT,
+  PLATFORM_TILE_HEIGHT,
+} from './LevelTileset';
 
 /**
  * Level 1 – Cathedral Ruins: a pálya TELJES geometriája, egyetlen forrásból.
@@ -38,10 +45,9 @@ export const FALL_DEATH_Y = 520;
 
 // --- Talaj / player geometria -----------------------------------------------
 
-/** A ground-placeholder 64x32, origin 0.5 -> a felszíne a középpont - 16. */
+/** A talajsáv 32px magas (LevelTileset), origin 0.5 -> a felszíne a középpont - 16. */
 export const GROUND_CENTER_Y = 434;
-export const GROUND_TOP = GROUND_CENTER_Y - 16; // 418
-export const GROUND_TILE_HEIGHT = 32;
+export const GROUND_TOP = GROUND_CENTER_Y - GROUND_TILE_HEIGHT / 2; // 418
 
 /**
  * A player talpa a `sprite.y + 24`-nél van (PlayerAnimations.ORIGIN_Y). Minden "álló player
@@ -145,7 +151,7 @@ export interface PlatformDef {
   /** A sprite középpontja. */
   x: number;
   y: number;
-  /** Szélesség 64px-es csempékben (platform-placeholder 64x16, setScale(tiles, 1)). */
+  /** Szélesség 64px-es egységekben (a fizikai test 64x16-os, setScale(tiles, 1)). */
   tiles: number;
   /** Alulról átjárható (a létra ezen megy át), felülről szilárd. */
   oneWay?: boolean;
@@ -181,8 +187,8 @@ export const PLATFORMS: PlatformDef[] = [
 
 // --- Geometria-helperek -----------------------------------------------------
 
-/** A platform felszíne (a placeholder 16px magas, origin 0.5). */
-export const platformTop = (p: PlatformDef): number => p.y - 8;
+/** A platform felszíne (a lap 16px magas, origin 0.5). */
+export const platformTop = (p: PlatformDef): number => p.y - PLATFORM_TILE_HEIGHT / 2;
 export const platformLeft = (p: PlatformDef): number => p.x - p.tiles * 32;
 export const platformRight = (p: PlatformDef): number => p.x + p.tiles * 32;
 
@@ -436,13 +442,23 @@ export function enemyChaseBounds(def: EnemySpawnDef): { min: number; max: number
 export const LADDER = {
   x: 5570, // a H1 (oneWay) platform bal fele alatt: a player alulról átmászik rajta
   zoneTop: 100,
+  /**
+   * A MÁSZÁSI zóna szélessége — a RAJZOLT létráé (a két oldalléc külső éle között), nem a
+   * 32px-es csempéé. A kettő szándékosan külön konstans, lásd `LevelTileset.LADDER_TILE_WIDTH`.
+   */
   width: 28,
 } as const;
 
+/**
+ * A méretek a csempéből jönnek, nem szemre hangolt számok: a `width`/`height` a `door-gate`
+ * PNG mérete, az `openingHeight` pedig a boltív átjárható nyílásáé — a trigger-zóna ehhez
+ * igazodik, hogy pontosan ott aktiválódjon, ahol a player ténylegesen az ajtóban áll.
+ */
 export const DOOR = {
   x: 5840,
-  width: 48,
-  height: 72,
+  width: DOOR_TILE_WIDTH,
+  height: DOOR_TILE_HEIGHT,
+  openingHeight: DOOR_OPENING_HEIGHT,
 } as const;
 
 /** A pálya végi (ajtó-)checkpoint: E-re aktiválódik, és egyben a boss-átmenet. */
