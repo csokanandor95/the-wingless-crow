@@ -3,7 +3,7 @@ import { JUMP_VELOCITY, MOVE_SPEED } from '../player/Player';
 import { BODY_WIDTH as PLAYER_BODY_WIDTH } from '../player/PlayerAnimations';
 import { BODY_WIDTH as HARVESTER_BODY_WIDTH } from '../enemies/CrowHarvesterAnimations';
 import {
-  DOOR_OPENING_HEIGHT,
+  DOOR_APERTURE,
   DOOR_TILE_HEIGHT,
   DOOR_TILE_WIDTH,
   GROUND_TILE_HEIGHT,
@@ -182,7 +182,9 @@ export const PLATFORMS: PlatformDef[] = [
   { id: 'F1', x: 4500, y: 340, tiles: 2 },
 
   // --- H: boss-ajtó ---
-  { id: 'H1', x: 5700, y: 140, tiles: 6, oneWay: true }, // a létra célja, az ajtó ezen áll
+  // A jobb széle PONTOSAN a pálya széle (5808 + 6*32 = 6000): a szakasz így valódi
+  // végállomásként olvas, nem egy lebegő lapként, ami mögött még marad hely.
+  { id: 'H1', x: 5808, y: 140, tiles: 6, oneWay: true }, // a létra célja, az ajtó ezen áll
 ];
 
 // --- Geometria-helperek -----------------------------------------------------
@@ -440,7 +442,7 @@ export function enemyChaseBounds(def: EnemySpawnDef): { min: number; max: number
 // --- Létra / ajtó / checkpointok --------------------------------------------
 
 export const LADDER = {
-  x: 5570, // a H1 (oneWay) platform bal fele alatt: a player alulról átmászik rajta
+  x: 5678, // a H1 (oneWay) platform bal fele alatt: a player alulról átmászik rajta
   zoneTop: 100,
   /**
    * A MÁSZÁSI zóna szélessége — a RAJZOLT létráé (a két oldalléc külső éle között), nem a
@@ -455,15 +457,15 @@ export const LADDER = {
  * igazodik, hogy pontosan ott aktiválódjon, ahol a player ténylegesen az ajtóban áll.
  */
 export const DOOR = {
-  x: 5840,
+  x: 5948,
   width: DOOR_TILE_WIDTH,
   height: DOOR_TILE_HEIGHT,
-  openingHeight: DOOR_OPENING_HEIGHT,
+  openingHeight: DOOR_APERTURE.height,
 } as const;
 
 /** A pálya végi (ajtó-)checkpoint: E-re aktiválódik, és egyben a boss-átmenet. */
 export const DOOR_CHECKPOINT = {
-  x: 5810, // az ajtótól kicsit balra, hogy ne a grafikájában éledjen újra a player
+  x: 5918, // az ajtótól kicsit balra, hogy ne a grafikájában éledjen újra a player
   y: platformTop(platformById('H1')) - PLAYER_HALF_HEIGHT,
 } as const;
 
@@ -574,7 +576,7 @@ export interface DecorPropDef {
 }
 
 /**
- * 13 elem a 6000px-es pályán (kb. 460 px-enként egy), hogy a díszlet ne váljon zsúfolttá.
+ * 11 elem a 6000px-es pályán (kb. 550 px-enként egy), hogy a díszlet ne váljon zsúfolttá.
  *
  * Az elhelyezés NEM szabad: a `level1Layout.test.ts` őrzi, hogy minden lábnyom egyetlen
  * talaj-szegmensen BELÜL marad, és nem takarja a hazardokat (tüskemező, kasza-söprés) sem a
@@ -582,33 +584,34 @@ export interface DecorPropDef {
  * `REAPER_ENEMY_CLEARANCE`-es biztonsági sávjába lógna.
  */
 export const DECOR_PROPS: DecorPropDef[] = [
-  // A — start: a láda-halom a spawntól balra keretezi a pálya elejét.
-  { id: 'A-crates', texture: PROP_TEXTURES.CRATE_STACK, x: 52, surfaceId: 'G1' },
+  // A — start: a lámpa a spawntól balra keretezi a pálya elejét.
+  { id: 'A-lamp', texture: PROP_TEXTURES.STREET_LAMP, x: 52, surfaceId: 'G1' },
 
-  // B — első enemy: tágas, sík terep, a két prop a két végén ül.
-  { id: 'B-lamp', texture: PROP_TEXTURES.STREET_LAMP, x: 1010, surfaceId: 'G2' },
-  { id: 'B-wagon', texture: PROP_TEXTURES.WAGON, x: 1600, surfaceId: 'G2' },
+  // B — első enemy: tágas, sík terep. A szekér a szegmens KÖZEPÉN ((960+1660)/2), nem a
+  // peremén: a nagy sziluett így nem a szakadék-átmenetre esik.
+  { id: 'B-crates', texture: PROP_TEXTURES.CRATE_STACK, x: 1010, surfaceId: 'G2' },
+  { id: 'B-wagon', texture: PROP_TEXTURES.WAGON, x: 1310, surfaceId: 'G2' },
 
-  // C — a platforming-szakasz alatt, a C2 platform elé.
-  { id: 'C-well', texture: PROP_TEXTURES.WELL, x: 1858, surfaceId: 'G3' },
-
-  // D — spike-tutorial. A lámpa KÖZVETLENÜL a tüskemező elé kerül (2740): nem takarja,
-  // hanem megjelöli. A láda-halom a mező UTÁN, a köztes checkpoint (3000) elé.
+  // D — spike-tutorial. A tüskemező (2740–2868) KÖRNYÉKE szándékosan üres, hogy a hazard
+  // tisztán olvasható legyen; a láda a mező ELŐTT, a láda-halom UTÁNA, a köztes
+  // checkpoint (3000) elé.
   { id: 'D-crate', texture: PROP_TEXTURES.CRATE, x: 2445, surfaceId: 'G4' },
-  { id: 'D-lamp', texture: PROP_TEXTURES.STREET_LAMP, x: 2705, surfaceId: 'G4' },
   { id: 'D-crates', texture: PROP_TEXTURES.CRATE_STACK, x: 2920, surfaceId: 'G4', flipX: true },
 
-  // E — kombinált kihívás. A szekér az E2 platform ALATT fér el (teteje 343 > a lap alja 324).
-  { id: 'E-wagon', texture: PROP_TEXTURES.WAGON, x: 3310, surfaceId: 'G5', flipX: true },
+  // E — kombinált kihívás. A szekér az E4 (legmagasabb) platform ALATT áll: annak az alja
+  // 218, a szekér teteje 343, tehát bőven elfér.
   { id: 'E-crate', texture: PROP_TEXTURES.CRATE, x: 3600, surfaceId: 'G5' },
+  { id: 'E-wagon', texture: PROP_TEXTURES.WAGON, x: 3960, surfaceId: 'G5', flipX: true },
 
   // G — a kasza utáni partot a kút jelöli meg ("átértél"), majd a záró harc díszlete.
   { id: 'G-well', texture: PROP_TEXTURES.WELL, x: 4790, surfaceId: 'G6' },
   { id: 'G-crates', texture: PROP_TEXTURES.CRATE_STACK, x: 5195, surfaceId: 'G6' },
-  { id: 'G-wagon', texture: PROP_TEXTURES.WAGON, x: 5490, surfaceId: 'G6' },
 
-  // H — a létra után, az ajtóhoz vezető úton.
-  { id: 'H-lamp', texture: PROP_TEXTURES.STREET_LAMP, x: 5640, surfaceId: 'G6' },
+  // H — a két lámpa KÖZREFOGJA a létra lábát (LADDER.x ± 40), tehát a felfelé vezető út
+  // meg van világítva. A mászási zóna 5664..5692, a lámpák lábnyoma mindkét oldalon
+  // ~8 px-re marad tőle.
+  { id: 'H-lamp-left', texture: PROP_TEXTURES.STREET_LAMP, x: 5638, surfaceId: 'G6' },
+  { id: 'H-lamp-right', texture: PROP_TEXTURES.STREET_LAMP, x: 5718, surfaceId: 'G6' },
 ];
 
 /** A prop lábnyoma a talajon — a tesztek és az ütközés-vizsgálatok ebből dolgoznak. */

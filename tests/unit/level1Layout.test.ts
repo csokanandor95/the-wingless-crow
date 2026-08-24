@@ -51,10 +51,10 @@ import {
   type Span,
 } from '../../src/levels/Level1Layout';
 import {
-  DOOR_HEADER_HEIGHT,
-  DOOR_OPENING_HEIGHT,
+  DOOR_APERTURE,
   DOOR_THRESHOLD_PX,
   DOOR_TILE_HEIGHT,
+  DOOR_TILE_WIDTH,
   GROUND_EDGE_WIDTH,
   LADDER_TILE_WIDTH,
   PLATFORM_TILE_HEIGHT,
@@ -516,6 +516,12 @@ describe('létra és boss-ajtó', () => {
     expect(upper.oneWay).toBe(true);
   });
 
+  it('a felső platform jobb széle PONTOSAN a pálya széle', () => {
+    // Szándékos design-tény, nem véletlen: a szakasz így valódi végállomásként olvas, nem
+    // egy lebegő lapként, ami mögött még marad hely.
+    expect(platformRight(upper)).toBe(WORLD_WIDTH);
+  });
+
   it('a létra teljes szélességében a felső platform alatt van', () => {
     expect(LADDER.x - LADDER.width / 2).toBeGreaterThanOrEqual(platformLeft(upper));
     expect(LADDER.x + LADDER.width / 2).toBeLessThanOrEqual(platformRight(upper));
@@ -537,14 +543,23 @@ describe('létra és boss-ajtó', () => {
   // A csempén a boltív nyílása NEM ér le a kép aljáig: alatta egy küszöb-kő van. A scene
   // ezzel a 19px-szel süllyeszti a képet a platform felszíne alá, hogy az ív padlója a
   // járható felületre essen. Ha valaki átméretezi az ajtót anélkül, hogy a küszöböt
-  // újraszámolná, a player a kőben állna — ezt fogja meg ez a három állítás.
-  it('az ajtó magassága a három mért rész összege (küszöb + nyílás + felső kőfal)', () => {
-    expect(DOOR_THRESHOLD_PX + DOOR_OPENING_HEIGHT + DOOR_HEADER_HEIGHT).toBe(DOOR_TILE_HEIGHT);
+  // újraszámolná, a player a kőben állna — ezt fogják meg az alábbi állítások.
+  it('a boltív nyílása és a küszöb elfér a csempén', () => {
+    expect(DOOR_APERTURE.top + DOOR_APERTURE.height + DOOR_THRESHOLD_PX).toBeLessThanOrEqual(
+      DOOR_TILE_HEIGHT
+    );
+    expect(DOOR_APERTURE.left + DOOR_APERTURE.width).toBeLessThanOrEqual(DOOR_TILE_WIDTH);
     expect(DOOR.height).toBe(DOOR_TILE_HEIGHT);
   });
 
-  it('a boltív nyílása magasabb a playernél — át lehet menni rajta', () => {
+  it('a boltív nyílásán átfér a player — szélesebb és magasabb a testénél', () => {
+    expect(DOOR_APERTURE.width).toBeGreaterThan(PLAYER_BODY_WIDTH);
     expect(DOOR.openingHeight).toBeGreaterThan(2 * PLAYER_HALF_HEIGHT);
+  });
+
+  it('a nyílás nagyjából a csempe közepén van — a trigger-zóna DOOR.x-re központozható', () => {
+    const apertureCenter = DOOR_APERTURE.left + DOOR_APERTURE.width / 2;
+    expect(Math.abs(apertureCenter - DOOR_TILE_WIDTH / 2)).toBeLessThanOrEqual(1);
   });
 
   it('a küszöb-kő elbújik a platform mögött — nem lóg le alóla észrevehetően', () => {
@@ -636,6 +651,19 @@ describe('DECOR_PROPS', () => {
         expect(overlaps, `${prop.id} a(z) ${def.id} söprési sávjában van`).toBe(false);
       }
     }
+  });
+
+  it('a két H-lámpa KÖZREFOGJA a létra lábát', () => {
+    // Az "átfedés" tiltása (lásd a következő tesztet) még megengedné, hogy mindkét lámpa
+    // ugyanarra az oldalra kerüljön. A szándék viszont az, hogy a felfelé vezető út
+    // MINDKÉT oldalról meg legyen világítva.
+    const lamps = DECOR_PROPS.filter((p) => p.id.startsWith('H-lamp'));
+    expect(lamps.length).toBe(2);
+
+    const left = lamps.filter((p) => decorPropFootprint(p).right <= LADDER.x);
+    const right = lamps.filter((p) => decorPropFootprint(p).left >= LADDER.x);
+    expect(left.length, 'nincs lámpa a létrától balra').toBe(1);
+    expect(right.length, 'nincs lámpa a létrától jobbra').toBe(1);
   });
 
   it('egyetlen prop sem takarja a létrát vagy a köztes checkpointot', () => {

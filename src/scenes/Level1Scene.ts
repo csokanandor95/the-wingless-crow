@@ -49,7 +49,9 @@ import {
 } from '../levels/Level1Layout';
 import type { PlatformDef } from '../levels/Level1Layout';
 import {
+  DOOR_APERTURE,
   DOOR_DEPTH,
+  DOOR_INTERIOR_DEPTH,
   DOOR_THRESHOLD_PX,
   GROUND_EDGE_WIDTH,
   GROUND_TILE_HEIGHT,
@@ -259,7 +261,7 @@ export default class Level1Scene extends Phaser.Scene {
       .setVisible(false);
 
     // A billentyű-súgók CSAK friss játékban jelennek meg. Boss-vereség után a player az
-    // ajtó-checkpointon éled újra (x ~5810), ahol mindkét trigger azonnal átlépettnek
+    // ajtó-checkpointon éled újra (x ~5918), ahol mindkét trigger azonnal átlépettnek
     // számítana — értelmetlen lenne ott a mozgás-tutorialt felvillantani.
     const atLevelStart = spawn.x === START_X && spawn.y === START_Y;
     this.tutorialHint = new TutorialHint(this, atLevelStart ? TUTORIAL_HINTS : []);
@@ -407,8 +409,23 @@ export default class Level1Scene extends Phaser.Scene {
     // ezért megy az ajtó a terrainnél HÁTRÉBB (DOOR_DEPTH < TERRAIN_DEPTH) — így a platform
     // takarja ki.
     const upper = platformById('H1');
+    const doorBottomY = platformTop(upper) + DOOR_THRESHOLD_PX;
+
+    // A boltív nyílása ÁTLÁTSZÓ a csempén, tehát enélkül a parallax égbolt látszana át rajta.
+    // A folyosó-placeholder pontosan az alpha-lyukat fedi be (DOOR_APERTURE), a csempe
+    // bal-felső sarkához képest pozicionálva — az ajtó MÖGÖTT (DOOR_INTERIOR_DEPTH), így a
+    // boltív kőkerete és a rajzolt belső padló előtte marad.
     this.add
-      .image(DOOR.x, platformTop(upper) + DOOR_THRESHOLD_PX, TILE_TEXTURES.DOOR_GATE)
+      .image(
+        DOOR.x - DOOR.width / 2 + DOOR_APERTURE.left,
+        doorBottomY - DOOR.height + DOOR_APERTURE.top,
+        'door-interior-placeholder'
+      )
+      .setOrigin(0, 0)
+      .setDepth(DOOR_INTERIOR_DEPTH);
+
+    this.add
+      .image(DOOR.x, doorBottomY, TILE_TEXTURES.DOOR_GATE)
       .setOrigin(0.5, 1)
       .setDepth(DOOR_DEPTH);
   }

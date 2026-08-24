@@ -93,10 +93,18 @@ import crateUrl from '../../assets/props/gothic-town/crate.png';
 import crateStackUrl from '../../assets/props/gothic-town/crate-stack.png';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 import { PROP_TEXTURES, SPIKE_HEIGHT, SPIKE_TILE_WIDTH } from '../levels/Level1Layout';
-import { TILE_TEXTURES } from '../levels/LevelTileset';
+import { DOOR_APERTURE, TILE_TEXTURES } from '../levels/LevelTileset';
 
 const LOADING_BAR_WIDTH = 320;
 const LOADING_BAR_HEIGHT = 14;
+
+/**
+ * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a
+ * folyosó mélyéé. A kettő közt soronként interpolálunk, így az átjáró mélységet sugall.
+ * A meleg árnyalat szándékos: a hideg feketétől lyuknak látszana, nem térnek.
+ */
+const DOOR_INTERIOR_NEAR = [0x2a, 0x1f, 0x24] as const;
+const DOOR_INTERIOR_FAR = [0x0d, 0x09, 0x0c] as const;
 
 const PLAYER_SHEETS: Array<{ key: string; url: string }> = [
   { key: PLAYER_TEXTURES.IDLE, url: knightIdleUrl },
@@ -265,6 +273,31 @@ export default class BootScene extends Phaser.Scene {
     // A `ladder-placeholder`, a `pillar-placeholder` és a `door-placeholder` TÖRÖLVE:
     // a létra és az ajtó valódi csempét kapott (TILE_IMAGES), a létra mögötti hátfal-oszlop
     // pedig szándékosan megszűnt — a létra a lebegő platformnak van támasztva.
+
+    // A boss-ajtó mögötti folyosó. A `door-gate` csempe boltíve ÁTLÁTSZÓ, tehát nélküle a
+    // parallax égbolt látszik át rajta: az ajtó "lyuk a falban" lenne, nem átjáró. A textúra
+    // pontosan az alpha-lyuk méretű (lásd DOOR_APERTURE), és soronként sötétedik felfelé —
+    // így mélységet sugall, nem lapos fekete foltot. Valódi asset az `assets/effects/`
+    // iterációban jöhet a helyére.
+    const doorInteriorGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    for (let row = 0; row < DOOR_APERTURE.height; row++) {
+      // 1 = a nyílás teteje (a folyosó mélye), 0 = a küszöb (ide még jut fény)
+      const depth = 1 - row / (DOOR_APERTURE.height - 1);
+      const channel = (near: number, far: number) => Math.round(near + (far - near) * depth);
+      const color =
+        (channel(DOOR_INTERIOR_NEAR[0], DOOR_INTERIOR_FAR[0]) << 16) |
+        (channel(DOOR_INTERIOR_NEAR[1], DOOR_INTERIOR_FAR[1]) << 8) |
+        channel(DOOR_INTERIOR_NEAR[2], DOOR_INTERIOR_FAR[2]);
+
+      doorInteriorGfx.fillStyle(color, 1);
+      doorInteriorGfx.fillRect(0, row, DOOR_APERTURE.width, 1);
+    }
+    doorInteriorGfx.generateTexture(
+      'door-interior-placeholder',
+      DOOR_APERTURE.width,
+      DOOR_APERTURE.height
+    );
+    doorInteriorGfx.destroy();
 
     // Tüskék (Level 1, D szakasz). Egyetlen 32x16-os csempe, amit a SpikeField tileSprite-tal
     // ismétel a mező hosszában. A világos csont-szín szándékos: a spec megköveteli, hogy a

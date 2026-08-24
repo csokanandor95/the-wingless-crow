@@ -1224,8 +1224,8 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 - music — *kész: boss theme (1. iteráció) és Level 1 ambient (9. iteráció), lásd 18. pont*
 - sound effects — *kész: a teljes harci hangkép (7–8. iteráció). Hiányzik még a
   tűzgolyó-becsapódás, a hurt, a charge, az ugrás/halál/checkpoint/léptek.*
-- environment props — ***kész** (11. iteráció): 13 nem ütköző hangulati elem a Level 1-en
-  (utcai lámpa ×3, szekér ×3, kút ×2, láda ×2, ládahalom ×3). Forrás: GothicVania Town
+- environment props — ***kész** (11. iteráció): 11 nem ütköző hangulati elem a Level 1-en
+  (utcai lámpa ×3, szekér ×2, kút ×1, láda ×2, ládahalom ×3). Forrás: GothicVania Town
   (Luis Zuno) — public domain. Az elhelyezés unit-tesztelt: egyik prop sem takar hazardot,
   checkpointot vagy a létrát.*
 - UI

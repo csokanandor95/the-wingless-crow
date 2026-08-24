@@ -95,21 +95,30 @@ export const DOOR_TILE_WIDTH = 64;
 export const DOOR_TILE_HEIGHT = 128;
 
 /**
- * A csempén MÉRT geometria (a kivágott PNG-n a nyílás `x = 14..51`, `y = 48..108`):
+ * A boltív ÁTLÁTSZÓ nyílása a csempén belül — a PNG alpha-csatornájából mérve:
+ * `x = 13..50` (38 px), `y = 48..105` (58 px).
  *
- *   - `DOOR_OPENING_HEIGHT` — a boltív átjárható nyílásának magassága;
- *   - `DOOR_THRESHOLD_PX`   — a nyílás alja és a csempe alja közti küszöb-kő.
+ * **Az alpha-lyuk a mérvadó, nem a "sötétnek látszó" terület.** A csempe 106–108. sora sötét,
+ * de ÁTLÁTSZATLAN: az a boltív rajzolt belső padlója. A mögé kerülő
+ * `door-interior-placeholder` pontosan ezt a lyukat fedi be — nagyobbra véve kitakarná a
+ * rajzolt padlót, kisebbre véve egy csík égbolt maradna látszani.
  *
- * A kettőből következik az elhelyezés: a képet `origin (0.5, 1)`-gyel
- * `platformTop + DOOR_THRESHOLD_PX`-re rakva **a boltív padlója pontosan a járható
- * felszínre esik** — enélkül a player a kőben állna. A küszöb-kő ilyenkor a platform alá
- * lóg, ezért kell az ajtónak a platform-látványnál HÁTRÉBB lévő depth (`DOOR_DEPTH`).
+ * A `left`/`top` a csempe bal-felső sarkához képest értendő.
  */
-export const DOOR_OPENING_HEIGHT = 61;
-export const DOOR_THRESHOLD_PX = 19;
+export const DOOR_APERTURE = { left: 13, top: 48, width: 38, height: 58 } as const;
 
-/** A boltív fölötti tömör kőfal — a három rész együtt adja ki a csempe magasságát. */
-export const DOOR_HEADER_HEIGHT = DOOR_TILE_HEIGHT - DOOR_OPENING_HEIGHT - DOOR_THRESHOLD_PX;
+/**
+ * A nyílás alja és a csempe alja közti küszöb-kő.
+ *
+ * Ebből következik az elhelyezés: a képet `origin (0.5, 1)`-gyel
+ * `platformTop + DOOR_THRESHOLD_PX`-re rakva **a boltív padlója pontosan a járható felszínre
+ * esik** — enélkül a player a kőben állna. A küszöb-kő ilyenkor a platform alá lóg, ezért kell
+ * az ajtónak a platform-látványnál HÁTRÉBB lévő depth (`DOOR_DEPTH`).
+ *
+ * SZÁNDÉKOSAN 19, nem 22 (= a csempe alja mínusz az alpha-lyuk alja): a különbség pont a
+ * rajzolt belső padló 3 px-e, aminek a járható felszín FÖLÖTT kell látszania.
+ */
+export const DOOR_THRESHOLD_PX = 19;
 
 // --- Létra -------------------------------------------------------------------
 
@@ -133,6 +142,7 @@ export const LADDER_TILE_HEIGHT = 16;
  *
  *   -30 / -25 / -20   parallax háttér-rétegek
  *   -10               hangulati propok        <- a player/enemy ELŐTTÜK megy el
+ *    -7               az ajtó mögötti folyosó <- kitakarja az égboltot a boltív nyílásában
  *    -6               boss-ajtó               <- a platform MÖGÖTT (küszöb-kő elrejtése)
  *    -5               talaj + platform lap
  *    -1               létra, köztes checkpoint
@@ -140,4 +150,5 @@ export const LADDER_TILE_HEIGHT = 16;
  */
 export const TERRAIN_DEPTH = -5;
 export const DOOR_DEPTH = -6;
+export const DOOR_INTERIOR_DEPTH = DOOR_DEPTH - 1;
 export const DECOR_DEPTH = -10;

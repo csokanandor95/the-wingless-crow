@@ -179,12 +179,19 @@ paletta korrekció nélkül (mért átlagszín: padló `(42,33,33)`, platform `(
   látszik át alatta. Fordított sorrendben a lap kitakarná a sziklát. **Egycsempés platformra
   (`C1`, `E1`) nem fér el a két végzáró** (2×48 > 64), és ez nem hiányosság: a csupasz lap
   vizuálisan elválasztja a „lépőkövet" a valódi platformoktól.
-- **Az ajtó geometriája MÉRT, nem hangolt**: a 64×128-as csempén a boltív nyílása
-  `x = 14..51`, `y = 48..108`, tehát a nyílás alja a kép aljától **19 px**-re van (küszöb-kő).
-  A képet `origin (0.5, 1)`-gyel `platformTop + DOOR_THRESHOLD_PX`-re rakva **a boltív padlója
-  pontosan a járható felszínre esik** — enélkül a player a kőben állna. A küszöb-kő ilyenkor a
-  platform alá lóg, ezért megy az ajtó a terrainnél **hátrébb** (`DOOR_DEPTH = -6` <
-  `TERRAIN_DEPTH = -5`). A trigger-zóna a **nyílást** fedi (61px), nem a teljes csempét.
+- **Az ajtó geometriája MÉRT, nem hangolt**: a 64×128-as csempén a boltív ÁTLÁTSZÓ nyílása
+  (`DOOR_APERTURE`) `x = 13..50` (38px), `y = 48..105` (58px). A képet `origin (0.5, 1)`-gyel
+  `platformTop + DOOR_THRESHOLD_PX`-re rakva **a boltív padlója pontosan a járható felszínre
+  esik** — enélkül a player a kőben állna. A küszöb-kő ilyenkor a platform alá lóg, ezért megy
+  az ajtó a terrainnél **hátrébb** (`DOOR_DEPTH = -6` < `TERRAIN_DEPTH = -5`). A trigger-zóna a
+  **nyílást** fedi (58px), nem a teljes csempét.
+  - **A `DOOR_THRESHOLD_PX` szándékosan 19, nem 22** (= a csempe alja mínusz az alpha-lyuk
+    alja): a különbség pont a boltív rajzolt belső padlójának 3 px-e, aminek a járható felszín
+    FÖLÖTT kell látszania. A csempe 106–108. sora sötét, de ÁTLÁTSZATLAN — ezért kell az
+    alpha-csatornából mérni, nem fényesség alapján.
+  - **A nyílás mögé `door-interior-placeholder` kerül** (`DOOR_INTERIOR_DEPTH = -7`, tehát az
+    ajtó mögé): enélkül a parallax égbolt látszana át a boltíven, és az ajtó „lyuk a falban"
+    lenne, nem átjáró. A textúra pontosan az alpha-lyuk méretű, és soronként sötétedik felfelé.
 - **A létra mögötti `pillar-placeholder` hátfal TÖRÖLVE** (user-döntés): a létra egyszerűen a
   `H1` platformnak van támasztva, a fokok között a parallax háttér látszik át. A tileSprite a
   teljes **32px**-es csempeszélességgel rajzol (különben a minta csonkolódna), a mászási zóna
@@ -192,8 +199,8 @@ paletta korrekció nélkül (mért átlagszín: padló `(42,33,33)`, platform `(
 - **Törölt placeholder textúrák**: `ladder-placeholder`, `pillar-placeholder`,
   `door-placeholder`.
 
-**Phase 8 — 11. iteráció: LEVEL 1 HANGULATI PROPOK kész.** A pálya 13 nem ütköző
-háttér-dekorációt kapott (`assets/props/gothic-town/`): utcai lámpa ×3, szekér ×3, kút ×2,
+**Phase 8 — 11. iteráció: LEVEL 1 HANGULATI PROPOK kész.** A pálya 11 nem ütköző
+háttér-dekorációt kapott (`assets/props/gothic-town/`): utcai lámpa ×3, szekér ×2, kút ×1,
 láda ×2, ládahalom ×3. Forrás: **GothicVania Town** (Luis Zuno / @ansimuz) — **public domain**.
 Új modul: `src/levels/LevelDecor.ts`.
 - **Nincs physics body és nincs osztály**: tiszta díszlet, a gameplay-re nulla hatással. A
@@ -217,8 +224,12 @@ láda ×2, ládahalom ×3. Forrás: **GothicVania Town** (Luis Zuno / @ansimuz) 
   minden lábnyom egyetlen talaj-szegmensen belül marad, nem metsz spike-mezőt, nem lóg a
   kasza söprési sávjába (ezért van a `G-well` 4790-en és nem 4760-on), nem takarja a létrát
   vagy a köztes checkpointot, és nem ér bele a fölötte lévő platform aljába.
-- A `D-lamp` **szándékosan közvetlenül a tüskemező elé** (2705) kerül: nem takarja a hazardot,
-  hanem megjelöli.
+- **A tüskemező (2740–2868) környéke szándékosan ÜRES**: a hazard olvashatósága fontosabb a
+  díszletnél. (Egy hangoló körben volt ott lámpa „jelölőnek", de a user kivetette.)
+- **A H szakaszban KÉT lámpa fogja közre a létra lábát** (`LADDER.x ± 40`), tehát a felfelé
+  vezető út meg van világítva. Unit teszt őrzi, hogy tényleg az egyik balra, a másik jobbra
+  van — az „nem takarja a létrát" állítás önmagában megengedné, hogy mindkettő egy oldalra
+  kerüljön.
 
 A Phase 8 többi része (a maradék environment sprite-ok, a maradék SFX, particles,
 `ui/` modul) még hátravan.
@@ -570,13 +581,13 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   a player odaér. Ezért nem kell külön „ugorj" felirat a peremre. A súgók CSAK friss
   játékban jelennek meg: boss-vereség után az ajtó-checkpointon éledünk újra, ahol mindkét
   trigger átlépettnek számítana
-- **Létra** a pálya végén (x=5570): `tileSprite` a vizuál (32px-es csempeszélességgel), külön
+- **Létra** a pálya végén (x=5678): `tileSprite` a vizuál (32px-es csempeszélességgel), külön
   `Zone` statikus bodyval a fizika (28px — a RAJZOLT létra szélessége). A scene `update()`-je
   **szinkron** `this.physics.overlap(player, ladderZone)`-t használ, NEM `physics.add.overlap`
   callbacket — utóbbi csak a scene `update()` UTÁN futna le, ami 1 frame késést okozna a
   mászásban. **Hátfal nincs** (a `pillar-placeholder` oszlop törölve): a létra a `H1`
   platformnak van támasztva, a fokok között a parallax háttér látszik át
-- **Checkpoint-ajtó** (x=5840, `H1` jobb vége): ugyanaz a szinkron `physics.overlap()` minta,
+- **Checkpoint-ajtó** (x=5948, `H1` jobb vége): ugyanaz a szinkron `physics.overlap()` minta,
   mint a létránál (`doorZone`). A zóna a boltív **nyílását** fedi (64×61), nem a teljes
   csempét — így a prompt pontosan akkor jön elő, amikor a player láthatóan az ajtóban áll.
   Közelben **E**-re: `checkpoint.activate()` + 500ms
@@ -630,7 +641,7 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   static sprite-ok `setVisible(false)`-ok, a látvány külön tileSprite + végzáró képek.
   *(Az 5 korábbi `pillar-placeholder` parallax oszlopot a valódi háttérrétegek váltották ki,
   a létra hátfal-oszlopát pedig a 10. iteráció törölte.)*
-- **Hangulati propok (Phase 8, 11. iteráció)**: 13 nem ütköző háttér-dekoráció
+- **Hangulati propok (Phase 8, 11. iteráció)**: 11 nem ütköző háttér-dekoráció
   (`DECOR_PROPS` a layoutban, `createDecorProps()` a `LevelDecor.ts`-ben). Nincs physics
   bodyjuk, és a `DECOR_DEPTH = -10` miatt a player/enemyk előttük mennek el
 - Kódból generált placeholder már csak a hazardoké (tüske, reaper, checkpoint-jelölő) és a
@@ -1018,9 +1029,10 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
-- A Level 1-en már **csak a hazardok és a lövedékek** kódból generált téglalapok
+- A Level 1-en már **csak a hazardok, a lövedékek és az ajtó mögötti folyosó** kódból generált
   (`generateTexture`): a tüskék, a Swinging Reaper (horgony + penge), a köztes checkpoint
-  jelölője, valamint a player és a boss lövedéke. A három karakter, mindkét háttér és a
+  jelölője, a `door-interior-placeholder` (függőleges átmenet, ami kitakarja az égboltot a
+  boltív nyílásában), valamint a player és a boss lövedéke. A három karakter, mindkét háttér és a
   teljes terrain (talaj, platformok, létra, ajtó) valódi pixel art.
   A `ground-placeholder` / `platform-placeholder` textúra megmarad, de a Level 1-en már
   **láthatatlan fizikai testként** (a `ground-placeholder`-t a `BossScene` is használja)
