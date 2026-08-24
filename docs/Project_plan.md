@@ -567,9 +567,30 @@ Alapvető elemek:
 
 A Phaser physics rendszerét használjuk.
 
-> **Megjegyzés (Phase 6):** a `gap` egyelőre NINCS implementálva a Level 1-ben.
-> Amíg nincs checkpoint/respawn, egy szakadékba esve a player beragadna
-> (a `Player.die()` letiltja a physics bodyt). A gap-ek a checkpoint-tal együtt jönnek.
+> ~~**Megjegyzés (Phase 6):** a `gap` egyelőre NINCS implementálva a Level 1-ben.~~
+> ~~Amíg nincs checkpoint/respawn, egy szakadékba esve a player beragadna~~
+> ~~(a `Player.die()` letiltja a physics bodyt). A gap-ek a checkpoint-tal együtt jönnek.~~
+>
+> **LEZÁRVA (Level 1 Redesign, 1. iteráció):** a `gap` implementálva van. A Level 1 talaja
+> már nem folyamatos, hanem öt szegmensből áll (`GROUND_SEGMENTS` a
+> `src/levels/Level1Layout.ts`-ben); a köztük lévő négy hézag a szakadék. A zuhanás-halált
+> nem a világ alja adja, hanem egy `FALL_DEATH_Y` küszöb: a FIZIKAI világ szándékosan
+> mélyebb a canvasnál (`WORLD_HEIGHT + FALL_DEPTH`), így a player láthatóan kizuhan a
+> képből, mielőtt meghal — a kamera bounds-a viszont a canvas magassága marad, tehát
+> továbbra sincs függőleges görgetés.
+
+> **Kiegészítés (Level 1 Redesign, 1. iteráció) — a szakadékok MÉRETEZETTEK, nem szemre rakottak:**
+>
+> A `Level1Layout.ts` a `Player` exportált `MOVE_SPEED`/`JUMP_VELOCITY`-jéből és a
+> `config/physics.ts` `GRAVITY_Y`-jából SZÁMOLJA a fizikai plafont — max ugrásmagasság
+> **156 px**, max ugrástáv **250 px** —, és minden szakadék/emelkedés ehhez van tervezve
+> (0.7-es, illetve 0.75-ös biztonsági szorzóval). A `horizontalReachForRise()` adja meg,
+> hogy egy adott emelkedés mellett mekkora a tényleges vízszintes hatótáv: magasabbra
+> ugorva rövidebbet lehet ugrani, és ezt egy szemre tervezett pálya csendben elronthatná.
+>
+> A `tests/unit/level1Layout.test.ts` ezzel a képlettel **bejárja a pályát** (BFS a start
+> szegmensről), és bizonyítja, hogy minden felület elérhető. Ez a spec „All platforms are
+> reachable" elfogadási kritériumát futtatható állítássá teszi.
 
 A játékos rendelkezik:
 
@@ -602,6 +623,48 @@ Főbb elemek:
 - egyszerű platforming
 - checkpoint
 - boss arena
+
+> **Level 1 Redesign (3 iterációs blokk, a Phase 8 közben beszúrva).** Az eredeti Phase 6-os
+> Level 1 (3200 px, folyamatos talaj, hazard nélkül) pillanatok alatt átugrálható volt, és a
+> 9 platform gyakorlatilag dekoráció maradt. A user írt hozzá egy részletes layout-specet
+> (nyolc szakasz, A–H), ami alapján a pálya **6000 px**-re nőtt, és három olyan elemet
+> kapott, ami korábban nem volt a kódban: **szakadék + zuhanás-halál**, **spike**, és egy
+> **lengő kaszás (Swinging Reaper)** időzítés-alapú hazard.
+>
+> A szakaszsorrend: `A start/mozgás-tutorial · B első enemy · C platforming + gap ·
+> D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc · H boss-ajtó`.
+>
+> **1. iteráció — KÉSZ:** layout-váz, öt talaj-szegmens + négy szakadék, 13 platform,
+> 8 CrowHarvester, zuhanás-halál, enemy-respawn, köztes checkpoint, tutorial feliratok.
+> **2. iteráció — KÉSZ:** spike-ok (D szakasz), lásd lentebb. **3. iteráció:** Swinging
+> Reaper (F szakasz).
+>
+> **Kiegészítés (2. iteráció) — a környezeti hazardok külön sebzés-modellt igényelnek.**
+> A `Player.takeDamage()` szándékosan nem néz HURT állapotot, csak DEAD-et: egy enemy-csapás
+> diszkrét esemény, ott ez helyes. Egy tüske viszont FOLYAMATOS érintkezés — rajta állva a
+> scene minden frame-ben sebezne, és a 100 HP két másodperc alatt elfogyna. Ezért került be
+> a `src/hazards/HazardDamage.ts` `HazardDamageGate`-je: egy 900 ms-os, MINDEN környezeti
+> hazardra KÖZÖS i-frame ablak. A `Player`-hez nem kellett hozzányúlni.
+>
+> **Egy tanulság a manuális tesztből, ami a tervben nem látszott:** a tüske-találat eredetileg
+> vízszintesen is visszalökte a playert („arra, amerről jött"). Ez ~36 px haladást és ~150 ms-ot
+> vett el, amitől a 128 px-es mezőn való átkelés 970 ms-ra nyúlt — túl a 900 ms-os ablakon,
+> tehát a player EGYETLEN hibáért kétszer sebződött, és a másodikat a játék saját reakciója
+> okozta. Ez sérti a spec „Avoid unavoidable damage" elvét, ezért a visszalökés **csak
+> függőleges** maradt. Az átkelés így pontosan egy találat (15 HP) — a D szakasz tutorial,
+> nem büntetés.
+>
+> **Két döntés, ami ELTÉR a dokumentum korábbi állapotától** (user által jóváhagyva):
+>
+> 1. **A player halálakor az enemyk is újraélednek.** Korábban szándékos scope-döntés volt,
+>    hogy csak a player áll vissza („ne büntessük duplán"). Egy 6000 px-es, szakadékokkal
+>    tagolt pályán viszont ez azt jelentené, hogy egy nehéz szakaszt ismételt halálokkal
+>    „le lehet koptatni". A `Level1Scene.resetEnemies()` a `CrowHarvester`-eket
+>    megsemmisíti és a layout-adatból újraspawnolja.
+> 2. **Van egy KÖZTES checkpoint** (a spike-szakasz után, x=3000). A layout-spec csak a pálya
+>    végén említett checkpointot; a megnövelt hossznál ez túl büntető lenne. Nem új
+>    mechanika — a meglévő `CheckpointSystem` új elhelyezése, azzal a különbséggel, hogy
+>    ÉRINTÉSRE aktiválódik (nem `E`-re, mint az ajtó), hogy ne versenyezzen annak promptjával.
 
 ### Level 2 – The Crowless Forest
 
@@ -1093,6 +1156,12 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 - environment
 - checkpoint
 - transition
+
+> **Újranyitva a Phase 8 közben — „Level 1 Redesign", 3 iteráció.** Az eredeti Phase 6-os
+> layout túl egyszerű volt (3200 px, folyamatos talaj, hazard nélkül). Az új, nyolc szakaszos
+> 6000 px-es pálya részletei a 14. pontnál. Az 1. iteráció (layout-váz + gap + zuhanás-halál
+> + enemy-respawn + köztes checkpoint + tutorial feliratok) és a 2. iteráció (spike-ok + a
+> minden hazardra közös i-frame kapu) **kész**; hátravan a Swinging Reaper (3. it.).
 
 ## Phase 7 – Boss
 

@@ -13,73 +13,46 @@ import AudioManager, {
   MUSIC_KEYS,
   SFX_KEYS,
 } from '../systems/AudioManager';
+import TutorialHint from '../ui/TutorialHint';
+import HazardDamageGate from '../hazards/HazardDamage';
+import SpikeField, { SPIKE_DAMAGE, SPIKE_KNOCKBACK_Y } from '../hazards/SpikeField';
+import {
+  DOOR,
+  DOOR_CHECKPOINT,
+  ENEMY_SPAWNS,
+  FALL_DEATH_Y,
+  FALL_DEPTH,
+  GROUND_CENTER_Y,
+  GROUND_SEGMENTS,
+  GROUND_TOP,
+  HARVESTER_SPAWN_OFFSET,
+  LADDER,
+  MID_CHECKPOINT,
+  PLATFORMS,
+  PLAYER_HALF_HEIGHT,
+  SPIKE_FIELDS,
+  START_X,
+  START_Y,
+  surfaceSpan,
+  TUTORIAL_HINTS,
+  WORLD_HEIGHT,
+  WORLD_WIDTH,
+  platformById,
+  platformTop,
+} from '../levels/Level1Layout';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 
-const WORLD_WIDTH = 3200;
-// A WORLD_HEIGHT szándékosan megegyezik a canvas magasságával (main.ts): így a kamera
-// csak vízszintesen görget, és a teljes függőleges sáv (talajtól a felső platformig)
-// mindig látszik. A létra is belefér ebbe a sávba.
-const WORLD_HEIGHT = 450;
+/** A ground-placeholder csempe szélessége — a szegmensek ehhez skálázódnak. */
+const GROUND_TILE_WIDTH = 64;
 
-const GROUND_CENTER_Y = 434;
-const GROUND_TOP = 418; // ground-placeholder 64x32, origin 0.5 -> 434 - 16
-
-const PLAYER_HALF_HEIGHT = 24; // player-placeholder 32x48
-const START_X = 100; // pálya eleji kezdőpont = a CheckpointSystem default-ja
-const START_Y = 300;
-const HARVESTER_SPAWN_OFFSET = 24; // a CrowHarvester talpa a sprite.y + 23-nál van -> 1px ejtés
-
-interface PlatformDef {
-  id: string;
-  x: number;
-  y: number;
-  tiles: number;
-  /** Alulról átjárható (a létra ezen megy át), felülről szilárd. */
-  oneWay?: boolean;
-}
-
-// A platform-placeholder 64x16, origin 0.5, setScale(tiles, 1).
-// Egyetlen forrás a geometriának: az enemy patrol-határok is ebből származnak.
-const PLATFORMS: PlatformDef[] = [
-  { id: 'P1', x: 380, y: 350, tiles: 3 }, // első ugrás a talajról
-  { id: 'P2', x: 620, y: 292, tiles: 2 }, // magasabb lépés
-  { id: 'P3', x: 1000, y: 322, tiles: 3 }, // átvezetés
-  { id: 'P4', x: 1360, y: 300, tiles: 5 }, // platform-CrowHarvester A (tágas)
-  { id: 'P5', x: 1750, y: 342, tiles: 2 }, // lépcsős emelkedő start
-  { id: 'P6', x: 1980, y: 272, tiles: 2 },
-  { id: 'P7', x: 2200, y: 202, tiles: 2 }, // csúcspont
-  { id: 'P8', x: 2440, y: 272, tiles: 3 }, // platform-CrowHarvester B (szűk)
-  { id: 'P9', x: 2900, y: 140, tiles: 6, oneWay: true }, // létra célja
-];
-
-const platformTop = (p: PlatformDef): number => p.y - 8;
-const platformLeft = (p: PlatformDef): number => p.x - p.tiles * 32;
-const platformRight = (p: PlatformDef): number => p.x + p.tiles * 32;
-
-const platformById = (id: string): PlatformDef => {
-  const found = PLATFORMS.find((p) => p.id === id);
-  if (!found) throw new Error(`Ismeretlen platform id: ${id}`);
-  return found;
-};
-
-// Létra a pálya végén. Az X úgy van megválasztva, hogy P9 (span 2708-3092) fölé essen,
-// így a player alulról átmászik az egyirányú platformon és a tetején köt ki.
-const LADDER_X = 2762;
-const LADDER_ZONE_TOP = 100;
-const LADDER_WIDTH = 28;
-
-// Platformon álló enemy patrol-határainak behúzása a peremtől (a CrowHarvester félszélessége 10px).
-const EDGE_INSET = 24;
-
-// Ajtó (checkpoint + boss-transition) a P9 felső platformon, a door-placeholder helyén.
-const DOOR_X = 3040;
-const DOOR_WIDTH = 48;
-const DOOR_HEIGHT = 72;
-const CHECKPOINT_X = 3010; // az ajtótól kicsit balra, hogy ne a grafikájában jelenjen meg
-const CHECKPOINT_Y = platformTop(platformById('P9')) - PLAYER_HALF_HEIGHT;
-const RESPAWN_DELAY_MS = 1200; // rövid szünet a halál-tint után, mielőtt visszatér a checkpointra
+const RESPAWN_DELAY_MS = 1200; // rövid szünet a halál-animáció után, mielőtt visszatér a checkpointra
 /** Az ajtó-átmenet hossza. A kamera-fade ÉS a zene kifadelése is ebből dolgozik. */
 const TRANSITION_FADE_MS = 500;
+
+/** A köztes checkpoint jelölőjének színe aktiválás előtt / után. */
+const CHECKPOINT_TINT_IDLE = 0x4a4452;
+const CHECKPOINT_TINT_ACTIVE = 0xffd88a;
+const CHECKPOINT_FLASH_HOLD_MS = 1200;
 
 export default class Level1Scene extends Phaser.Scene {
   private player!: Player;
@@ -87,6 +60,7 @@ export default class Level1Scene extends Phaser.Scene {
   private playerHpText!: Phaser.GameObjects.Text;
   private background!: ParallaxBackground;
   private audio!: AudioManager;
+  private tutorialHint!: TutorialHint;
 
   private ladderZone!: Phaser.GameObjects.Zone;
   private ladderContact!: LadderContact;
@@ -97,6 +71,21 @@ export default class Level1Scene extends Phaser.Scene {
   private checkpointPromptText!: Phaser.GameObjects.Text;
   private isTransitioning = false;
   private respawnScheduled = false;
+  /** Egyszeri kapu: enélkül a HURT-lock alatt frame-enként újraindulna a zuhanás-halál. */
+  private fallDeathTriggered = false;
+
+  private spikes!: SpikeField;
+  /**
+   * KÖZÖS kapu minden környezeti hazardnak (tüskék most, Swinging Reaper a következő
+   * iterációban): egy tüskébe esve ne lehessen ugyanabban a pillanatban a kaszától is
+   * sebződni. A `Player` HURT-lockja erre nem elég — az csak 150 ms.
+   */
+  private hazardGate = new HazardDamageGate();
+
+  private midCheckpointZone!: Phaser.GameObjects.Zone;
+  private midCheckpointMarker!: Phaser.GameObjects.Image;
+  private midCheckpointText!: Phaser.GameObjects.Text;
+  private midCheckpointActivated = false;
 
   private fireballs: Fireball[] = [];
   private enemies: CrowHarvester[] = [];
@@ -115,13 +104,21 @@ export default class Level1Scene extends Phaser.Scene {
     this.enemies = [];
     this.isTransitioning = false;
     this.respawnScheduled = false;
+    this.fallDeathTriggered = false;
+    this.midCheckpointActivated = false;
+    // A hazardGate class field initializer — az is csak a Scene ELSŐ létrehozásakor fut le
+    // (lásd fent), ezért egy scene-restart után örökölné az előző futás i-frame-jeit.
+    this.hazardGate.reset();
 
     // Az ég legfelső sorának színe: a parallax háttér ezt amúgy is teljesen kitakarja,
     // de így egy esetleges letterbox / a create() előtti pillanat sem villant feketét.
     // A main.ts game-szintű backgroundColor-ja (#0a0a0f) változatlan — arra a BossScene épül.
     this.cameras.main.setBackgroundColor('#673838');
 
-    this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    // A FIZIKAI világ mélyebb, mint a canvas: a szakadékba lépő player kizuhan a képből,
+    // és a FALL_DEATH_Y-t átlépve hal meg. A KAMERA bounds-a viszont pontosan a canvas
+    // magassága marad, tehát nincs függőleges görgetés — a pálya továbbra is egy vízszintes sáv.
+    this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT + FALL_DEPTH);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
     // A háttér mindent megelőz: a rétegei -30..-20 depth-en ülnek, tehát a scene minden
@@ -147,16 +144,12 @@ export default class Level1Scene extends Phaser.Scene {
 
     this.createDecor();
 
-    // Folyamatos talaj végig — a respawn megvan, de a PLATFORMS layout még nincs
-    // szakadékokra tervezve; a gap bevezetése külön polish-feladat (lásd CLAUDE.md).
-    const ground = this.physics.add.staticGroup();
-    ground.create(WORLD_WIDTH / 2, GROUND_CENTER_Y, 'ground-placeholder')
-      .setScale(WORLD_WIDTH / 64, 1)
-      .refreshBody();
-
+    const ground = this.createGround();
     const platforms = this.createPlatforms();
+    this.spikes = new SpikeField(this, SPIKE_FIELDS);
     this.createLadder();
     this.createDoorZone();
+    this.createMidCheckpoint();
 
     // A checkpoint a registry-ben perzisztál a scene-váltásokon át (pl. BossScene ->
     // vissza Level1Scene-be) — enélkül minden create() nulláról hozná létre, és egy
@@ -175,6 +168,10 @@ export default class Level1Scene extends Phaser.Scene {
     this.physics.add.collider(this.player, platforms);
 
     this.spawnEnemies();
+    // FIGYELEM: ezek a colliderek a this.enemies tömb REFERENCIÁJÁRA kötődnek, és a Phaser
+    // minden physics stepben újraiterálja a tartalmát. Ezért tudja a resetEnemies() helyben
+    // (splice + push) kicserélni a lakóit anélkül, hogy újra kellene regisztrálni bármit —
+    // és ezért TILOS a tömböt új tömbre cserélni (lásd CLAUDE.md 2. tanulság).
     this.physics.add.collider(this.enemies, ground);
     this.physics.add.collider(this.enemies, platforms);
 
@@ -231,6 +228,33 @@ export default class Level1Scene extends Phaser.Scene {
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setVisible(false);
+
+    // A billentyű-súgók CSAK friss játékban jelennek meg. Boss-vereség után a player az
+    // ajtó-checkpointon éled újra (x ~5810), ahol mindkét trigger azonnal átlépettnek
+    // számítana — értelmetlen lenne ott a mozgás-tutorialt felvillantani.
+    const atLevelStart = spawn.x === START_X && spawn.y === START_Y;
+    this.tutorialHint = new TutorialHint(this, atLevelStart ? TUTORIAL_HINTS : []);
+  }
+
+  /**
+   * A talaj NEM folyamatos: a GROUND_SEGMENTS közötti hézagok a szakadékok. Minden szegmens
+   * egyetlen, vízszintesen felskálázott static sprite — ugyanaz a minta, mint a korábbi
+   * egyetlen, teljes pálya szélességű talajnál, csak most szegmensenként.
+   */
+  private createGround(): Phaser.Physics.Arcade.StaticGroup {
+    const ground = this.physics.add.staticGroup();
+
+    for (const segment of GROUND_SEGMENTS) {
+      const width = segment.endX - segment.startX;
+      const sprite = ground.create(
+        segment.startX + width / 2,
+        GROUND_CENTER_Y,
+        'ground-placeholder'
+      ) as Phaser.Physics.Arcade.Sprite;
+      sprite.setScale(width / GROUND_TILE_WIDTH, 1).refreshBody();
+    }
+
+    return ground;
   }
 
   private createPlatforms(): Phaser.Physics.Arcade.StaticGroup {
@@ -254,27 +278,27 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   private createLadder(): void {
-    const upper = platformById('P9');
-    const zoneHeight = GROUND_TOP - LADDER_ZONE_TOP;
-    const zoneCenterY = LADDER_ZONE_TOP + zoneHeight / 2;
+    const upper = platformById('H1');
+    const zoneHeight = GROUND_TOP - LADDER.zoneTop;
+    const zoneCenterY = LADDER.zoneTop + zoneHeight / 2;
 
     // Hátfal, hogy a létra ne a semmiben lógjon.
     this.add
-      .image(LADDER_X, zoneCenterY, 'pillar-placeholder')
+      .image(LADDER.x, zoneCenterY, 'pillar-placeholder')
       .setDisplaySize(64, zoneHeight)
       .setDepth(-2);
 
     this.add
-      .tileSprite(LADDER_X, zoneCenterY, LADDER_WIDTH, zoneHeight, 'ladder-placeholder')
+      .tileSprite(LADDER.x, zoneCenterY, LADDER.width, zoneHeight, 'ladder-placeholder')
       .setDepth(-1);
 
-    this.ladderZone = this.add.zone(LADDER_X, zoneCenterY, LADDER_WIDTH, zoneHeight);
+    this.ladderZone = this.add.zone(LADDER.x, zoneCenterY, LADDER.width, zoneHeight);
     this.physics.add.existing(this.ladderZone, true);
 
     // A topY/bottomY a player középpontjának szélsőértékei: fent a lábak pont a felső
     // platform felszínén állnak meg, lent a talajon.
     this.ladderContact = {
-      centerX: LADDER_X,
+      centerX: LADDER.x,
       topY: platformTop(upper) - PLAYER_HALF_HEIGHT,
       bottomY: GROUND_TOP - PLAYER_HALF_HEIGHT,
     };
@@ -286,49 +310,119 @@ export default class Level1Scene extends Phaser.Scene {
     // mögötti hátfal-oszlop megmarad (createLadder()), az funkcionális.
 
     // Pálya végi ajtó a felső platform jobb végén — a checkpoint + boss-transition trigger.
-    const upper = platformById('P9');
+    const upper = platformById('H1');
     this.add
-      .image(DOOR_X, platformTop(upper) - DOOR_HEIGHT / 2, 'door-placeholder')
+      .image(DOOR.x, platformTop(upper) - DOOR.height / 2, 'door-placeholder')
       .setDepth(-1);
   }
 
   private createDoorZone(): void {
-    const upper = platformById('P9');
-    const zoneY = platformTop(upper) - DOOR_HEIGHT / 2;
+    const upper = platformById('H1');
+    const zoneY = platformTop(upper) - DOOR.height / 2;
 
-    this.doorZone = this.add.zone(DOOR_X, zoneY, DOOR_WIDTH, DOOR_HEIGHT);
+    this.doorZone = this.add.zone(DOOR.x, zoneY, DOOR.width, DOOR.height);
     this.physics.add.existing(this.doorZone, true);
   }
 
+  /**
+   * Köztes checkpoint a spike-szakasz után. Az ajtóval ellentétben ÉRINTÉSRE aktiválódik,
+   * nem E-billentyűre: így nem versenyez az ajtó promptjával, és nem kell új input.
+   */
+  private createMidCheckpoint(): void {
+    const markerHeight = 64;
+
+    this.midCheckpointMarker = this.add
+      .image(MID_CHECKPOINT.x, GROUND_TOP - markerHeight / 2, 'checkpoint-placeholder')
+      .setTint(CHECKPOINT_TINT_IDLE)
+      .setDepth(-1);
+
+    this.midCheckpointZone = this.add.zone(
+      MID_CHECKPOINT.x,
+      GROUND_TOP - MID_CHECKPOINT.zoneHeight / 2,
+      MID_CHECKPOINT.zoneWidth,
+      MID_CHECKPOINT.zoneHeight
+    );
+    this.physics.add.existing(this.midCheckpointZone, true);
+
+    this.midCheckpointText = this.add
+      .text(MID_CHECKPOINT.x, GROUND_TOP - markerHeight - 16, 'Checkpoint', {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: '#ffd88a',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0);
+  }
+
+  private activateMidCheckpoint(): void {
+    this.midCheckpointActivated = true;
+    this.checkpoint.activate(MID_CHECKPOINT.x, MID_CHECKPOINT.y);
+    this.midCheckpointMarker.setTint(CHECKPOINT_TINT_ACTIVE);
+
+    // hold + yoyo: felvillan, áll, majd ugyanazzal a tweennel elhalványul.
+    this.tweens.add({
+      targets: this.midCheckpointText,
+      alpha: 1,
+      duration: 200,
+      hold: CHECKPOINT_FLASH_HOLD_MS,
+      yoyo: true,
+    });
+  }
+
+  /**
+   * MINDEN enemy explicit patrol-határt és `clampChaseToBounds`-ot kap (a szakadékok
+   * bevezetése előtt ez csak a platformon állókra volt igaz): enélkül egy üldöző földi
+   * enemy lesétálna a szakadék peremén, és a D szakaszban belesétálna a tüskékbe.
+   * A határok a Level1Layout ENEMY_SPAWNS adattömbjéből jönnek, ahol unit teszt őrzi,
+   * hogy mindegyik a saját felületén belül marad.
+   */
   private spawnEnemies(): void {
-    // Földi CrowHarvesterek: default patrol (spawn ±80px), üldözés közben szabadon mozognak.
-    this.enemies.push(new CrowHarvester(this, 820, 386));
-    this.enemies.push(new CrowHarvester(this, 1850, 386));
-    this.enemies.push(new CrowHarvester(this, 2700, 386));
-
-    // Platform-kötött CrowHarvesterek: a patrol range a platform tetejére szorul, és
-    // clampChaseToBounds miatt üldözés közben sem sétálnak le a peremről.
-    for (const id of ['P4', 'P8']) {
-      const p = platformById(id);
-      this.enemies.push(
-        new CrowHarvester(this, p.x, platformTop(p) - HARVESTER_SPAWN_OFFSET, {
-          patrolMinX: platformLeft(p) + EDGE_INSET,
-          patrolMaxX: platformRight(p) - EDGE_INSET,
+    for (const def of ENEMY_SPAWNS) {
+      const surface = surfaceSpan(def.surfaceId);
+      const enemy = new CrowHarvester(
+        this,
+        def.x,
+        surface.top - HARVESTER_SPAWN_OFFSET,
+        {
+          patrolMinX: def.patrolMinX,
+          patrolMaxX: def.patrolMaxX,
           clampChaseToBounds: true,
-        })
+        }
       );
-    }
 
-    // Csapás-hang. Távolság-alapú némítás NEM kell, pedig 5 enemy él a 3200px-es pályán:
-    // a CrowHarvester csak ATTACK_RANGE-en (42px) belül támad, tehát egy csapkodó lény
-    // definíció szerint a player mellett áll, és mindig a képernyőn van.
-    // A create() minden futáskor újraépíti az enemies tömböt, így listener sem duplikálódik.
-    for (const enemy of this.enemies) {
+      // Csapás-hang. Távolság-alapú némítás NEM kell: a CrowHarvester csak ATTACK_RANGE-en
+      // (42px) belül támad, tehát egy csapkodó lény definíció szerint a player mellett áll,
+      // és mindig a képernyőn van.
       enemy.on('harvester-attack', () => this.audio.playSfx(SFX_KEYS.ENEMY_SWING));
+
+      this.enemies.push(enemy);
     }
   }
 
-  update(): void {
+  /**
+   * A player halálakor az enemyk is újraélednek (a level1-layout spec szerint) — így egy
+   * szakaszt nem lehet ismételt halálokkal "lekoptatni".
+   *
+   * A tömb IDENTITÁSA nem változhat: a create()-ben regisztrált colliderek/overlapek erre a
+   * referenciára kötődnek (CLAUDE.md 2. tanulság), ezért splice + push, sosem új tömb.
+   */
+  private resetEnemies(): void {
+    for (const enemy of this.enemies) {
+      enemy.destroy();
+    }
+    this.enemies.splice(0, this.enemies.length);
+    this.spawnEnemies();
+  }
+
+  /** Ugyanaz a helyben-csere, mint a resetEnemies()-nél: a fireball-colliderek is a tömbre kötnek. */
+  private clearFireballs(): void {
+    for (const fireball of this.fireballs) {
+      fireball.destroy();
+    }
+    this.fireballs.splice(0, this.fireballs.length);
+  }
+
+  update(_time: number, _delta: number): void {
     // A kamera scrollX-e a scene update() UTÁN frissül, tehát a háttér 1 frame-et késik.
     // 0.1-0.5-ös parallax faktornál ez legfeljebb ~1.5px — nem észlelhető, ezért nem
     // kell külön PRE_RENDER hook.
@@ -341,6 +435,7 @@ export default class Level1Scene extends Phaser.Scene {
     this.player.setLadderContact(touchingLadder ? this.ladderContact : null);
 
     this.controller.update();
+    this.tutorialHint.update(this.player.x);
 
     // Debug kijelzés (Phase 8 / ui modul cseréli le): HP + aktuális player state.
     this.playerHpText.setText(
@@ -348,6 +443,12 @@ export default class Level1Scene extends Phaser.Scene {
     );
 
     for (const enemy of this.enemies) {
+      // Biztosíték: a patrol-határok ezt elvileg kizárják, de egy szakadékba került enemy
+      // enélkül némán "patrolozna" a világ alján, a képernyőn kívül.
+      if (!enemy.isDead() && enemy.y > FALL_DEATH_Y) {
+        enemy.takeDamage(enemy.getMaxHP());
+        continue;
+      }
       enemy.update(this.player);
     }
 
@@ -357,6 +458,16 @@ export default class Level1Scene extends Phaser.Scene {
       }
     }
 
+    this.checkSpikeContact();
+
+    if (
+      !this.midCheckpointActivated &&
+      !this.player.isDead() &&
+      this.physics.overlap(this.player, this.midCheckpointZone)
+    ) {
+      this.activateMidCheckpoint();
+    }
+
     const nearDoor = !this.player.isDead() && this.physics.overlap(this.player, this.doorZone);
     this.checkpointPromptText.setVisible(nearDoor && !this.isTransitioning);
 
@@ -364,19 +475,61 @@ export default class Level1Scene extends Phaser.Scene {
       this.activateCheckpointAndTransition();
     }
 
+    // Zuhanás-halál. A flag KELL: a takeDamage() HURT-lockja alatt (150ms) a player még
+    // zuhan, tehát flag nélkül minden frame újra sebezne és új delayedCall-t ütemezne.
+    if (!this.player.isDead() && !this.fallDeathTriggered && this.player.y > FALL_DEATH_Y) {
+      this.fallDeathTriggered = true;
+      this.player.takeDamage(this.player.getHP());
+    }
+
     if (this.player.isDead() && !this.respawnScheduled) {
       this.respawnScheduled = true;
       this.time.delayedCall(RESPAWN_DELAY_MS, () => {
         const { x, y } = this.checkpoint.getRespawnPoint();
+        this.clearFireballs();
+        this.resetEnemies();
         this.player.respawn(x, y);
         this.respawnScheduled = false;
+        this.fallDeathTriggered = false;
+        // Az új élet ne örökölje az előző halál i-frame-jeit — különben a checkpointról
+        // épp a tüskékbe visszaéledő player egy ablaknyi ideig sebezhetetlen lenne.
+        this.hazardGate.reset();
       });
+    }
+  }
+
+  /**
+   * Tüske-érintkezés. Szinkron `physics.overlap()`, mint a létránál és az ajtónál — nem
+   * `physics.add.overlap` callback, ami csak a scene update()-je UTÁN futna le.
+   *
+   * A HP-t a `hazardGate` i-frame ablaka védi, NEM a visszalökés: a `Player` HURT-lockja
+   * csak 150 ms, és a velocityhez sem nyúl, tehát a lendület megmarad. A 900 ms-os ablak
+   * mellett egy nekifutásból való átkelés (128 px / 200 px/s = 640 ms) PONTOSAN egy
+   * találatot ér — a D szakasz tutorial, nem büntetés. Aki viszont MEGÁLL a tüskéken,
+   * ablakonként újra sebződik: az már az ő döntése.
+   */
+  private checkSpikeContact(): void {
+    if (this.player.isDead()) return;
+    if (!this.hazardGate.canDamage(this.time.now)) return;
+
+    for (const zone of this.spikes.getZones()) {
+      if (!this.physics.overlap(this.player, zone)) continue;
+
+      this.hazardGate.register(this.time.now);
+      this.player.takeDamage(SPIKE_DAMAGE);
+
+      // CSAK függőleges pop, a takeDamage() UTÁN (az HURT state-re vált, de a velocityhez
+      // nem nyúl). Vízszintesen SZÁNDÉKOSAN nem lökünk: a hátrafelé tolás annyival nyújtaná
+      // meg a mezőn töltött időt, hogy az i-frame ablak lejárna, és a player egyetlen hibáért
+      // kétszer sebződne — lásd a SPIKE_KNOCKBACK_Y kommentjét.
+      this.player.setVelocityY(SPIKE_KNOCKBACK_Y);
+      return;
     }
   }
 
   private activateCheckpointAndTransition(): void {
     this.isTransitioning = true;
-    this.checkpoint.activate(CHECKPOINT_X, CHECKPOINT_Y);
+    this.checkpoint.activate(DOOR_CHECKPOINT.x, DOOR_CHECKPOINT.y);
     this.checkpointPromptText.setText('Checkpoint mentve...').setVisible(true);
 
     // A zene a KÉPPEL EGYÜTT halkul el. A scene shutdownja önmagában is elvágná (az

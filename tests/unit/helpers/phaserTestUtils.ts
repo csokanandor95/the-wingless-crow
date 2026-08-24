@@ -22,10 +22,26 @@ export function createMockBody() {
   };
 }
 
-function createMockZone() {
+export interface MockZone {
+  body: unknown;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  setData: ReturnType<typeof vi.fn>;
+  getData: ReturnType<typeof vi.fn>;
+}
+
+// A geometriát (x/y/width/height) a SpikeField tesztje olvassa vissza: azt bizonyítja, hogy
+// a sebző zóna a mező KÖZEPÉN ül, a talaj felszínén, és a behúzás a mező egészére vonatkozik.
+function createMockZone(x = 0, y = 0, width = 0, height = 0): MockZone {
   const data = new Map<string, unknown>();
   return {
     body: null,
+    x,
+    y,
+    width,
+    height,
     // Stateful: a Player attack-hitboxa setData('damage', ...)-vel ír, a
     // Level1Scene (és a tesztek) getData('damage')-vel olvassák vissza.
     setData: vi.fn((key: string, value: unknown) => {
@@ -172,10 +188,16 @@ export function createMockImage(
 function createMockText() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const text: any = {
+    destroyed: false,
     setPosition: vi.fn(() => text),
     setText: vi.fn(() => text),
     setOrigin: vi.fn(() => text),
     setVisible: vi.fn(() => text),
+    // A CrowHarvester.destroy()-a felszabadítja a debug HP-szöveget (a scene-en belüli
+    // enemy-reset miatt már nem elég a scene-shutdown takarítása).
+    destroy: vi.fn(() => {
+      text.destroyed = true;
+    }),
   };
   return text;
 }
@@ -184,7 +206,20 @@ export function createMockScene() {
   return {
     add: {
       existing: vi.fn(),
-      zone: vi.fn(() => createMockZone()),
+      zone: vi.fn((x?: number, y?: number, width?: number, height?: number) =>
+        createMockZone(x, y, width, height)
+      ),
+      // A SpikeField ezzel csempézi a tüske-grafikát a mező hosszában (a létra mintájára).
+      tileSprite: vi.fn(
+        (x: number, y: number, width: number, height: number, texture: string) => {
+          const sprite = { x, y, width, height, texture, depth: 0, setDepth: vi.fn() };
+          sprite.setDepth.mockImplementation((v: number) => {
+            sprite.depth = v;
+            return sprite;
+          });
+          return sprite;
+        }
+      ),
       text: vi.fn(() => createMockText()),
       image: vi.fn((x: number, y: number, texture: string, frame: string | number) =>
         createMockImage(x, y, texture, frame)
@@ -205,7 +240,12 @@ export function createMockScene() {
     // A tween mock tweent AD VISSZA (nem undefined-ot), mert az AudioManager eltárolja és
     // `stop()`-olja a futó fade-et. A `flushLastTween()` a hívás ARGUMENTUMAIBÓL olvas,
     // ezért ez a többi tesztet nem érinti.
-    tweens: { add: vi.fn((_config: MockTweenConfig) => createMockTween()) },
+    // A killTweensOf-ot a CrowHarvester.destroy()-a hívja: a halál-fade tweenje futhat még
+    // rajta, amikor a Level1Scene enemy-resetje megsemmisíti.
+    tweens: {
+      add: vi.fn((_config: MockTweenConfig) => createMockTween()),
+      killTweensOf: vi.fn((_target: unknown) => undefined),
+    },
     // A Phaser SoundManager game-szintű; az AudioManager innen kér hangot, és a scene
     // `events`-én keresztül iratkozik fel a shutdownra.
     sound: {

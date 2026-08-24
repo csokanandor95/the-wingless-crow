@@ -4,6 +4,7 @@ import Level1Scene from './scenes/Level1Scene';
 import BossScene from './scenes/BossScene';
 import NarrationScene from './scenes/NarrationScene';
 import Level2Scene from './scenes/Level2Scene';
+import { GRAVITY_Y } from './config/physics';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -18,7 +19,9 @@ const config: Phaser.Types.Core.GameConfig = {
     default: 'arcade',
     arcade: {
       // Phaser 4-ben a gravity Vector2Like, tehát az x is kötelező (Phaser 3-ban nem volt az).
-      gravity: { x: 0, y: 800 },
+      // Az érték a config/physics.ts-ből jön: a Level1Layout ugyanebből vezeti le a maximális
+      // ugrásmagasságot és -távolságot, amikhez a pálya szakadékai méretezve vannak.
+      gravity: { x: 0, y: GRAVITY_Y },
       debug: true,
     },
   },

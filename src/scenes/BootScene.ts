@@ -70,6 +70,7 @@ import bgRuinsUrl from '../../assets/backgrounds/ruined-city/03-ruins.png';
 // ez teszi a rajzolt padlóélt PONTOSAN a BossScene GROUND_TOP-jára (418). Lásd CLAUDE.md.
 import bossArenaUrl from '../../assets/backgrounds/cathedral/boss-arena.png';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
+import { SPIKE_HEIGHT, SPIKE_TILE_WIDTH } from '../levels/Level1Layout';
 
 const LOADING_BAR_WIDTH = 320;
 const LOADING_BAR_HEIGHT = 14;
@@ -235,6 +236,33 @@ export default class BootScene extends Phaser.Scene {
     doorGfx.fillRect(0, 0, 48, 72);
     doorGfx.generateTexture('door-placeholder', 48, 72);
     doorGfx.destroy();
+
+    // Tüskék (Level 1, D szakasz). Egyetlen 32x16-os csempe, amit a SpikeField tileSprite-tal
+    // ismétel a mező hosszában. A világos csont-szín szándékos: a spec megköveteli, hogy a
+    // hazard egyértelműen felismerhető legyen, a talaj (0x3a3a3a) és a poros vörös háttér
+    // előtt pedig ez a legerősebb kontraszt.
+    const spikeGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    spikeGfx.fillStyle(0x2e2a30, 1);
+    spikeGfx.fillRect(0, 12, SPIKE_TILE_WIDTH, 4); // talapzat
+    spikeGfx.fillStyle(0xc8c2b0, 1);
+    for (let i = 0; i < 4; i++) {
+      const x = i * 8;
+      spikeGfx.fillTriangle(x, 14, x + 4, 0, x + 8, 14);
+    }
+    spikeGfx.generateTexture('spike-placeholder', SPIKE_TILE_WIDTH, SPIKE_HEIGHT);
+    spikeGfx.destroy();
+
+    // Köztes checkpoint jelölő (Level 1, a spike-szakasz után): egy alacsony talapzat +
+    // egy karcsú oszlop. Aktiválatlanul sötét; aktiváláskor a scene setTint()-tel
+    // világítja ki, ezért a textúra szándékosan világosszürke alapon készül.
+    const checkpointGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    checkpointGfx.fillStyle(0x9a9aa8, 1);
+    checkpointGfx.fillRect(0, 56, 24, 8); // talapzat
+    checkpointGfx.fillRect(8, 8, 8, 48); // oszlop
+    checkpointGfx.fillStyle(0xd8d0c0, 1);
+    checkpointGfx.fillRect(4, 0, 16, 10); // tálca a láng helyén
+    checkpointGfx.generateTexture('checkpoint-placeholder', 24, 64);
+    checkpointGfx.destroy();
 
     // Boss lövedék: nagyobb és lilás, hogy egyértelműen elváljon a player tűzgolyójától.
     const bossProjectileGfx = this.make.graphics({ x: 0, y: 0 }, false);

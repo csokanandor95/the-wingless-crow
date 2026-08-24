@@ -324,6 +324,32 @@ export default class CrowHarvester extends Phaser.Physics.Arcade.Sprite implemen
     this.play(key, true);
   }
 
+  /**
+   * A Level1Scene a player halálakor MEGSEMMISÍTI és újraspawnolja az összes enemyt
+   * (`resetEnemies()`), tehát a destroy() már nem csak scene-shutdownkor fut le, hanem
+   * a játék közben is — élő, akár épp támadó lényen.
+   *
+   * A `DEAD` state beállítása KÖTELEZŐ a `super.destroy()` ELŐTT: ez teszi inertté az összes
+   * függőben lévő `delayedCall`-t (startAttack startup/cooldown, playHitReaction), amelyek
+   * mind `crowHarvesterState === DEAD` guarddal indulnak. Enélkül egy windup közben
+   * megsemmisített lény callbackje MÉG MINDIG megsebezné a playert (resolveAttackHit ->
+   * playerRef.takeDamage) egy már nem létező kaszával.
+   */
+  override destroy(fromScene?: boolean): void {
+    this.crowHarvesterState = CrowHarvesterState.DEAD;
+    this.playerRef = null;
+
+    // A die() elhalványító tweenje futhat még rajtunk; a destroy után az onComplete
+    // (setVisible) egy megsemmisített objektumon hívódna meg.
+    this.scene?.tweens.killTweensOf(this);
+
+    // A die() csak elrejti a HP-szöveget — a scene-shutdown eddig amúgy is felszabadította.
+    // Az in-scene reset viszont nem, ezért itt kell explicit megsemmisíteni.
+    this.hpText.destroy();
+
+    super.destroy(fromScene);
+  }
+
   isDead(): boolean {
     return this.crowHarvesterState === CrowHarvesterState.DEAD;
   }

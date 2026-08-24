@@ -106,6 +106,43 @@ describe('CrowHarvester', () => {
     });
   });
 
+  // A Level1Scene a player halálakor megsemmisíti és újraspawnolja az összes enemyt
+  // (resetEnemies()), tehát a destroy() már nem csak scene-shutdownkor fut le, hanem
+  // menet közben, akár egy ÉPP TÁMADÓ lényen.
+  describe('destroy (in-scene enemy reset)', () => {
+    it('DEAD-re állít, hogy a függő delayedCall-ok inertté váljanak', () => {
+      crowHarvester.destroy();
+
+      expect(crowHarvester.isDead()).toBe(true);
+      expect(crowHarvester.crowHarvesterState).toBe(CrowHarvesterState.DEAD);
+    });
+
+    it('a windup közben megsemmisített lény MÁR NEM sebzi meg a playert', () => {
+      const near = createPlayerAt(scene, HARVESTER_X + 50, HARVESTER_Y);
+      crowHarvester.update(near); // CHASE
+
+      near.x = HARVESTER_X + ATTACK_RANGE - 5;
+      crowHarvester.update(near); // ATTACK — startAttack() ütemezi a startup delayedCallt
+      expect(crowHarvester.crowHarvesterState).toBe(CrowHarvesterState.ATTACK);
+
+      // A reset a windup KÖZBEN kapja el: a sebzés-callback még ütemezve van.
+      crowHarvester.destroy();
+      createDelayedCallStepper(scene).next(); // ATTACK_STARTUP_MS
+
+      expect(near.getHP()).toBe(PLAYER_MAX_HP);
+    });
+
+    it('felszabadítja a debug HP-szöveget és leállítja a futó tweeneket', () => {
+      crowHarvester.takeDamage(MAX_HP); // die() -> elhalványító tween indul
+      crowHarvester.destroy();
+
+      expect(scene.tweens.killTweensOf).toHaveBeenCalledWith(crowHarvester);
+      // A hpText az egyetlen scene-objektum, amit a CrowHarvester maga hoz létre.
+      const hpText = scene.add.text.mock.results[0].value as { destroyed: boolean };
+      expect(hpText.destroyed).toBe(true);
+    });
+  });
+
   describe('state transitions', () => {
     it('PATROL->CHASE csak akkor, ha vízszintesen ÉS vertikálisan is közel van a player', () => {
       // Csak vízszintesen közel, de vertikálisan távol -> marad PATROL.

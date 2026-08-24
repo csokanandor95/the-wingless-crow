@@ -58,7 +58,9 @@ Három opció volt feltéve a usernek:
 
 Készen: Step 1 (Projekt setup), Phase 2 (Player), Phase 3 (Combat), Phase 4 (Magic), Phase 5 (Enemy) részlegesen — CrowHarvester kész.
 
-**Phase 6 (Level) KÉSZ:** level layout, platforms, environment, checkpoint, transition mind megvan. A pálya végi ajtónál (`door-placeholder`, P9 platform) **E** billentyűvel aktiválható a checkpoint, ami egyben fade-out után átvált a `BossScene`-re.
+**Phase 6 (Level) KÉSZ:** level layout, platforms, environment, checkpoint, transition mind megvan. A pálya végi ajtónál (`door-placeholder`, `H1` platform) **E** billentyűvel aktiválható a checkpoint, ami egyben fade-out után átvált a `BossScene`-re.
+*(A Phase 6 ÚJRA MEG LETT NYITVA a Phase 8 közben — lásd lentebb a „Level 1 Redesign" blokkot.
+A pálya 3200 → 6000 px, a talaj szegmensekre bomlott, és szakadékok kerültek bele.)*
 
 **Phase 7 (Boss) KÉSZ:** valódi boss (`bosses/GraftedWingBreaker.ts` — *The Grafted
 Wing-Breaker*, a Project_plan.md 12. pontja szerinti névvel), fix 800×450-es boss aréna,
@@ -162,7 +164,29 @@ az ajtón át nem lép a `BossScene`-re.
 A Phase 8 többi része (environment sprite-ok, a maradék SFX, particles,
 `ui/` modul) még hátravan.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (10 fájl, 177 teszt — ebből 5 az animáció-/háttér-/VFX-vezérlést fedi). Game state / Utility logic unit tesztek még hátravannak. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
+**LEVEL 1 REDESIGN — 1. iteráció KÉSZ (a Phase 8 közé beszúrt, 3 iterációs blokk).**
+Az eredeti Level 1 (3200 px, folyamatos talaj, hazard nélkül) pillanatok alatt átugrálható
+volt. A user layout-specje (`2D helper/level1-layout.md`) alapján a pálya **6000 px**-re nőtt,
+nyolc szakaszra tagolva: `A start/mozgás-tutorial · B első enemy · C platforming + gap ·
+D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc · H boss-ajtó`.
+
+- **1. iteráció (KÉSZ):** layout-váz — új `src/levels/Level1Layout.ts` adatmodul, öt
+  talaj-szegmens + **négy szakadék**, 13 platform, **8 CrowHarvester**, zuhanás-halál,
+  **enemy-respawn**, köztes checkpoint, tutorial feliratok (`src/ui/TutorialHint.ts`).
+- **2. iteráció (KÉSZ):** spike-ok a D szakaszban — `src/hazards/HazardDamage.ts`
+  (i-frame kapu) + `src/hazards/SpikeField.ts`. Egy 128px-es mező a G3-on (2740–2868),
+  15 sebzés, függőleges visszalökés. Részletek lentebb, a „Hazardok" szakaszban.
+- **3. iteráció (hátravan):** Swinging Reaper az F szakaszban.
+
+**Két viselkedés-változás a korábban dokumentálthoz képest (user-döntés):**
+1. **A player halálakor az enemyk is újraélednek** (`Level1Scene.resetEnemies()`). Korábban
+   szándékosan CSAK a player állt vissza; egy 6000 px-es pályán viszont az azt jelentené,
+   hogy egy nehéz szakaszt ismételt halálokkal „le lehet koptatni".
+2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
+   aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
+
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**12 fájl, 225 teszt** — ebből 5 az animáció-/háttér-/VFX-vezérlést, 1 a **Level 1 pálya-geometriát**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak.
+- A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
 - A `CrowHarvester`/`Player`/`GraftedWingBreaker` `scene.time.delayedCall`-jai **interleave-elhetnek** (pl. `CrowHarvester.resolveAttackHit()` a `Player.takeDamage()`-en keresztül saját delayedCallt ütemez ugyanazon a mock scene-en) — ezért a `createDelayedCallStepper` helper (`tests/unit/helpers/phaserTestUtils.ts`) `.next()` (egy lépés) ÉS `.flushRemaining()` (a kurzortól a végéig, újra-tüzelés nélkül) metódust is ad. A `createDelayedCallStepper(scene, true)` (`skipExisting`) a kurzort a MÁR ütemezett hívások mögé állítja — ez kell, ha a teszt előkészítése maga is ütemez callbackeket (pl. a bosst Phase 2-be sebezzük, ami hit-villanást ütemez).
@@ -212,6 +236,8 @@ the-wingless-crow/
 │       ├── crowHarvester.test.ts # §23 Enemy scope (CrowHarvester HP/damage/death/state transitions)
 │       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, slash/projectile/spell/charge, death)
 │       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown, SFX)
+│       ├── level1Layout.test.ts # a Level 1 geometria invariánsai (elérhetőség-BFS, gapek, enemy-bounds, spike-ok)
+│       ├── hazards.test.ts      # HazardDamageGate i-frame ablak + SpikeField geometria
 │       ├── playerAnimations.test.ts       # state->anim leképezés + a Player animáció-vezérlése
 │       ├── crowHarvesterAnimations.test.ts # state->anim + a facing-kompenzáció regressziós tesztje
 │       ├── bossAnimations.test.ts         # state->anim, facing-kompenzáció SCALE-lel, levezetett konstansok
@@ -223,9 +249,18 @@ the-wingless-crow/
 ├── src/
 │   ├── main.ts
 │   ├── vite-env.d.ts             # /// <reference types="vite/client" /> — az *.mp3 import típusa
+│   ├── config/
+│   │   └── physics.ts            # GRAVITY_Y — a main.ts ÉS a Level1Layout ugrás-számítása ebből dolgozik
+│   ├── levels/
+│   │   └── Level1Layout.ts       # a Level 1 TELJES geometriája, Phaser-mentes adatmodulként
+│   ├── hazards/
+│   │   ├── HazardDamage.ts       # HazardDamageGate — KÖZÖS i-frame ablak minden hazardnak
+│   │   └── SpikeField.ts         # statikus tüskemezők (látvány tileSprite + külön hitbox Zone)
+│   ├── ui/
+│   │   └── TutorialHint.ts       # egyszer megjelenő billentyű-súgó (ez nyitja meg az ui/ mappát)
 │   ├── scenes/
 │   │   ├── BootScene.ts          # placeholder textúrák + audio betöltés + loading kijelzés
-│   │   ├── Level1Scene.ts        # 3200px pálya, PLATFORMS adattömb, létra, 5 CrowHarvester, checkpoint-ajtó
+│   │   ├── Level1Scene.ts        # 6000px pálya; a geometria a levels/Level1Layout.ts-ből jön
 │   │   ├── BossScene.ts          # 800x450 fix aréna, boss entrance, HP-bar, victory/defeat ágak
 │   │   ├── NarrationScene.ts     # adatvezérelt szöveges átvezető (typewriter), újrahasználható
 │   │   └── Level2Scene.ts        # placeholder — a Level 2 tervezése még hátravan
@@ -251,7 +286,7 @@ the-wingless-crow/
 │       └── DamageSystem.ts       # Damageable interface + PhysicsOverlapObject típus-alias
 ```
 
-Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `EndingScene`, `enemies/Archer.ts`, `enemies/Beast.ts`, `systems/GameState.ts`, `ui/` mappa (HUD, Menu, Dialogue), és az `assets/` alatt a `sprites/ backgrounds/ tiles/ effects/` mappák (egyelőre csak `audio/` van).
+Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `EndingScene`, `enemies/Archer.ts`, `enemies/Beast.ts`, `systems/GameState.ts`, `hazards/SwingingReaper.ts` (a Level 1 Redesign 3. iterációja), és az `assets/` alatt a `tiles/ effects/` mappák. Az `ui/` mappa **megnyílt** a `TutorialHint.ts`-szel, de a HUD / Menu / Dialogue még hátravan.
 
 > A tervezett `EndingScene.ts` és `ui/Dialogue.ts` szerepét várhatóan a `NarrationScene`
 > fogja betölteni (adatvezérelt: `{ lines, nextScene, title? }`), ezért azok külön fájlként
@@ -375,19 +410,59 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   peremről. A flag nélkül (default false) a földi enemyk szabadon üldöznek — ez fontos,
   különben ±80px-be szorulnának.
 
-### Level1Scene (`src/scenes/Level1Scene.ts`)
-- **3200×450-es pálya** (a magasság szándékosan = canvas magasság, így csak vízszintes kameragörgetés van; a létra is belefér a sávba)
-- **Folyamatos talaj, NINCS szakadék** — amíg nincs checkpoint/respawn, egy pit soft-lockot okozna
-- **9 platform** a modul-szintű `PLATFORMS` tömbben (adatvezérelt: az enemy patrol-határok
-  ugyanebből a forrásból származnak, `platformTop/Left/Right` helper függvényekkel — ne
-  duplikálj magic numbereket). P9 `oneWay: true` → `checkCollision.down = false`, a létra
-  ezen megy át
-- **5 CrowHarvester**: 3 földi (820, 1850, 2700) + 2 platformon álló (P4 tágas, P8 szűk)
-- **Létra** a pálya végén (x=2762): `tileSprite` a vizuál, külön `Zone` statikus bodyval
+### Level1Scene (`src/scenes/Level1Scene.ts` + `src/levels/Level1Layout.ts`)
+
+> **A geometria NEM a scene-ben él.** A `Level1Layout.ts` egy szándékosan Phaser-mentes
+> adatmodul: `GROUND_SEGMENTS`, `PLATFORMS`, `ENEMY_SPAWNS`, `LADDER`, `DOOR`,
+> `MID_CHECKPOINT`, `TUTORIAL_HINTS` + a geometria-helperek. Így a pálya invariánsai
+> GameObject-mockolás nélkül unit-tesztelhetők (`tests/unit/level1Layout.test.ts`) —
+> ugyanaz az elv, mint a `ParallaxBackground` pure `tilePositionForScroll()`-jánál.
+> **Magic number nem kerülhet vissza a scene-be.**
+
+- **6000×450-es pálya** (a magasság szándékosan = canvas magasság, így csak vízszintes
+  kameragörgetés van; a létra is belefér a sávba). Nyolc szakasz: A–H, lásd fentebb
+- **A talaj NEM folyamatos:** öt `GROUND_SEGMENTS` szegmens, a köztük lévő **négy hézag
+  a szakadék** (160 / 160 / 130 / 400 px). A `groundGaps()` SZÁMÍTJA őket a szegmensekből,
+  tehát nincsenek külön felsorolva — egy szegmens elmozdítása automatikusan átméretezi a
+  szomszédos szakadékot
+- **Zuhanás-halál:** a FIZIKAI világ mélyebb a canvasnál (`WORLD_HEIGHT + FALL_DEPTH`),
+  a KAMERA bounds-a viszont 450 marad → nincs függőleges görgetés, de a player láthatóan
+  kizuhan a képből. A `FALL_DEATH_Y` (520) átlépésekor `takeDamage(getHP())` — nincs új
+  Player-API, a meglévő HURT→`die()` lánc fut. **A `fallDeathTriggered` flag KÖTELEZŐ:**
+  a HURT-lock 150 ms-a alatt a player még zuhan, tehát enélkül minden frame újra sebezne
+  és új `delayedCall`-t ütemezne
+- **A szakadékok MÉRETEZETTEK, nem szemre rakottak.** A layout a `Player` exportált
+  `MOVE_SPEED`/`JUMP_VELOCITY`-jéből és a `config/physics.ts` `GRAVITY_Y`-jából számol:
+  `MAX_JUMP_HEIGHT = 156`, `MAX_JUMP_DISTANCE = 250`. A `horizontalReachForRise(rise)`
+  adja a tényleges hatótávot adott emelkedéshez (magasabbra ugorva rövidebbet lehet
+  ugrani). A teszt ezzel **bejárja a pályát** (BFS a start szegmensről) és bizonyítja,
+  hogy minden felület elérhető
+- **13 platform** a `PLATFORMS` tömbben (adatvezérelt: az enemy patrol-határok ugyanebből a
+  forrásból származnak, `platformTop/Left/Right` helperekkel). `H1` `oneWay: true` →
+  `checkCollision.down = false`, a létra ezen megy át
+- **8 CrowHarvester**, és **MINDEGYIK explicit patrol-határt + `clampChaseToBounds: true`-t
+  kap** — nem csak a platformon állók, mint korábban. Enélkül egy üldöző földi enemy
+  lesétálna a szakadék peremén (a 2. iterációban pedig belesétálna a tüskékbe). A
+  `CrowHarvester`-ben ez **kódváltozás nélkül** megvolt
+- **Enemy-respawn:** a player halálakor a `resetEnemies()` megsemmisíti és a layout-adatból
+  újraspawnolja az összes lényt (a `clearFireballs()` a lövedékeket is). **A tömb
+  IDENTITÁSA nem változhat** (splice + push, sosem új tömb): a `create()`-ben regisztrált
+  colliderek/overlapek erre a referenciára kötődnek, és a Phaser minden physics stepben
+  újraiterálja a tartalmát (lásd 2. tanulság). Ehhez kellett a `CrowHarvester.destroy()`
+  override — lásd a 18. tanulságot
+- **Két checkpoint:** a pálya végi ajtó (**E** billentyű) és egy **köztes** (x=3000, a
+  spike-szakasz után), ami **ÉRINTÉSRE** aktiválódik. Utóbbi szándékosan más input, hogy ne
+  versenyezzen az ajtó promptjával; a visszajelzés a jelölő kivilágosodása + egy rövid felirat
+- **Tutorial feliratok** (`src/ui/TutorialHint.ts`): a mozgás-súgó `triggerX: 0`, tehát
+  AZONNAL, a spawn pillanatában megjelenik — egy `START_X` fölötti küszöb csapda lenne
+  (csak azután jönne, hogy a játékos magától már elindult). A súgók CSAK friss játékban
+  jelennek meg: boss-vereség után az ajtó-checkpointon éledünk újra, ahol mindkét trigger
+  átlépettnek számítana
+- **Létra** a pálya végén (x=5570): `tileSprite` a vizuál, külön `Zone` statikus bodyval
   a fizika. A scene `update()`-je **szinkron** `this.physics.overlap(player, ladderZone)`-t
   használ, NEM `physics.add.overlap` callbacket — utóbbi csak a scene `update()` UTÁN
   futna le, ami 1 frame késést okozna a mászásban
-- **Checkpoint-ajtó** (x=3040, P9 jobb vége): ugyanaz a szinkron `physics.overlap()` minta,
+- **Checkpoint-ajtó** (x=5840, `H1` jobb vége): ugyanaz a szinkron `physics.overlap()` minta,
   mint a létránál (`doorZone`). Közelben **E**-re: `checkpoint.activate()` + 500ms
   `cameras.main.fadeOut()` + scene-váltás. A prompt-szöveg csak akkor látszik, ha a player
   a zónában van és még nincs folyamatban a transition (`isTransitioning` flag)
@@ -401,9 +476,11 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - **Respawn**: az `update()` minden frame-ben nézi `player.isDead()`-et; ha igen és még
   nincs ütemezve respawn (`respawnScheduled` flag), `RESPAWN_DELAY_MS` (1200ms) után
   lekéri a `CheckpointSystem`-től az aktuális respawn-pontot és meghívja `player.respawn(x,y)`-t.
-  **Csak a playert állítja vissza** — az enemyk HP/állapota változatlan marad (szándékos
-  scope-döntés, nem terveltérés: az egyszerűbb, "ne büntesd duplán a playert" viselkedést
-  választottuk a teljes pálya-reset helyett)
+  **Az enemyk és a lövedékek IS visszaállnak** (`resetEnemies()` + `clearFireballs()`, a
+  `player.respawn()` ELŐTT). *Ez VÁLTOZÁS: korábban szándékosan csak a player állt vissza
+  („ne büntesd duplán"), de a 6000 px-es, szakadékokkal tagolt pályán az azt jelentené, hogy
+  egy nehéz szakaszt ismételt halálokkal le lehet koptatni. User-döntés, a Project_plan.md
+  14. pontja frissítve.*
 - **A `checkpoint` a Phaser `registry`-ben perzisztál** (`this.registry.get/set('checkpoint', ...)`),
   NEM sima `Level1Scene` mezőként — mivel az ajtónál az E lenyomása egyszerre aktiválja a
   checkpointot ÉS azonnal átvált a `BossScene`-re, egy sima mezőben tárolt checkpoint minden
@@ -560,6 +637,47 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   szöveggel) → `Level2Scene`
 - **Vereség**: fade → `Level1Scene`, ahol a player a checkpointon (az ajtónál) éled újra és
   **E**-vel léphet be ismét; a boss ilyenkor friss HP-val indul
+
+### Hazardok (`src/hazards/`)
+
+Környezeti veszélyek — az enemyktől eltérően **folyamatos érintkezésűek**, és ez az egyetlen
+lényeges különbség, amiből minden más következik.
+
+**`HazardDamage.ts` — a közös i-frame kapu.**
+- `HAZARD_INVULNERABILITY_MS = 900` + a pure `HazardDamageGate` (`canDamage(now)` /
+  `register(now)` / `reset()`). Phaser-mentes, ezért mockolás nélkül tesztelhető.
+- **Miért kell:** a `Player.takeDamage()` szándékosan NEM néz HURT állapotot, csak DEAD-et —
+  egy enemy-csapásnál ez helyes, mert az diszkrét esemény. Egy tüskén ÁLLVA viszont a scene
+  minden frame-ben (60×/s) sebezne, és a 100 HP két másodperc alatt elfogyna. A playernek
+  nincs általános sebezhetetlenségi rendszere; ez a kapu a legkisebb változtatás, ami ezt
+  megoldja anélkül, hogy a `Player`-hez hozzányúlnánk.
+- **EGYETLEN, MEGOSZTOTT példány** a `Level1Scene`-ben minden hazardra (tüske most, reaper
+  a 3. iterációban): egy tüskébe esve ne lehessen ugyanabban a pillanatban a kaszától is
+  sebződni. A `create()`-ben ÉS respawnkor is `reset()`-elni kell (class field initializer,
+  tehát scene-restartkor nem épül újra — lásd 3. tanulság).
+- A 900 ms-nak **gameplay-jelentése van**: a 128px-es mezőn `MOVE_SPEED` (200 px/s) mellett
+  640 ms átkelni, tehát egy nekifutás PONTOSAN egy találatot ér. Unit teszt őrzi, hogy az
+  ablak a 640 ms fölött marad.
+
+**`SpikeField.ts` — statikus tüskemezők (D szakasz).**
+- **A látvány és a hitbox KÜLÖN objektum**, a létra mintájára: egy `tileSprite` csempézi a
+  grafikát a mező hosszában, a sebzést egyetlen static bodys `Zone` adja.
+  **Ez nem stílus-kérdés:** a `SPIKE_HITBOX_INSET_X` (4px) behúzás így a MEZŐ két szélére
+  vonatkozik. Csempénkénti bodyk mellett a behúzások **sebezhetetlen réseket nyitnának a
+  tüskék KÖZÖTT**, ahol a player büntetlenül megállhatna. Unit teszt őrzi.
+- A mezők NEM ütköznek (csak overlap): át lehet gyalogolni rajtuk, sebzés árán. A scene
+  **szinkron** `physics.overlap()`-pel teszteli őket, mint a létrát és az ajtót.
+- **A visszalökés CSAK FÜGGŐLEGES** (`SPIKE_KNOCKBACK_Y = -260`). Volt vízszintes összetevő
+  is („tolja vissza, amerről jött"), de manuális teszten kiderült, hogy **saját magának okoz
+  egy második találatot**: a hátrafelé tolás ~36px haladást és ~150ms-ot vesz el, amitől az
+  átkelés 970 ms-ra nyúlik — túl a 900 ms-os ablakon. A player egyetlen hibáért kétszer
+  fizetett, és a másodikat a JÁTÉK REAKCIÓJA okozta: pont az, amit a layout-spec
+  „avoid unavoidable damage" pontja tilt. Vízszintes lökés nélkül a lendület megmarad (a
+  HURT-lock nem nyúl a velocityhez), és az átkelés egy találat. Aki MEGÁLL a tüskéken,
+  ablakonként újra sebződik — az már az ő döntése.
+- **Az enemyk nem sétálnak a tüskékbe, és ehhez NINCS enemy-kód.** Tisztán layout-kérdés: a
+  `D-1` CrowHarvester patrol-határa (2460–2700) nem éri el a mezőt (2740–2868). Unit teszt
+  őrzi, hogy egyetlen enemy patrol-tartománya se metsszen spike-mezőt.
 
 ### NarrationScene (`src/scenes/NarrationScene.ts`)
 - Adatvezérelt, újrahasználható szöveges átvezető: `scene.start('NarrationScene', { lines, nextScene, title? })`
@@ -730,6 +848,18 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
     (`bodyOffsetX + bodyWidth / 2`), nem külön hangolható konstans. Ezt a
     `crowHarvesterAnimations.test.ts` és a `bossAnimations.test.ts` egyaránt őrzi.
 17. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attack()`, `castFireball()`) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
+18. **Egy élő entitás `destroy()`-a önmagában NEM állítja le a függő `delayedCall`-jait.**
+    A `Level1Scene.resetEnemies()` menet közben, akár TÁMADÁS KÖZBEN semmisít meg egy
+    `CrowHarvester`-t. A `startAttack()` `delayedCall`-ja viszont ettől még lefut, és a
+    `resolveAttackHit()` MEGSEBEZTE volna a playert egy már nem létező kaszával. A megoldás
+    nem külön timer-nyilvántartás, hanem az, hogy a `destroy()` override a `super.destroy()`
+    ELŐTT `DEAD`-re állítja a state-et — az összes callback már eleve `state === DEAD`
+    guarddal indul, tehát mind inertté válik. **Minden olyan entitásnál, amit a scene menet
+    közben megsemmisíthet, ez a minta kell.** Ugyanitt kell felszabadítani a saját
+    scene-objektumait is (a `hpText`-et eddig csak a scene-shutdown takarította) és leállítani
+    a rá futó tweeneket (`scene?.tweens.killTweensOf(this)`) — a halál-fade `onComplete`-je
+    egyébként egy megsemmisített objektumon hívódna meg. A `GameObject.destroy()` maga
+    idempotens (`!this.scene` guard), tehát a kézi + a shutdown-hívás párosa biztonságos.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
@@ -798,6 +928,31 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 
 ## Következő lépés
 
+**LEVEL 1 REDESIGN — 3. iteráció: SWINGING REAPER (Section F).** Ez az aktuális feladat.
+- Új `src/hazards/SwingingReaper.ts`. A magja egy **pure** függvény, a
+  `ParallaxBackground.tilePositionForScroll()` mintájára:
+  `swingAngleAt(elapsedMs, periodMs, maxAngleRad, phaseMs) = maxAngleRad * cos(2π(t+phase)/period)`.
+  Determinisztikus, `Phaser.Math.Between` NÉLKÜL — ugyanaz az elv, amiért a boss
+  támadás-választása is determinisztikus (a spec kifejezetten megköveteli:
+  „Movement is deterministic").
+- Az osztály: `update(deltaMs)` akkumulálja az időt és mozgatja a látványt (frame-enként
+  újrarajzolt `Graphics` lánc + forgatott penge-sprite, depth 1 = a player ELŐTT),
+  `hitsPlayer(x, y)` sugár-alapú találat (mint a `CrowHarvester.resolveAttackHit()` és a
+  boss `CHARGE_HIT_RANGE`-e), `destroy()`.
+- **Geometria** (a 250/156-os ugrás-plafonhoz méretezve): horgony (4500, 84), kötélhossz 226,
+  amplitúdó ±45°, periódus 2400 ms. Így a penge alsó pontja (4500, 310) — az `F1` platform
+  teteje 332, a rajta álló player középpontja 308, tehát TALÁL. A ±45°-os szélsőállások
+  (4340/4660, y=244) viszont a talajszinten álló playertől (y≈394) 150+ px-re vannak, tehát
+  **a partokon biztonságos**. A player végignézhet egy teljes lengést, majd a szélsőállásnál
+  átugorhat — a spec „observe the pattern before committing" pontja geometriából levezetve.
+- Sebzés 20, találati sugár 24, és a 4200–4800 sávban **nincs enemy** (spec követelmény).
+- Bekötés: a `Level1Scene.update(_time, delta)` már megkapja a `delta`-t. A sebzés a
+  **MEGLÉVŐ, megosztott `hazardGate`**-en megy át — új infrastruktúra nem kell.
+- `BootScene`: `reaper-blade-placeholder` (~36×36 sarló) + `hazard-anchor-placeholder`.
+- Tesztek: `swingAngleAt` (t=0 → +max; t=periódus/2 → −max; t=periódus/4 → 0; amplitúdó-korlát;
+  determinizmus), `hitsPlayer` sugáron belül/kívül, és a layout-tesztbe: a penge söprési
+  sávjában nincs enemy spawn.
+
 **Phase 8 – Atmosphere folyamatban.** Az 1. iteráció (boss music) kész; ami még hátravan:
 - **A maradék sound effectek** (Project_plan.md 18. pont listája). A **teljes harci hangkép
   KÉSZ** (7–8. iteráció): kardsuhintás + becsapódás, mindkét tűzgolyó, a Shadow Spell és az
@@ -829,8 +984,8 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 többi Enemy típus + Level + Bossok, VAGY tovább a Lore (Phase 9) / QA (Phase 10) irányba.
 
 Nyitott, nem blokkoló polish-tételek:
-- Szakadékok (gap) bevezetése a Level 1 `PLATFORMS` layoutjába (Project_plan.md 13. pont) —
-  a checkpoint/respawn már készen áll rá.
+- ~~Szakadékok (gap) bevezetése a Level 1 layoutjába (Project_plan.md 13. pont).~~
+  **KÉSZ** — Level 1 Redesign, 1. iteráció: négy szakadék + zuhanás-halál.
 - A knight csomagban van még **landolás** (`Jump.png` `f6–7`), és több nem használt sheet
   (Roll, Slide, crouch, Hanging, Pray, attack_from_air) az eredeti forrásmappában. Ezekhez
   nincs state a játékban, és a Project_plan.md sem tervez ilyet — csak akkor kerüljenek be,
