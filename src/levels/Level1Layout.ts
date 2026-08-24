@@ -280,6 +280,76 @@ export const SPIKE_FIELDS: SpikeFieldDef[] = [
   { id: 'D-spikes', startX: 2740, endX: 2868, surfaceId: 'G3' },
 ];
 
+// --- Swinging Reaper (F szakasz) --------------------------------------------
+
+export interface SwingingReaperDef {
+  id: string;
+  /** A mennyezeti horgony világ-koordinátái. */
+  anchorX: number;
+  anchorY: number;
+  /** A horgonytól a penge KÖZÉPPONTJÁIG mért kötélhossz. */
+  ropeLength: number;
+  /** Maximális kitérés a függőlegestől, fokban (a spec ±45°-ot ír elő). */
+  maxAngleDeg: number;
+  /** Egy TELJES oda-vissza lengés hossza. */
+  periodMs: number;
+  /** Fázis-eltolás, ha valaha több reaper lóg egymás mellett. */
+  phaseMs?: number;
+}
+
+/**
+ * F szakasz — a gap4 (4300–4700) fölött lengő kasza, pont az azt áthidaló `F1` platform
+ * fölött. A számok NEM szemre vannak rakva, hanem a 250/156-os ugrás-plafonhoz méretezve:
+ *
+ *   - a penge alsó pontja (0°):  (4500, 310) — az `F1` teteje 332, a rajta álló player
+ *     középpontja 308, tehát a penge végigsöpri a platformot → TALÁL;
+ *   - a ±45°-os szélsőállások:   (4340, 244) és (4660, 244) — a talajszinten álló playertől
+ *     (y≈394) 155 px-re, tehát a KÉT PARTON biztonságos.
+ *
+ * Ebből adódik a szakasz megoldása: a player a partról végignéz egy teljes lengést, és a
+ * TÚLOLDALI szélsőállásnál ugrik — ekkor a penge tőle ELFELÉ indul. Ez a spec „Player must
+ * be able to observe the pattern before committing to the jump" pontja, geometriából levezetve.
+ */
+export const REAPERS: SwingingReaperDef[] = [
+  {
+    id: 'F-reaper',
+    anchorX: 4500,
+    anchorY: 84,
+    ropeLength: 226,
+    maxAngleDeg: 45,
+    periodMs: 2400,
+  },
+];
+
+export interface ReaperSweep {
+  /** A penge középpontjának szélső X-ei (a ±maxAngle állásokban). */
+  left: number;
+  right: number;
+  /** A legalsó pont (0°-nál) és a legfelső (a szélsőállásokban). */
+  lowestY: number;
+  highestY: number;
+}
+
+/** A penge söprési tartománya — a tesztek és az enemy-távolságtartás ebből dolgoznak. */
+export function reaperSweep(def: SwingingReaperDef): ReaperSweep {
+  const maxAngleRad = (def.maxAngleDeg * Math.PI) / 180;
+  const halfWidth = def.ropeLength * Math.sin(maxAngleRad);
+
+  return {
+    left: def.anchorX - halfWidth,
+    right: def.anchorX + halfWidth,
+    lowestY: def.anchorY + def.ropeLength,
+    highestY: def.anchorY + def.ropeLength * Math.cos(maxAngleRad),
+  };
+}
+
+/**
+ * Ekkora sávval a söprés KÖRÜL sem állhat enemy — a spec „Enemies are not spawned/placed
+ * near the reaper swing" pontja. A gyakorlatban a gap4 amúgy is kizárja őket (nincs talaj
+ * 4300 és 4700 között), de a teszt így egy jövőbeli, `F1`-re rakott enemyt is elkapna.
+ */
+export const REAPER_ENEMY_CLEARANCE = 80;
+
 // --- Enemyk -----------------------------------------------------------------
 
 /**

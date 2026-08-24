@@ -121,6 +121,7 @@ export interface MockImage {
   depth: number;
   alpha: number;
   tint: number | null;
+  rotation: number;
   destroyed: boolean;
   setOrigin(x: number, y: number): MockImage;
   setFlipX(v: boolean): MockImage;
@@ -128,6 +129,9 @@ export interface MockImage {
   setDepth(v: number): MockImage;
   setAlpha(v: number): MockImage;
   setTint(v: number): MockImage;
+  // A SwingingReaper ezekkel mozgatja/forgatja a pengét a lengés mentén.
+  setPosition(x: number, y: number): MockImage;
+  setRotation(v: number): MockImage;
   destroy(): void;
 }
 
@@ -150,6 +154,7 @@ export function createMockImage(
     depth: 0,
     alpha: 1,
     tint: null,
+    rotation: 0,
     destroyed: false,
     setOrigin(ox, oy) {
       image.originX = ox;
@@ -177,12 +182,55 @@ export function createMockImage(
       image.tint = v;
       return image;
     },
+    setPosition(x, y) {
+      image.x = x;
+      image.y = y;
+      return image;
+    },
+    setRotation(v) {
+      image.rotation = v;
+      return image;
+    },
     destroy() {
       image.destroyed = true;
     },
   };
 
   return image;
+}
+
+/**
+ * A `Graphics` minimális mása. A SwingingReaper ezzel rajzolja újra a láncot minden
+ * frame-ben; a teszt a `lineBetween` argumentumaiból olvassa vissza, hogy a lánc a
+ * horgonytól a penge AKTUÁLIS pozíciójáig tart.
+ */
+export interface MockGraphics {
+  depth: number;
+  destroyed: boolean;
+  clear: ReturnType<typeof vi.fn>;
+  lineStyle: ReturnType<typeof vi.fn>;
+  lineBetween: ReturnType<typeof vi.fn>;
+  setDepth(v: number): MockGraphics;
+  destroy(): void;
+}
+
+export function createMockGraphics(): MockGraphics {
+  const graphics: MockGraphics = {
+    depth: 0,
+    destroyed: false,
+    clear: vi.fn(),
+    lineStyle: vi.fn(),
+    lineBetween: vi.fn((_x1: number, _y1: number, _x2: number, _y2: number) => undefined),
+    setDepth(v) {
+      graphics.depth = v;
+      return graphics;
+    },
+    destroy() {
+      graphics.destroyed = true;
+    },
+  };
+
+  return graphics;
 }
 
 function createMockText() {
@@ -224,6 +272,7 @@ export function createMockScene() {
       image: vi.fn((x: number, y: number, texture: string, frame: string | number) =>
         createMockImage(x, y, texture, frame)
       ),
+      graphics: vi.fn(() => createMockGraphics()),
     },
     physics: {
       add: {

@@ -16,6 +16,7 @@ import AudioManager, {
 import TutorialHint from '../ui/TutorialHint';
 import HazardDamageGate from '../hazards/HazardDamage';
 import SpikeField, { SPIKE_DAMAGE, SPIKE_KNOCKBACK_Y } from '../hazards/SpikeField';
+import SwingingReaper, { REAPER_DAMAGE } from '../hazards/SwingingReaper';
 import {
   DOOR,
   DOOR_CHECKPOINT,
@@ -30,6 +31,7 @@ import {
   MID_CHECKPOINT,
   PLATFORMS,
   PLAYER_HALF_HEIGHT,
+  REAPERS,
   SPIKE_FIELDS,
   START_X,
   START_Y,
@@ -75,6 +77,7 @@ export default class Level1Scene extends Phaser.Scene {
   private fallDeathTriggered = false;
 
   private spikes!: SpikeField;
+  private reapers: SwingingReaper[] = [];
   /**
    * KÖZÖS kapu minden környezeti hazardnak (tüskék most, Swinging Reaper a következő
    * iterációban): egy tüskébe esve ne lehessen ugyanabban a pillanatban a kaszától is
@@ -102,6 +105,7 @@ export default class Level1Scene extends Phaser.Scene {
     // objektumok bennmaradnának, és az update() rajtuk hívott setVelocityX stb. elszállna.
     this.fireballs = [];
     this.enemies = [];
+    this.reapers = [];
     this.isTransitioning = false;
     this.respawnScheduled = false;
     this.fallDeathTriggered = false;
@@ -147,6 +151,9 @@ export default class Level1Scene extends Phaser.Scene {
     const ground = this.createGround();
     const platforms = this.createPlatforms();
     this.spikes = new SpikeField(this, SPIKE_FIELDS);
+    for (const def of REAPERS) {
+      this.reapers.push(new SwingingReaper(this, def));
+    }
     this.createLadder();
     this.createDoorZone();
     this.createMidCheckpoint();
@@ -422,7 +429,7 @@ export default class Level1Scene extends Phaser.Scene {
     this.fireballs.splice(0, this.fireballs.length);
   }
 
-  update(_time: number, _delta: number): void {
+  update(_time: number, delta: number): void {
     // A kamera scrollX-e a scene update() UTÁN frissül, tehát a háttér 1 frame-et késik.
     // 0.1-0.5-ös parallax faktornál ez legfeljebb ~1.5px — nem észlelhető, ezért nem
     // kell külön PRE_RENDER hook.
@@ -458,7 +465,15 @@ export default class Level1Scene extends Phaser.Scene {
       }
     }
 
+    // A kaszák AKKOR IS lengenek, ha a player halott vagy máshol jár: a lengés folyamatos
+    // és determinisztikus, tehát a partra érkező player mindig egy futó mintát lát —
+    // ezt kell végignéznie, mielőtt ugrik.
+    for (const reaper of this.reapers) {
+      reaper.update(delta);
+    }
+
     this.checkSpikeContact();
+    this.checkReaperContact();
 
     if (
       !this.midCheckpointActivated &&
@@ -523,6 +538,30 @@ export default class Level1Scene extends Phaser.Scene {
       // meg a mezőn töltött időt, hogy az i-frame ablak lejárna, és a player egyetlen hibáért
       // kétszer sebződne — lásd a SPIKE_KNOCKBACK_Y kommentjét.
       this.player.setVelocityY(SPIKE_KNOCKBACK_Y);
+      return;
+    }
+  }
+
+  /**
+   * Kasza-érintkezés. UGYANAZON a megosztott `hazardGate`-en megy át, mint a tüskék: egy
+   * kaszatalálat után a tüskék sem sebezhetnek azonnal, és fordítva.
+   *
+   * **Visszalökés SZÁNDÉKOSAN nincs.** A penge az `F1` platform fölött söpör, ami egy 400px-es
+   * szakadékot hidal át — egy oldalirányú lökés a szakadékba taszítaná a playert, tehát a
+   * találat halált okozna, amire nem lehet reagálni. Ez ugyanaz a hiba, amit a tüskéknél a
+   * vízszintes lökés okozott (lásd SpikeField). A visszajelzés a `Player` piros villanása és
+   * a hurt animációja — ez egyébként konzisztens is: a projektben egyetlen ENEMY-találat sem
+   * lök vissza, a tüske függőleges popja a kivétel (ott a hazardból KIEMELÉS a cél).
+   */
+  private checkReaperContact(): void {
+    if (this.player.isDead()) return;
+    if (!this.hazardGate.canDamage(this.time.now)) return;
+
+    for (const reaper of this.reapers) {
+      if (!reaper.hitsPlayer(this.player.x, this.player.y)) continue;
+
+      this.hazardGate.register(this.time.now);
+      this.player.takeDamage(REAPER_DAMAGE);
       return;
     }
   }

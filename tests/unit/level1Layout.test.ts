@@ -33,6 +33,9 @@ import {
   platformLeft,
   platformRight,
   platformTop,
+  REAPER_ENEMY_CLEARANCE,
+  REAPERS,
+  reaperSweep,
   SPIKE_FIELDS,
   SPIKE_TILE_WIDTH,
   START_X,
@@ -335,6 +338,63 @@ describe('SPIKE_FIELDS', () => {
   it('a köztes checkpoint a tüskék UTÁN van — a szakasz teljesítését jutalmazza', () => {
     for (const field of SPIKE_FIELDS) {
       expect(MID_CHECKPOINT.x).toBeGreaterThan(field.endX);
+    }
+  });
+});
+
+// --- Swinging Reaper (F szakasz) --------------------------------------------
+
+describe('REAPERS', () => {
+  it('az id-k egyediek, és minden lengés valódi (pozitív amplitúdó és periódus)', () => {
+    const ids = REAPERS.map((r) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    for (const def of REAPERS) {
+      expect(def.maxAngleDeg).toBeGreaterThan(0);
+      expect(def.maxAngleDeg).toBeLessThanOrEqual(90);
+      expect(def.periodMs).toBeGreaterThan(0);
+      expect(def.ropeLength).toBeGreaterThan(0);
+    }
+  });
+
+  it('a penge egy platform fölött söpör — van hova landolni alatta', () => {
+    for (const def of REAPERS) {
+      const sweep = reaperSweep(def);
+      const bridge = PLATFORMS.map(platformSpan).find(
+        (span) => span.left < def.anchorX && span.right > def.anchorX
+      );
+
+      expect(bridge, `a(z) ${def.id} alatt nincs platform`).toBeDefined();
+      // A penge legalsó pontja a platform FÖLÖTT marad (nem a kőbe lóg bele),
+      // de elég alacsonyan ahhoz, hogy a rajta álló playert elérje.
+      expect(sweep.lowestY).toBeLessThan(bridge!.top);
+    }
+  });
+
+  it('a penge a szakadék fölött leng, nem a talaj fölött', () => {
+    // Ez adja a szakasz tétjét: a találat helye egyben az egyetlen átjutási útvonal.
+    const gaps = groundGaps();
+
+    for (const def of REAPERS) {
+      const overGap = gaps.some((gap) => def.anchorX > gap.startX && def.anchorX < gap.endX);
+      expect(overGap, `a(z) ${def.id} nem szakadék fölött van`).toBe(true);
+    }
+  });
+
+  it('EGYETLEN enemy sem áll a penge söprési sávjában', () => {
+    // A spec követelménye: "Enemies are not spawned/placed near the reaper swing".
+    for (const def of REAPERS) {
+      const sweep = reaperSweep(def);
+      const dangerLeft = sweep.left - REAPER_ENEMY_CLEARANCE;
+      const dangerRight = sweep.right + REAPER_ENEMY_CLEARANCE;
+
+      for (const enemy of ENEMY_SPAWNS) {
+        const reachesLeft = enemy.patrolMinX - HARVESTER_HALF_BODY_WIDTH;
+        const reachesRight = enemy.patrolMaxX + HARVESTER_HALF_BODY_WIDTH;
+        const overlaps = reachesRight > dangerLeft && reachesLeft < dangerRight;
+
+        expect(overlaps, `${enemy.id} a(z) ${def.id} söprési sávjában van`).toBe(false);
+      }
     }
   });
 });

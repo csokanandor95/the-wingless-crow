@@ -636,8 +636,9 @@ Főbb elemek:
 >
 > **1. iteráció — KÉSZ:** layout-váz, öt talaj-szegmens + négy szakadék, 13 platform,
 > 8 CrowHarvester, zuhanás-halál, enemy-respawn, köztes checkpoint, tutorial feliratok.
-> **2. iteráció — KÉSZ:** spike-ok (D szakasz), lásd lentebb. **3. iteráció:** Swinging
-> Reaper (F szakasz).
+> **2. iteráció — KÉSZ:** spike-ok (D szakasz), lásd lentebb. **3. iteráció — KÉSZ:**
+> Swinging Reaper (F szakasz), lásd lentebb. **A blokk ettől még nyitva marad:** a Phase 8-ra
+> visszatérés előtt egy finomhangolási kör következik a teljes pályán.
 >
 > **Kiegészítés (2. iteráció) — a környezeti hazardok külön sebzés-modellt igényelnek.**
 > A `Player.takeDamage()` szándékosan nem néz HURT állapotot, csak DEAD-et: egy enemy-csapás
@@ -653,6 +654,20 @@ Főbb elemek:
 > okozta. Ez sérti a spec „Avoid unavoidable damage" elvét, ezért a visszalökés **csak
 > függőleges** maradt. Az átkelés így pontosan egy találat (15 HP) — a D szakasz tutorial,
 > nem büntetés.
+>
+> **Kiegészítés (3. iteráció) — Swinging Reaper, az első MOZGÓ hazard.** A mozgás magja egy
+> pure függvény (`swingAngleAt`), determinisztikus, `Phaser.Math.Between` nélkül — a spec
+> kifejezetten megköveteli („Movement is deterministic"), és csak így tanulható meg a minta.
+> A geometria nem szemre készült, hanem a 250/156-os ugrás-plafonhoz méretezve: a penge a
+> szakadékot áthidaló platformot végigsöpri (nem lehet rajta megállni), a két parton viszont
+> 155 px-re elkerüli a playert. **Ebből adódik a szakasz megoldása** — a partról végignézni
+> egy lengést, és a túloldali szélsőállásnál ugrani. Manuális teszten igazolva: rossz fázisban
+> áthaladásonként 20 sebzés, jó fázisban a teljes átkelés 0.
+>
+> **A visszalökés itt SZÁNDÉKOSAN elmaradt**, a tüske függőleges popjával szemben: a penge egy
+> 400 px-es szakadék fölött söpör, tehát bármilyen lökés a mélybe taszítaná a playert — a
+> találat halált okozna, amire nem lehet reagálni. Ugyanaz a hibaosztály, mint a tüskék
+> vízszintes lökése volt. Konzisztens is: a projektben egyetlen ENEMY-találat sem lök vissza.
 >
 > **Két döntés, ami ELTÉR a dokumentum korábbi állapotától** (user által jóváhagyva):
 >
@@ -1160,8 +1175,9 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 > **Újranyitva a Phase 8 közben — „Level 1 Redesign", 3 iteráció.** Az eredeti Phase 6-os
 > layout túl egyszerű volt (3200 px, folyamatos talaj, hazard nélkül). Az új, nyolc szakaszos
 > 6000 px-es pálya részletei a 14. pontnál. Az 1. iteráció (layout-váz + gap + zuhanás-halál
-> + enemy-respawn + köztes checkpoint + tutorial feliratok) és a 2. iteráció (spike-ok + a
-> minden hazardra közös i-frame kapu) **kész**; hátravan a Swinging Reaper (3. it.).
+> + enemy-respawn + köztes checkpoint + tutorial feliratok), a 2. iteráció (spike-ok + a
+> minden hazardra közös i-frame kapu) és a 3. iteráció (Swinging Reaper) **kész**.
+> A blokk egy **finomhangolási körig nyitva marad**, mielőtt a Phase 8 folytatódna.
 
 ## Phase 7 – Boss
 

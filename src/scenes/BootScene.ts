@@ -252,6 +252,31 @@ export default class BootScene extends Phaser.Scene {
     spikeGfx.generateTexture('spike-placeholder', SPIKE_TILE_WIDTH, SPIKE_HEIGHT);
     spikeGfx.destroy();
 
+    // Swinging Reaper (Level 1, F szakasz) — a mennyezeti horgony: egy gerenda, amiről a
+    // lánc lóg. Vízszintes elem, hogy a lengés tengelye egyértelmű legyen.
+    const anchorGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    anchorGfx.fillStyle(0x1a1620, 1);
+    anchorGfx.fillRect(0, 0, 48, 12);
+    anchorGfx.fillStyle(0x4a4450, 1);
+    anchorGfx.fillRect(0, 0, 48, 3); // felső él-fény
+    anchorGfx.fillRect(21, 10, 6, 4); // a lánc befogása
+    anchorGfx.generateTexture('hazard-anchor-placeholder', 48, 14);
+    anchorGfx.destroy();
+
+    // A lengő penge. A rajzolt alak nagyjából a 36x36-os textúra közepére van igazítva, mert
+    // a sprite originje (0.5, 0.5) EGYBEESIK a találati kör középpontjával — a hitbox így a
+    // grafika tényleges kiterjedéséből származik, nem szabadon hangolt szám.
+    const bladeGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    bladeGfx.fillStyle(0x2e2a30, 1);
+    bladeGfx.fillRect(15, 0, 6, 14); // nyél-csonk: ide fut be a lánc
+    bladeGfx.fillStyle(0xc8c2b0, 1);
+    bladeGfx.fillTriangle(18, 10, 1, 26, 35, 26); // penge felső éle
+    bladeGfx.fillTriangle(1, 26, 35, 26, 18, 35); // lefelé futó hegy
+    bladeGfx.fillStyle(0x8f8a80, 1);
+    bladeGfx.fillTriangle(18, 10, 1, 26, 12, 26); // árnyékos belső él
+    bladeGfx.generateTexture('reaper-blade-placeholder', 36, 36);
+    bladeGfx.destroy();
+
     // Köztes checkpoint jelölő (Level 1, a spike-szakasz után): egy alacsony talapzat +
     // egy karcsú oszlop. Aktiválatlanul sötét; aktiváláskor a scene setTint()-tel
     // világítja ki, ezért a textúra szándékosan világosszürke alapon készül.

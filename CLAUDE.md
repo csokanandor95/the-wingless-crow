@@ -176,7 +176,12 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 - **2. iteráció (KÉSZ):** spike-ok a D szakaszban — `src/hazards/HazardDamage.ts`
   (i-frame kapu) + `src/hazards/SpikeField.ts`. Egy 128px-es mező a G3-on (2740–2868),
   15 sebzés, függőleges visszalökés. Részletek lentebb, a „Hazardok" szakaszban.
-- **3. iteráció (hátravan):** Swinging Reaper az F szakaszban.
+- **3. iteráció (KÉSZ):** Swinging Reaper az F szakaszban — `src/hazards/SwingingReaper.ts`.
+  Determinisztikus inga a gap4 fölött, 20 sebzés, a meglévő megosztott i-frame kapun át.
+
+**A blokk MÉG NYITVA VAN.** Mind a három tervezett iteráció implementálva, de a Phase 8-ra
+visszatérés ELŐTT egy **finomhangolási kör** következik a most újragondolt pályán — a
+jelöltekhez lásd a „Következő lépés" szakaszt a dokumentum végén.
 
 **Két viselkedés-változás a korábban dokumentálthoz képest (user-döntés):**
 1. **A player halálakor az enemyk is újraélednek** (`Level1Scene.resetEnemies()`). Korábban
@@ -185,7 +190,7 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**12 fájl, 225 teszt** — ebből 5 az animáció-/háttér-/VFX-vezérlést, 1 a **Level 1 pálya-geometriát**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**12 fájl, 243 teszt** — ebből 5 az animáció-/háttér-/VFX-vezérlést, 1 a **Level 1 pálya-geometriát**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -237,7 +242,7 @@ the-wingless-crow/
 │       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, slash/projectile/spell/charge, death)
 │       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown, SFX)
 │       ├── level1Layout.test.ts # a Level 1 geometria invariánsai (elérhetőség-BFS, gapek, enemy-bounds, spike-ok)
-│       ├── hazards.test.ts      # HazardDamageGate i-frame ablak + SpikeField geometria
+│       ├── hazards.test.ts      # HazardDamageGate + SpikeField geometria + SwingingReaper lengés
 │       ├── playerAnimations.test.ts       # state->anim leképezés + a Player animáció-vezérlése
 │       ├── crowHarvesterAnimations.test.ts # state->anim + a facing-kompenzáció regressziós tesztje
 │       ├── bossAnimations.test.ts         # state->anim, facing-kompenzáció SCALE-lel, levezetett konstansok
@@ -255,7 +260,8 @@ the-wingless-crow/
 │   │   └── Level1Layout.ts       # a Level 1 TELJES geometriája, Phaser-mentes adatmodulként
 │   ├── hazards/
 │   │   ├── HazardDamage.ts       # HazardDamageGate — KÖZÖS i-frame ablak minden hazardnak
-│   │   └── SpikeField.ts         # statikus tüskemezők (látvány tileSprite + külön hitbox Zone)
+│   │   ├── SpikeField.ts         # statikus tüskemezők (látvány tileSprite + külön hitbox Zone)
+│   │   └── SwingingReaper.ts     # determinisztikus lengő kasza (pure swingAngleAt mag)
 │   ├── ui/
 │   │   └── TutorialHint.ts       # egyszer megjelenő billentyű-súgó (ez nyitja meg az ui/ mappát)
 │   ├── scenes/
@@ -286,7 +292,7 @@ the-wingless-crow/
 │       └── DamageSystem.ts       # Damageable interface + PhysicsOverlapObject típus-alias
 ```
 
-Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `EndingScene`, `enemies/Archer.ts`, `enemies/Beast.ts`, `systems/GameState.ts`, `hazards/SwingingReaper.ts` (a Level 1 Redesign 3. iterációja), és az `assets/` alatt a `tiles/ effects/` mappák. Az `ui/` mappa **megnyílt** a `TutorialHint.ts`-szel, de a HUD / Menu / Dialogue még hátravan.
+Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `EndingScene`, `enemies/Archer.ts`, `enemies/Beast.ts`, `systems/GameState.ts`, és az `assets/` alatt a `tiles/ effects/` mappák. Az `ui/` mappa **megnyílt** a `TutorialHint.ts`-szel, de a HUD / Menu / Dialogue még hátravan.
 
 > A tervezett `EndingScene.ts` és `ui/Dialogue.ts` szerepét várhatóan a `NarrationScene`
 > fogja betölteni (adatvezérelt: `{ lines, nextScene, title? }`), ezért azok külön fájlként
@@ -679,6 +685,38 @@ lényeges különbség, amiből minden más következik.
   `D-1` CrowHarvester patrol-határa (2460–2700) nem éri el a mezőt (2740–2868). Unit teszt
   őrzi, hogy egyetlen enemy patrol-tartománya se metsszen spike-mezőt.
 
+**`SwingingReaper.ts` — lengő kasza (F szakasz), az első MOZGÓ hazard.**
+- A mag egy **pure** függvény, a `ParallaxBackground.tilePositionForScroll()` mintájára:
+  `swingAngleAt(t, period, maxAngle, phase) = maxAngle · cos(2π(t+phase)/period)`, mellette a
+  szintén pure `bladePositionAt(def, angle)`. **Determinisztikus, `Phaser.Math.Between`
+  NÉLKÜL** — ugyanaz az elv, amiért a boss támadás-választása is az; a spec kifejezetten
+  megköveteli („Movement is deterministic"), és csak így tanulható meg a minta.
+- **Koszinusz, nem szinusz:** `t = 0`-nál a penge a szélsőállásban indul, nem középen — így a
+  pálya betöltésekor egy teljes, tiszta lengés látszik.
+- Az osztály `update(deltaMs)`-sel akkumulálja az időt, frame-enként újrarajzolja a láncot
+  (`Graphics`) és mozgatja/forgatja a penge-sprite-ot. **A forgatás `-angle`:** a Phaser
+  rotationje az óramutatóval egyező (a képernyő y-a lefelé nő), tehát egy lefelé lógó
+  sprite a kötél irányába `-angle`-lel áll be.
+- **A lengés a scene indulásától fut, és halál/respawn NEM állítja vissza a fázist.** Ez
+  szándékos: az inga folyamatos, a player a partra érve mindig egy futó mintát lát — pont
+  azt kell végignéznie, mielőtt ugrik.
+- **Visszalökés SZÁNDÉKOSAN nincs** (szemben a tüske függőleges popjával). A penge egy 400px-es
+  szakadékot áthidaló platform fölött söpör; egy oldalirányú lökés a szakadékba taszítaná a
+  playert, tehát a találat halált okozna, amire nem lehet reagálni — ugyanaz a hiba, mint a
+  tüskék vízszintes lökésénél. Konzisztens is: a projektben egyetlen ENEMY-találat sem lök vissza.
+- **A geometria a 250/156-os ugrás-plafonhoz van méretezve** (`REAPERS` a `Level1Layout.ts`-ben):
+  horgony (4500, 84), kötélhossz 226, ±45°, periódus 2400 ms.
+  - a penge alsó pontja (4500, **310**) — az `F1` teteje 332, a rajta álló player középpontja
+    308 → a penge végigsöpri a platformot, **nem lehet rajta megállni**;
+  - a ±45°-os szélsőállások (4340/4660, y=**244**) a talajszinten álló playertől (y≈394)
+    155 px-re → **a két part biztonságos**.
+  - Ebből adódik a megoldás: a partról végignézni egy lengést, és a TÚLOLDALI szélsőállásnál
+    ugrani, mert onnan a penge elfelé indul. **Manuális teszten igazolva:** rossz fázisban
+    áthaladásonként 20 sebzés, jó fázisban a teljes átkelés 0.
+- A sebzést — a tüskékhez hasonlóan — a **scene** alkalmazza a megosztott `hazardGate`-en át;
+  az osztály csak a `hitsPlayer(x, y)` sugár-alapú döntést adja (mint a
+  `CrowHarvester.resolveAttackHit()` és a boss `CHARGE_HIT_RANGE`-e).
+
 ### NarrationScene (`src/scenes/NarrationScene.ts`)
 - Adatvezérelt, újrahasználható szöveges átvezető: `scene.start('NarrationScene', { lines, nextScene, title? })`
 - Typewriter reveal; **Space/Enter** = gépelés közben teljes sor, kész sornál a következő sor;
@@ -928,30 +966,28 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 
 ## Következő lépés
 
-**LEVEL 1 REDESIGN — 3. iteráció: SWINGING REAPER (Section F).** Ez az aktuális feladat.
-- Új `src/hazards/SwingingReaper.ts`. A magja egy **pure** függvény, a
-  `ParallaxBackground.tilePositionForScroll()` mintájára:
-  `swingAngleAt(elapsedMs, periodMs, maxAngleRad, phaseMs) = maxAngleRad * cos(2π(t+phase)/period)`.
-  Determinisztikus, `Phaser.Math.Between` NÉLKÜL — ugyanaz az elv, amiért a boss
-  támadás-választása is determinisztikus (a spec kifejezetten megköveteli:
-  „Movement is deterministic").
-- Az osztály: `update(deltaMs)` akkumulálja az időt és mozgatja a látványt (frame-enként
-  újrarajzolt `Graphics` lánc + forgatott penge-sprite, depth 1 = a player ELŐTT),
-  `hitsPlayer(x, y)` sugár-alapú találat (mint a `CrowHarvester.resolveAttackHit()` és a
-  boss `CHARGE_HIT_RANGE`-e), `destroy()`.
-- **Geometria** (a 250/156-os ugrás-plafonhoz méretezve): horgony (4500, 84), kötélhossz 226,
-  amplitúdó ±45°, periódus 2400 ms. Így a penge alsó pontja (4500, 310) — az `F1` platform
-  teteje 332, a rajta álló player középpontja 308, tehát TALÁL. A ±45°-os szélsőállások
-  (4340/4660, y=244) viszont a talajszinten álló playertől (y≈394) 150+ px-re vannak, tehát
-  **a partokon biztonságos**. A player végignézhet egy teljes lengést, majd a szélsőállásnál
-  átugorhat — a spec „observe the pattern before committing" pontja geometriából levezetve.
-- Sebzés 20, találati sugár 24, és a 4200–4800 sávban **nincs enemy** (spec követelmény).
-- Bekötés: a `Level1Scene.update(_time, delta)` már megkapja a `delta`-t. A sebzés a
-  **MEGLÉVŐ, megosztott `hazardGate`**-en megy át — új infrastruktúra nem kell.
-- `BootScene`: `reaper-blade-placeholder` (~36×36 sarló) + `hazard-anchor-placeholder`.
-- Tesztek: `swingAngleAt` (t=0 → +max; t=periódus/2 → −max; t=periódus/4 → 0; amplitúdó-korlát;
-  determinizmus), `hitsPlayer` sugáron belül/kívül, és a layout-tesztbe: a penge söprési
-  sávjában nincs enemy spawn.
+**LEVEL 1 FINOMHANGOLÁS.** Ez az aktuális feladat. A redesign mindhárom iterációja
+implementálva (layout-váz + gap, spike-ok, Swinging Reaper), a pálya START-tól a bossig
+végigjátszható — de a Phase 8-ra visszatérés ELŐTT a user finomhangolni akarja az egészet.
+**A blokk addig nyitva marad.**
+
+A hangolás a user vezetésével történik. Amit a 3. iteráció manuális végigjátszása FELVETETT
+(megfigyelés, nem javaslat — a döntés a useré):
+
+- **HP-mérleg a pálya hosszán.** Egy végigfutásban a player ~50–70 HP-val ért az F szakaszhoz
+  (enemy-csapások 8-anként + egy tüske 15). A pályán **nincs gyógyulás**, és a boss friss
+  HP-t sem ad — a `BossScene`-be tehát erősen sérülten lehet belépni. Hangolható pontok:
+  `CrowHarvester.ATTACK_DAMAGE` (8), `SPIKE_DAMAGE` (15), `REAPER_DAMAGE` (20), az enemyk
+  száma/sűrűsége (`ENEMY_SPAWNS`), vagy egy checkpoint-gyógyulás bevezetése.
+- **A Swinging Reaper büntetése.** Az `F1` platformon megállni garantált találat (a penge
+  végigsöpri), és áthaladásonként 20 sebzés. Ha ez soknak bizonyul, az elsődleges
+  nehézség-hangolópont a `periodMs` (2400, lassabb lengés = szélesebb ablak), utána a
+  `REAPER_DAMAGE`.
+- **A `main.ts` `arcade.debug: true`** minden hitboxot kirajzol, ami a layout vizuális
+  megítélését érdemben rontja. Egy hangoló körhöz érdemes lehet ideiglenesen kikapcsolni.
+- **Tutorial feliratok hossza** (`HINT_HOLD_MS` = 4000) és pozíciója.
+- **A köztes checkpoint helye** (x=3000, a spike-szakasz után) — a G4/E szakasz és az F
+  szakasz így egyetlen, hosszú, checkpoint nélküli blokk.
 
 **Phase 8 – Atmosphere folyamatban.** Az 1. iteráció (boss music) kész; ami még hátravan:
 - **A maradék sound effectek** (Project_plan.md 18. pont listája). A **teljes harci hangkép

@@ -15,8 +15,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type Phaser from 'phaser';
 import HazardDamageGate, { HAZARD_INVULNERABILITY_MS } from '../../src/hazards/HazardDamage';
 import SpikeField from '../../src/hazards/SpikeField';
+import SwingingReaper, {
+  bladePositionAt,
+  REAPER_HIT_RADIUS,
+  swingAngleAt,
+} from '../../src/hazards/SwingingReaper';
 import {
   GROUND_TOP,
+  REAPERS,
   SPIKE_HEIGHT,
   SPIKE_HITBOX_INSET_X,
   type SpikeFieldDef,
@@ -132,5 +138,142 @@ describe('SpikeField', () => {
   it('getZones(): a létrehozott zónákat adja vissza', () => {
     const spikes = new SpikeField(scene as unknown as Phaser.Scene, [FIELD]);
     expect(spikes.getZones()).toHaveLength(1);
+  });
+});
+
+// --- Swinging Reaper --------------------------------------------------------
+
+describe('swingAngleAt', () => {
+  const PERIOD = 2400;
+  const MAX = Math.PI / 4; // 45°
+
+  it('t=0-nál a JOBB szélsőállásban indul', () => {
+    // Koszinusz, nem szinusz: így a pálya betöltésekor a player egy teljes, tiszta
+    // lengést lát végig, nem a középpontból induló félmozdulatot.
+    expect(swingAngleAt(0, PERIOD, MAX)).toBeCloseTo(MAX, 10);
+  });
+
+  it('a periódus felénél a BAL szélsőállásban van', () => {
+    expect(swingAngleAt(PERIOD / 2, PERIOD, MAX)).toBeCloseTo(-MAX, 10);
+  });
+
+  it('a periódus negyedénél és háromnegyedénél átmegy a függőlegesen', () => {
+    expect(swingAngleAt(PERIOD / 4, PERIOD, MAX)).toBeCloseTo(0, 10);
+    expect(swingAngleAt((3 * PERIOD) / 4, PERIOD, MAX)).toBeCloseTo(0, 10);
+  });
+
+  it('egy teljes periódus után visszatér a kiindulásba', () => {
+    expect(swingAngleAt(PERIOD, PERIOD, MAX)).toBeCloseTo(MAX, 10);
+  });
+
+  it('SOSEM lépi túl az amplitúdót', () => {
+    for (let t = 0; t <= 3 * PERIOD; t += 17) {
+      expect(Math.abs(swingAngleAt(t, PERIOD, MAX))).toBeLessThanOrEqual(MAX + 1e-9);
+    }
+  });
+
+  it('DETERMINISZTIKUS: azonos bemenetre azonos kimenet', () => {
+    // A spec követelménye ("Movement is deterministic") — nincs Phaser.Math.Between,
+    // tehát a minta minden végigjátszáskor ugyanaz és megtanulható.
+    for (const t of [0, 137, 600, 1234, 2399]) {
+      expect(swingAngleAt(t, PERIOD, MAX)).toBe(swingAngleAt(t, PERIOD, MAX));
+    }
+  });
+
+  it('a fázis-eltolás időben tolja el a lengést', () => {
+    expect(swingAngleAt(0, PERIOD, MAX, PERIOD / 2)).toBeCloseTo(-MAX, 10);
+  });
+});
+
+describe('a Level 1 reaper geometriája', () => {
+  const def = REAPERS[0];
+  const maxAngleRad = (def.maxAngleDeg * Math.PI) / 180;
+
+  it('a legalsó ponton végigsöpri az F1 platformot (a rajta álló playert eltalálja)', () => {
+    const bottom = bladePositionAt(def, 0);
+    // Az F1 teteje 332, a rajta álló player középpontja 332 - 24 = 308.
+    const playerOnPlatformY = 308;
+
+    expect(bottom.x).toBeCloseTo(4500, 6);
+    expect(Math.abs(bottom.y - playerOnPlatformY)).toBeLessThan(REAPER_HIT_RADIUS);
+  });
+
+  it('a szélsőállásokban a parton álló player BIZTONSÁGBAN van', () => {
+    // Ez adja a szakasz megoldását: a partról végig lehet nézni a lengést.
+    const groundPlayerY = GROUND_TOP - 24; // 394
+
+    for (const angle of [maxAngleRad, -maxAngleRad]) {
+      const blade = bladePositionAt(def, angle);
+      const bankX = angle > 0 ? 4700 : 4300; // a gap4 két partja
+      const distance = Math.hypot(blade.x - bankX, blade.y - groundPlayerY);
+
+      expect(distance).toBeGreaterThan(REAPER_HIT_RADIUS * 3);
+    }
+  });
+});
+
+describe('SwingingReaper', () => {
+  let scene: MockScene;
+  const def = REAPERS[0];
+
+  beforeEach(() => {
+    scene = createMockScene();
+  });
+
+  it('a pengét a kiinduló szögnek megfelelő helyre teszi', () => {
+    const reaper = new SwingingReaper(scene as unknown as Phaser.Scene, def);
+    const expected = bladePositionAt(def, (def.maxAngleDeg * Math.PI) / 180);
+
+    // A player a jobb szélsőállás alatt, a talajon: nem éri el.
+    expect(reaper.hitsPlayer(expected.x, expected.y)).toBe(true);
+    expect(reaper.hitsPlayer(expected.x + REAPER_HIT_RADIUS + 1, expected.y)).toBe(false);
+  });
+
+  it('update(): a felhalmozott idő szerint mozgatja a pengét', () => {
+    const reaper = new SwingingReaper(scene as unknown as Phaser.Scene, def);
+
+    // Fél periódus -> a másik szélsőállás.
+    reaper.update(def.periodMs / 2);
+    const opposite = bladePositionAt(def, -(def.maxAngleDeg * Math.PI) / 180);
+
+    expect(reaper.hitsPlayer(opposite.x, opposite.y)).toBe(true);
+  });
+
+  it('update(): a delta AKKUMULÁLÓDIK — több kis lépés = egy nagy lépés', () => {
+    const stepped = new SwingingReaper(scene as unknown as Phaser.Scene, def);
+    for (let i = 0; i < 60; i++) stepped.update(def.periodMs / 120); // 60 x fél periódus/60
+
+    const single = new SwingingReaper(scene as unknown as Phaser.Scene, def);
+    single.update(def.periodMs / 2);
+
+    const opposite = bladePositionAt(def, -(def.maxAngleDeg * Math.PI) / 180);
+    expect(stepped.hitsPlayer(opposite.x, opposite.y)).toBe(
+      single.hitsPlayer(opposite.x, opposite.y)
+    );
+  });
+
+  it('a láncot a horgonytól a penge AKTUÁLIS pozíciójáig rajzolja', () => {
+    const reaper = new SwingingReaper(scene as unknown as Phaser.Scene, def);
+    reaper.update(def.periodMs / 4); // függőleges állás
+
+    const graphics = scene.add.graphics.mock.results[0].value as {
+      lineBetween: { mock: { calls: number[][] } };
+    };
+    const calls = graphics.lineBetween.mock.calls;
+    const [x1, y1, x2, y2] = calls[calls.length - 1];
+
+    expect(x1).toBe(def.anchorX);
+    expect(y1).toBe(def.anchorY);
+    // Függőleges állásban a penge pontosan a horgony alatt, kötélhossznyira lóg.
+    expect(x2).toBeCloseTo(def.anchorX, 6);
+    expect(y2).toBeCloseTo(def.anchorY + def.ropeLength, 6);
+  });
+
+  it('a penge a player ELŐTT rajzolódik, hogy a fenyegetés olvasható legyen', () => {
+    new SwingingReaper(scene as unknown as Phaser.Scene, def);
+
+    // A player depth-je 0; a lánc és a penge is efölött van.
+    const graphics = scene.add.graphics.mock.results[0].value as { depth: number };
+    expect(graphics.depth).toBeGreaterThan(0);
   });
 });
