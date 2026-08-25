@@ -34,12 +34,41 @@
 ## Parancsok
 
 ```
-cd the-wingless-crow
+# a repo gyökere MAGA a the-wingless-crow mappa — nincs almappa, amibe be kellene lépni
 npm run dev      # dev szerver, http://localhost:5173
 npm run build    # production build (Phase 7-ben lefutott, működik)
 npm run test     # vitest unit tesztek (egyszeri futás)
 npx tsc --noEmit # típusellenőrzés (nincs külön npm script)
 ```
+
+**A CI ebből a hármat futtatja minden pushnál** (`npx tsc --noEmit` → `npm run test` →
+`npm run build`, ebben a sorrendben) — lásd a „CI” szakaszt lentebb. Ha lokálisan mind a
+három zöld, a CI-nak is annak kell lennie.
+
+## CI (GitHub Actions)
+
+`.github/workflows/ci.yml` — a `Project_plan.md` 31. pontjában felvázolt pipeline **első,
+minimális szelete**. Egy job (`ubuntu-latest`, Node 24), és pontosan azt futtatja, ami
+MÁR LÉTEZIK: `npm ci` → `npx tsc --noEmit` → `npm run test` → `npm run build`.
+
+- **Trigger:** `push` szűrő NÉLKÜL (tehát minden branchre) + `pull_request` a `main` felé.
+  A `concurrency: cancel-in-progress` miatt egy ugyanarra a ref-re érkező újabb push
+  megszakítja a még futó, elavult futást.
+- **A typecheck KÜLÖN lépés, és a tesztek ELŐTT fut.** Ez nem redundancia: a `vite build`
+  esbuilddel csak **levágja** a típusokat, nem ellenőrzi őket — egy zöld build tehát
+  önmagában nem bizonyítja, hogy a `tsc` tiszta. A `tsconfig.json` `include`-ja
+  `["src", "tests"]`, tehát ez a lépés a teszt fájlokat is típusellenőrzi.
+- **`npm ci`, nem `npm install`** — a lockfile-hoz determinisztikusan telepít, és elszáll,
+  ha a `package.json` és a `package-lock.json` kicsúszott egymásból.
+- **A build a Linux runneren fut, ami case-sensitive.** A `BootScene` 36 assetet
+  Vite-importtal hoz be, tehát egy elgépelt nagybetű (pl. `idle.png` a `Idle.png` helyett)
+  Windowson észrevétlen, a CI-ban viszont **build-hiba**. Ez a Project_plan 30. pontjának
+  (asset testing) ingyen kapott szelete — de csak addig működik, amíg minden asset
+  committolva van (jelenleg mind a 37 az).
+- **Ami SZÁNDÉKOSAN nincs benne:** integration teszt, Playwright/E2E, visual regression,
+  cross-browser matrix, performance mérés, `dist/` artifact upload, GitHub Pages deploy,
+  branch protection. Mind későbbi mérföldkő (Phase 10/11), és a repóban jelenleg nincs is
+  mit futtatni belőlük — ezért nem is kerültek bele „üresen".
 
 ## Itt fejeztük be a Chat-szintű fejlesztést
 
@@ -265,7 +294,7 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**12 fájl, 250 teszt** — ebből 5 az animáció-/háttér-/VFX-vezérlést, 1 a **Level 1 pálya-geometriát**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**12 fájl, 265 teszt** — ebből 5 az animáció-/háttér-/VFX-vezérlést, 1 a **Level 1 pálya-geometriát**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -279,6 +308,9 @@ the-wingless-crow/
 ├── package.json
 ├── index.html
 ├── tsconfig.json                 # megj.: vite.config.js NINCS, a projekt Vite defaultokon fut
+├── .github/
+│   └── workflows/
+│       └── ci.yml                # minimális CI: typecheck + unit teszt + build, minden pushon
 ├── docs/
 │   └── Project_plan.md
 ├── assets/

@@ -1252,6 +1252,13 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 - performance testing
 - CI/CD
 
+> **Előrehozott lépés (2026-08-25):** a Phase 8 lezárása és a fenti Döntési pont
+> között — a „Többi Enemy típus, Level és Bossok" irány választása ELŐTT — elkészült a
+> **CI/CD első, minimális mérföldköve**: `.github/workflows/ci.yml`, ami minden pushon
+> lefuttatja a typecheck + unit teszt + production build hármast. A Phase 10 többi
+> tétele (integration, E2E, visual regression, cross-browser, performance) és a
+> deployment változatlanul hátravan. Részletek a 31. pontnál.
+
 ## Phase 11 – Deployment
 
 - production build
@@ -1631,6 +1638,39 @@ Critical errors   0
 
 Csak sikeres pipeline után történjen production deployment.
 
+> **Jelenlegi állapot (2026-08-25) — az ELSŐ, minimális CI mérföldkő KÉSZ.**
+>
+> A fenti a *végső* pipeline. Ebből ma a `.github/workflows/ci.yml` a következőket
+> valósítja meg, **minden pushon** (szűrő nélkül, tehát minden branchre) és a `main` felé
+> nyitott PR-eken:
+>
+> ```text
+> Git push → GitHub Actions (ubuntu-latest, Node 24)
+>     ↓
+> npm ci            (nem `npm install`: lockfile-hű, determinisztikus)
+>     ↓
+> npx tsc --noEmit  (typecheck — src ÉS tests)
+>     ↓
+> npm run test      (vitest, 12 fájl / 265 teszt)
+>     ↓
+> npm run build     (production build)
+> ```
+>
+> **Miért külön lépés a typecheck, ha a build úgyis lefordít?** Mert a `vite build`
+> esbuilddel csak **levágja** a típusokat, nem ellenőrzi őket — egy zöld build önmagában
+> nem bizonyítaná, hogy a `tsc` tiszta. A `tsconfig.json` `include`-ja `["src", "tests"]`,
+> tehát a teszt fájlok is átesnek a `strict` / `noUnusedLocals` ellenőrzésen.
+>
+> **Amit ez a mérföldkő SZÁNDÉKOSAN nem tartalmaz** (mind későbbi lépés, és a repóban
+> jelenleg nincs is mit futtatni belőlük): integration teszt · Playwright/E2E · visual
+> regression · cross-browser matrix · performance mérés · `dist/` artifact upload ·
+> GitHub Pages deploy (32. pont) · branch protection rule.
+>
+> **Mellékhaszon:** a CI Linux runneren fut, ami **case-sensitive**. A `BootScene` 36
+> assetet Vite-importtal hoz be, tehát egy elgépelt nagybetűs fájlnév Windowson
+> észrevétlen, a CI-ban viszont build-hiba — ez a 30. pont (asset testing) egy szeletét
+> ingyen adja, amíg minden asset committolva van.
+
 ---
 
 # 32. Deployment
@@ -1834,40 +1874,40 @@ A projekt akkor tekinthető sikeresnek, ha:
 
 ### Game
 
-- [ ] A játék böngészőben fut.
-- [ ] A player mozog.
-- [ ] A player ugrik.
-- [ ] Platform collision működik.
-- [ ] A player karddal tud támadni.
-- [ ] A player fireballt tud használni.
-- [ ] Legalább 1 enemy működik.
-- [ ] Enemy sebződik és meghal.
-- [ ] Player sebződik és meghal.
-- [ ] Checkpoint működik.
-- [ ] Legalább 1 boss működik.
-- [ ] Boss fight működik.
-- [ ] Boss phase transition működik.
-- [ ] Boss death működik.
+- [x] A játék böngészőben fut.
+- [x] A player mozog.
+- [x] A player ugrik.
+- [x] Platform collision működik.
+- [x] A player karddal tud támadni.
+- [x] A player fireballt tud használni.
+- [x] Legalább 1 enemy működik.
+- [x] Enemy sebződik és meghal.
+- [x] Player sebződik és meghal.
+- [x] Checkpoint működik.
+- [x] Legalább 1 boss működik.
+- [x] Boss fight működik.
+- [x] Boss phase transition működik.
+- [x] Boss death működik.
 - [ ] Ending működik.
-- [ ] Zene és sound effectek működnek.
+- [x] Zene és sound effectek működnek.
 - [ ] A játék rendelkezik egységes dark fantasy atmoszférával.
 
 ### QA
 
-- [ ] Unit test suite létrejött.
+- [x] Unit test suite létrejött.
 - [ ] Integration tesztek létrejöttek.
 - [ ] Playwright E2E tesztek létrejöttek.
 - [ ] Visual regression tesztek létrejöttek.
 - [ ] Cross-browser tesztelés létrejött.
 - [ ] Console/runtime error monitoring működik.
 - [ ] Alap performance ellenőrzés létrejött.
-- [ ] CI pipeline működik.
-- [ ] GitHub Actions futtatja a teszteket.
+- [x] CI pipeline működik. *(első, minimális mérföldkő: typecheck + unit teszt + build)*
+- [x] GitHub Actions futtatja a teszteket.
 - [ ] Sikeres pipeline után deployment történik.
 
 ### Deployment
 
-- [ ] GitHub repository létrejött.
+- [x] GitHub repository létrejött.
 - [ ] Production build működik.
 - [ ] GitHub Pages deployment működik.
 - [ ] A játék publikus URL-en elérhető.

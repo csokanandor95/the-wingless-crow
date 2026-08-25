@@ -1,0 +1,51 @@
+name: CI
+
+# Az elso, minimalis CI merfoldko (Project_plan.md 31. pont).
+# Szandekosan CSAK a mar letezo ellenorzeseket futtatja: typecheck + unit teszt + build.
+# NINCS integration / E2E / visual regression / cross-browser / performance lepes, es
+# NINCS deploy (se artifact, se GitHub Pages) — azok kesobbi merfoldkovek.
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Ugyanarra a ref-re erkezo ujabb push megszakitja a mar elavult futast.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      # npm ci (nem install): a lockfile-hoz determinisztikusan telepit, es elszall,
+      # ha a package.json es a lock kicsuszott egymasbol.
+      - name: Install dependencies
+        run: npm ci
+
+      # A `vite build` esbuilddel csak LEVAGJA a tipusokat, nem ellenorzi oket — egy zold
+      # build tehat nem bizonyitja, hogy a tsc tiszta. Ezert kell kulon lepesnek lennie.
+      # A tsconfig include-ja ["src", "tests"], tehat a teszteket is tipusellenorzi.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Production build
+        run: npm run build
