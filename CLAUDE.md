@@ -263,6 +263,17 @@ láda ×2, ládahalom ×3. Forrás: **GothicVania Town** (Luis Zuno / @ansimuz) 
 A Phase 8 többi része (a maradék environment sprite-ok, a maradék SFX, particles,
 `ui/` modul) még hátravan.
 
+**DÖNTÉSI PONT — ELDŐLT (2026-08-26).** A Phase 8 utáni döntési ponton (lásd lentebb és a
+`Project_plan.md` 21. pontjában) a user a **„Többi Enemy típus, Level2 és 2. Boss létrehozása"**
+irányt választotta, a Lore/QA helyett. A sorrend: **Enemy 2 (Caster) → Level 2 → Boss 2**.
+
+**Enemy 2 — GRAVECALLER KÉSZ (a döntési pont 1. iterációja).** A `Project_plan.md` 11.
+pontjának *„Archer / Caster"*-e: távolsági ellenfél, egyetlen támadással (árny-tűzgolyó).
+Új modulok: `enemies/Gravecaller.ts`, `enemies/GravecallerAnimations.ts`. Az asset a
+*Necromancer* csomagból jön (`assets/sprites/gravecaller/`) — **licenc nélkül, új nyitott
+jogi tétel.** A Level 1 `E2` platformján álló `E-platform-1` CrowHarvester **le lett
+cserélve** erre. Részletek lentebb, az „Enemy 2 — Gravecaller" szakaszban.
+
 **LEVEL 1 REDESIGN — 1. iteráció KÉSZ (a Phase 8 közé beszúrt, 3 iterációs blokk).**
 Az eredeti Level 1 (3200 px, folyamatos talaj, hazard nélkül) pillanatok alatt átugrálható
 volt. A user layout-specje (`2D helper/level1-layout.md`) alapján a pálya **6000 px**-re nőtt,
@@ -294,7 +305,7 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**12 fájl, 265 teszt** — ebből 5 az animáció-/háttér-/VFX-vezérlést, 1 a **Level 1 pálya-geometriát**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**14 fájl, 317 teszt** — ebből 6 az animáció-/háttér-/VFX-vezérlést, 1 a **Level 1 pálya-geometriát**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -321,6 +332,7 @@ the-wingless-crow/
 │   │       ├── sword-attack-2.wav      # player kardsuhintás (a sorszám a kapocs a csomaghoz)
 │   │       ├── sword-attack-3.wav      # CrowHarvester + boss közelharc (közös hang)
 │   │       ├── sword-impact-hit-1.wav  # a player kardjának becsapódása
+│   │       ├── fireball-1.wav          # Gravecaller lövedék (Spells/)
 │   │       ├── fireball-2.wav          # player tűzgolyó   (Spells/)
 │   │       ├── fireball-3.wav          # boss lövedék      (Spells/)
 │   │       └── firebuff-2.wav          # boss Shadow Spell becsapódás (Spells/)
@@ -358,6 +370,16 @@ the-wingless-crow/
 │       │   └── license.txt       # 2D_SL_Knight_v1.0 licenc, a repo dokumentálja a jogi státuszt
 │       ├── crow-harvester/       # Enemy 1 sprite
 │       │   └── enemy04_sheet.png # 1792x64 = 28 db 64x64-es frame. NINCS mellette licenc (lásd lentebb)
+│       ├── gravecaller/          # Enemy 2 sprite (Necromancer csomag) — NINCS licenc (lásd lentebb).
+│       │   │                     # ÖT külön sheet, MIND 96x96-os frame-mel, eredeti fájlnéven.
+│       │   ├── spr_NecromancerIdle_strip50.png    # 4800x96 = 50 frame
+│       │   ├── spr_NecromancerWalk_strip10.png    #  960x96 = 10 frame
+│       │   ├── spr_NecromancerGetHit_strip9.png   #  864x96 =  9 frame (f1/f3-ba égetett fehér villanás)
+│       │   ├── spr_NecromancerDeath_strip52.png   # 4992x96 = 52 frame (VALÓDI death animáció)
+│       │   └── spr_NecromancerAttackWithoutEffect_strip47.png
+│       │                         # 4512x96 = 47 frame — SZÁRMAZTATOTT: a forrás 6016x128
+│       │                         # (128x128-as frame), abból frame-enként (16,16,96,96)
+│       │                         # kivágással. Lásd a 19. technikai tanulságot.
 │       └── grafted-wing-breaker/ # Boss 1 sprite, eredeti fájlnéven (Bringer of Death, Clembod)
 │           ├── Bringer-of-Death-SpritSheet.png          # 1120x744 = 8x8 db 140x93-as frame
 │           └── Bringer-of-Death-SpritSheet_no-Effect.png # ugyanaz effektek nélkül; 1 frame kell belőle
@@ -366,12 +388,14 @@ the-wingless-crow/
 │       ├── player.test.ts       # Project_plan.md §23 Player scope
 │       ├── combat.test.ts       # §23 Combat scope (ATTACK_CONFIGS, Player attack, Fireball + ProjectileOptions)
 │       ├── crowHarvester.test.ts # §23 Enemy scope (CrowHarvester HP/damage/death/state transitions)
+│       ├── gravecaller.test.ts  # §23 Enemy scope (Gravecaller — vertikális kapu, kite, cast->reposition)
 │       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, slash/projectile/spell/charge, death)
 │       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown, SFX)
 │       ├── level1Layout.test.ts # a Level 1 geometria invariánsai (elérhetőség-BFS, gapek, enemy-bounds, spike-ok)
 │       ├── hazards.test.ts      # HazardDamageGate + SpikeField geometria + SwingingReaper lengés
 │       ├── playerAnimations.test.ts       # state->anim leképezés + a Player animáció-vezérlése
 │       ├── crowHarvesterAnimations.test.ts # state->anim + a facing-kompenzáció regressziós tesztje
+│       ├── gravecallerAnimations.test.ts   # state->anim, facing, LEVEZETETT geometria/cast-időzítés
 │       ├── bossAnimations.test.ts         # state->anim, facing-kompenzáció SCALE-lel, levezetett konstansok
 │       ├── afterImageTrail.test.ts        # a dash sebesség-csíkja: throttle + geometria-másolás
 │       ├── parallaxBackground.test.ts     # scroll->tilePositionX + a Level 1 réteg-terv invariánsai
@@ -405,7 +429,9 @@ the-wingless-crow/
 │   │   └── PlayerController.ts   # + létra-input ág
 │   ├── enemies/
 │   │   ├── CrowHarvester.ts      # Enemy 1, state machine + CrowHarvesterConfig (patrol határok)
-│   │   └── CrowHarvesterAnimations.ts # sheet geometria, anim kulcsok, facing-kompenzáció, animKeyForState()
+│   │   ├── CrowHarvesterAnimations.ts # sheet geometria, anim kulcsok, facing-kompenzáció, animKeyForState()
+│   │   ├── Gravecaller.ts        # Enemy 2 (távolsági), MAINTAIN_DISTANCE / CAST / REPOSITION
+│   │   └── GravecallerAnimations.ts   # 5 textúra egy 96x96-os geometriával, a cast-időzítés forrása
 │   ├── bosses/
 │   │   ├── GraftedWingBreaker.ts # Boss 1, két fázis, slash / projectile / spell / charge
 │   │   └── GraftedWingBreakerAnimations.ts # sheet geometria, anim kulcsok, időzítések forrása
@@ -554,6 +580,70 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
     100 px/s-os üldözőt, és 320 px után az üldözés megszakad — a szegmens hossza így ritkán
     számít.
 
+### Enemy 2 — Gravecaller (`src/enemies/Gravecaller.ts`, `GravecallerAnimations.ts`)
+
+A `Project_plan.md` 11. pontjának **„Archer / Caster"**-e. A név tematikus, nem az asset
+csomagé (*Necromancer*): a lore szerint pont az ilyen lény hívja vissza a holtakat — azt
+sérti meg, amit Lazarus őriz. Ugyanaz a névadási elv, mint a `Hollow → CrowHarvester`-nél.
+
+- **State machine**, a terv öt dobozának 1:1 leképezése:
+  `PATROL → DETECT PLAYER → MAINTAIN_DISTANCE → CAST → REPOSITION` (+ `DEAD`).
+- **EGYETLEN támadás:** árny-tűzgolyó. Nincs közelharca — sarokba szorítva is csak castol.
+- **A LÖVEDÉK VÍZSZINTES**, mint a playeré és a bossé; a `Fireball`/`ProjectileOptions`
+  NEM változott, csak egy új textúra + számhármas.
+- **Ebből következik a VERTIKÁLIS KAPU** (`VERTICAL_DETECTION_RANGE = 80`), és ez a lény
+  legfontosabb tervezési döntése: a Gravecaller csak nagyjából azonos magasságban lévő
+  playert vesz észre ÉS lő. Egy platformon álló caster enélkül a talajon futó playerre is
+  tüzelne — a lövedék pedig elmenne a feje fölött. **A kapu a `canCast()`-ban IS ott van,
+  nem csak a detektálásban**: a `takeDamage()` — a CrowHarvesterhez hasonlóan — PATROL-ból
+  azonnal ébreszt, tehát egy alulról indított tűzgolyó felkelti; kapu nélkül onnantól a
+  végtelenségig lőné a levegőt.
+- **MAINTAIN DISTANCE:** `< RETREAT_RANGE (140)` → hátrál `RETREAT_SPEED (70)`-nel,
+  `> PREFERRED_RANGE (300)` → közelít `ADVANCE_SPEED (50)`-nel, köztes sávban megáll.
+  A hátrálás a `chaseMinX/MaxX` peremén (ugyanaz a `enemyChaseBounds()`, mint a
+  CrowHarvesternél) **véget ér** → a platformon álló lény **sarokba szorítható**.
+- **CSAK ÁLLÓ HELYZETBŐL castol.** Ez teszi a MAINTAIN DISTANCE-t valódi állapottá, és
+  nem kozmetika: enélkül a lény az észlelés pillanatában, MOZGÁS NÉLKÜL castolt volna,
+  tehát a „távolságtartás" sosem futott volna le (a unit teszt pont ezt találta meg).
+  Gameplay-ben két dolgot ad: a túl messziről érkező playerre nem lő vakon, hanem előbb
+  lőtávba sétál; a rárohanó player elől pedig előbb hátrál. **Sarokba szorítva viszont
+  tüzel**, mert a peremen a hátrálás `velocity 0`-t ad, tehát „áll" — nem válik bábuvá.
+- **A hátrálás SZÁNDÉKOSAN lassabb a playernél** (70 ≪ `MOVE_SPEED` 200): a távolságtartás
+  késleltetés, nem menekülés. Ez + a `MAX_HP = 24` (3 kardcsapás) a user kérésének a
+  megvalósítása: „ne legyen nehéz közel menni hozzá és karddal megölni".
+- **CAST = a TELJES animáció** (windup + kikövetkezés, 1160 ms), és végig ÁLL: ez a
+  punish-ablak. A lövedék `CAST_STARTUP_MS`-nél (720) születik. Ezután `REPOSITION`
+  (1200 ms), ahol MOZOG, de nem castolhat — vagyis **a cooldown maga az állapot**, nincs
+  külön `canCast` flag. Két lövés között így 2360 ms telik el.
+- **Az irány a cast ELEJÉN rögzül**, nem a kioldáskor: a windup alatt mögé kerülve a
+  lövedék kikerülhető, tehát a telegraph tényleges információt hordoz.
+- **A lövedéket NEM a Gravecaller hozza létre**, csak `'gravecaller-projectile'` eventet
+  emittál (x, y, irány) — ugyanaz a minta, mint a `Player.'fireball-cast'`-ja és a boss
+  `'boss-projectile'`-ja. A `Level1Scene` készíti el a `Fireball`-t és játssza le a hangot.
+- **Sprite + animációk:** ÖT külön textúra (`GRAVECALLER_TEXTURES`), a knight mintájára —
+  a Phaser animációi (textúra, frame) párokat tárolnak, tehát a `play()` magától átvált.
+  - **A csomag frame-mérete KEVERT volt** (96×96 vs. 128×128); az attack sheet ezért
+    KIVÁGVA került a repóba. Lásd a **19. technikai tanulságot**.
+  - Natívan **JOBBRA néz** (mint a CrowHarvester); a test majdnem központozott (közepe
+    x=47, a frame közepe 48), a kompenzáció mégis a megosztott `systems/SpriteFacing.ts`-en
+    megy — hogy a lény ne váljon kivétellé egy jövőbeli body-eltolásnál.
+  - `BODY 20×38` a köpenyhez igazítva; `ORIGIN_Y = 45/96`, `FEET_OFFSET_Y = BODY_HEIGHT/2`
+    (19) — **levezetett**, ebből jön a layout `GRAVECALLER_SPAWN_OFFSET`-je (20).
+  - **VAN valódi death animáció** (52 frame) — a CrowHarvesternél nem volt. Ezért a fade
+    `delay: DEATH_ANIM_MS`-szel indul: enélkül a lény összeesés közben tűnne el.
+  - A `GetHit` sheet f1/f3 frame-jeibe **be van égetve a fehér villanás** (mint a
+    CrowHarvesternél), tehát **tint sehol nincs**.
+  - **A CAST telegraph-ját a találat NEM szakítja meg** (ugyanaz az elv, mint a bossnál):
+    a windup közben eltalált lény lövedéke ettől még megérkezik, tehát látszania kell.
+  - **A CAST slot-alapú** (40 ms/slot), mint a boss SLASH/CAST-ja: nem a teljes hosszt
+    rögzítjük, hanem a slot-időt, mert a kioldás frame-jének (`f31`) pontos pillanatban
+    kell képre kerülnie. A 47 frame-ből a statikus tartókockák ki vannak ritkítva; a
+    staff FELEMELÉSE (`f23–30`) viszont sűrűn megy — az a telegraph.
+- **Elhelyezés a Level 1-en:** egyetlen példány, az `E2` platformon (`E-platform-1`), a
+  korábbi CrowHarvester helyén. A patrol/chase határok **bitre változatlanok** (a
+  testszélessége is 20). A vertikális kapu így pont az `E1`/`E2`/`E3` platform-láncot fedi
+  le, a `G5` talajt nem — ezt a `level1Layout.test.ts` futtatható állításként őrzi.
+
 ### Level1Scene (`src/scenes/Level1Scene.ts` + `src/levels/Level1Layout.ts`)
 
 > **A geometria NEM a scene-ben él.** A `Level1Layout.ts` egy szándékosan Phaser-mentes
@@ -592,18 +682,28 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
 - **13 platform** a `PLATFORMS` tömbben (adatvezérelt: az enemy patrol-határok ugyanebből a
   forrásból származnak, `platformTop/Left/Right` helperekkel). `H1` `oneWay: true` →
   `checkCollision.down = false`, a létra ezen megy át
-- **8 CrowHarvester.** A séta-körzetük (`patrolMinX/MaxX`) az `ENEMY_SPAWNS` adata, az
-  ÜLDÖZÉSI határuk viszont **levezetett**: az `enemyChaseBounds()` a felület pereméből
-  (`EDGE_INSET`-tel behúzva) számítja, majd **elvágja a spike-mezőkkel**. Így egy platform
-  elmozdítása vagy egy új tüskemező automatikusan átméretezi a pórázt, és nem lehet elrontani.
-  A platformon állóknál a kettő egybeesik (a platform pereme MAGA a patrol-határ), tehát az
-  ő viselkedésük változatlan
+- **8 enemy: 7 CrowHarvester + 1 Gravecaller** (az `E2` platformon — lásd az Enemy 2
+  szakaszt). A típust az `ENEMY_SPAWNS` opcionális `type` mezője adja, aminek a default-ja
+  `'crow-harvester'` — ezért nem kellett a többi hét sorhoz hozzányúlni. A séta-körzetük
+  (`patrolMinX/MaxX`) az `ENEMY_SPAWNS` adata, az ÜLDÖZÉSI (illetve a Gravecallernél
+  ÁTHELYEZKEDÉSI) határuk viszont **levezetett**: az `enemyChaseBounds()` a felület
+  pereméből (`EDGE_INSET`-tel behúzva) számítja, majd **elvágja a spike-mezőkkel**. Így egy
+  platform elmozdítása vagy egy új tüskemező automatikusan átméretezi a pórázt, és nem lehet
+  elrontani. A platformon állóknál a kettő egybeesik (a platform pereme MAGA a patrol-határ)
+- **A két enemy-fajta KÉT KÜLÖN tömbben él** (`enemies`, `gravecallers`), de UGYANAZT a négy
+  regisztrációt kapja egy ciklusban (talaj-, platform-collider + kard- és tűzgolyó-overlap).
+  A handlerek csak a `Damageable` felületet használják, tehát típusfüggetlenek; a frissítést
+  a `LevelEnemy` interfészre írt `updateEnemies()` végzi. **Nem közös ős, hanem strukturális
+  tipizálás** — a következő enemy típus így egy tömb + egy `spawnEnemies()` ág
+- **A Gravecaller lövedékei külön tömbben** (`enemyProjectiles`), mert a PLAYERT sebzik —
+  ugyanaz a minta, mint a `BossScene.bossProjectiles`-e (overlap a playerrel, collider a
+  terepre, helyben-splice takarítás). A `clearFireballs()` respawnkor ezt is üríti
 - **Enemy-respawn:** a player halálakor a `resetEnemies()` megsemmisíti és a layout-adatból
-  újraspawnolja az összes lényt (a `clearFireballs()` a lövedékeket is). **A tömb
+  újraspawnolja az összes lényt (a `clearFireballs()` mindkét lövedék-tömböt is). **A tömbök
   IDENTITÁSA nem változhat** (splice + push, sosem új tömb): a `create()`-ben regisztrált
   colliderek/overlapek erre a referenciára kötődnek, és a Phaser minden physics stepben
-  újraiterálja a tartalmát (lásd 2. tanulság). Ehhez kellett a `CrowHarvester.destroy()`
-  override — lásd a 18. tanulságot
+  újraiterálja a tartalmát (lásd 2. tanulság). Ehhez kellett a `CrowHarvester.destroy()` és a
+  `Gravecaller.destroy()` override — lásd a 18. tanulságot
 - **Két checkpoint:** a pálya végi ajtó (**E** billentyű) és egy **köztes** (x=3000, a
   spike-szakasz után), ami **ÉRINTÉSRE** aktiválódik. Utóbbi szándékosan más input, hogy ne
   versenyezzen az ajtó promptjával; a visszajelzés a jelölő kivilágosodása + egy rövid felirat
@@ -904,6 +1004,7 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   | `FIREBALL_CAST` | `fireball-2` | a player `'fireball-cast'`-jánál, a lövedék születésekor |
   | `BOSS_PROJECTILE` | `fireball-3` | a `'boss-projectile'`-nél; más hang, mint a playeré |
   | `BOSS_SPELL_IMPACT` | `firebuff-2` | `SPELL_IMPACT_MS`-nél, amikor az oszlop FÖLDET ÉR |
+  | `GRAVECALLER_CAST` | `fireball-1` | a `'gravecaller-projectile'`-nél; HARMADIK tűzgolyó-hang |
 - **`scene.sound.play(key, config)`, NEM `sound.add()`** — a SoundManager `play()`-e olyan
   one-shot hangot hoz létre, ami a lejátszás végén magától felszabadul. Ezért az SFX-hez
   nincs `this.music`-szerű élettartam-kezelés, **nem exkluzív** (több csapás hangja
@@ -917,7 +1018,8 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   (`Phaser.Math.Between`), így egyetlen fájlból is változatos a sorozat. A default a hívó
   oldalán elhagyható; `{ detuneRange: 0 }` ad pontos lejátszást
 - **Bekötés — MINDIG event + scene, sosem közvetlen hanghívás az entitásban.** A `Player`, a
-  `CrowHarvester` és a boss csak eventet emittál (`'sword-swing'`, `'harvester-attack'`,
+  `CrowHarvester`, a `Gravecaller` és a boss csak eventet emittál (`'sword-swing'`,
+  `'harvester-attack'`, `'gravecaller-projectile'`,
   `'boss-slash'`, `'fireball-cast'`, `'boss-projectile'`, `'boss-spell'`), a `playSfx()`-et a
   scene hívja — ugyanaz a delegálási minta, mint a lövedékek létrehozásánál. Így az entitások
   nem függnek az `AudioManager`-től, és a kibocsátás unit-tesztben megfigyelhető.
@@ -1058,6 +1160,24 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
     a rá futó tweeneket (`scene?.tweens.killTweensOf(this)`) — a halál-fade `onComplete`-je
     egyébként egy megsemmisített objektumon hívódna meg. A `GameObject.destroy()` maga
     idempotens (`!this.scene` guard), tehát a kézi + a shutdown-hívás párosa biztonságos.
+19. **Kevert frame-méretű sprite csomagnál a frame-eket NORMALIZÁLD (vágd ki), ne írj
+    animációnkénti geometriát.** A Necromancer (Gravecaller) csomag idle/walk/hit/death
+    sheetjei 96×96-osak, az attack (és a nem használt spawn) viszont 128×128 — a 128-as
+    frame a 96-osnak PONTOSAN 16 px-es kerettel kipárnázott változata (mindkét tengelyen
+    mérve). Két frame-mérettel a `FacingGeometry` minden mezője (`frameWidth`,
+    `bodyOffsetX/Y`, `originY`) ANIMÁCIÓNKÉNT más lenne, tehát az `applyFacing()`-et minden
+    animáció-váltásnál újra kellene futtatni más geometriával — pont az a hibaosztály, amit
+    a 11./16. tanulság megszüntetett. Ehelyett az attack sheet **kivágva** került a repóba
+    (6016×128 → 4512×96), és ez **veszteségmentes**: a levágott keretben 0 db nem-üres
+    pixel volt (a `WithoutEffect` változatot használjuk, az effektes kilógna). Ellenőrzés:
+    a kivágott f0 alpha-bounding boxa bitre az idle f0-éval egyezik (`x 38..65, y 15..63`).
+    **Mielőtt animációnkénti geometriát írnál, nézd meg, nem egyszerű padding-e az eltérés.**
+20. **A unit teszt tervezési hibát is talál, nem csak regressziót.** A Gravecaller első
+    változata az észlelés pillanatában, MOZGÁS NÉLKÜL castolt, tehát a `MAINTAIN_DISTANCE`
+    állapot egyetlen frame-es átjáró volt — a „távolságtartás" sosem futott le. Ez kézi
+    végigjátszáson „működőnek" látszott volna (a lény lő, a player megöli); a hiba abból
+    derült ki, hogy a *„túl közeli player → hátrál"* teszt `velocity 0`-t kapott. A javítás
+    (`applySpacing()` visszaadja, hogy ÁLL-e, és a cast kapuja ez) egyben jobb gameplay is.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
@@ -1086,6 +1206,14 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   gyűjti, és a projekt végén másolja be őket — ezért nem került licenc fájl a
   `assets/backgrounds/ruined-city/` mellé, a forráscsomagot a `BootScene` importjainál
   lévő komment köti vissza.
+- **NYITOTT JOGI TÉTEL (ÚJ):** a Gravecaller assethez (`assets/sprites/gravecaller/`) sem
+  került licenc a repóba — a forráscsomagban (`2D helper/enemy/Necromancer`) **egyáltalán
+  nincs licenc/readme fájl**, és a `2D helper/Credits.txt`-ben **sem szerepel**. Ugyanaz a
+  kategória, mint a CrowHarvester: a repo nyilvánossá tétele / GitHub Pages deploy ELŐTT
+  tisztázni kell, és a **`Credits.txt`-be fel kell venni**. Ezért maradtak meg az eredeti
+  `spr_Necromancer*_strip*.png` fájlnevek: ez az egyetlen kapocs a forráscsomaghoz.
+  *Nyom a kereséshez: a `spr_<név>_strip<N>.png` GameMaker-konvenció, és a **penusbmic**
+  (itch.io) dark-fantasy csomagjaira jellemző — érdemes ott visszakeresni.*
 - **NYITOTT JOGI TÉTEL:** a kard SFX-ek forráscsomagja (*Free Fantasy SFX Pack* by
   **TomMusic**, `2D helper/sounds/...`) `ReadMe.txt`-je **nem tartalmaz licencszöveget**,
   csak a szerző elérhetőségeit (itch.io / gamedevmarket / e-mail). A feltételeket a
@@ -1135,6 +1263,11 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 - A boss lövedéke (`boss-projectile-placeholder`) még lila kör. A `Cast` animáció végén
   **varjak röppennek fel** a kaszáról — egy varjú-lövedék tökéletesen illene a témához,
   de az az `assets/effects/` iteráció dolga
+- A Gravecaller lövedéke (`gravecaller-projectile-placeholder`) mérgeszöld kör, világos
+  maggal. **Három lövedék-forrás van a pályán**, ezért három szín: player narancs, boss
+  lila, Gravecaller zöld. *(A Necromancer csomagban VAN cast-effekt sheet, de a mérés
+  szerint az egy szétfoszló BECSAPÓDÁS — 30→4 px —, nem loopolható repülő bolt, ezért
+  maradt a placeholder; valódi asset az `assets/effects/` iterációban.)*
 - `Level2Scene` teljes egészében placeholder ("Level 2 — The Crowless Forest / tervezés alatt"), és benne az **R billentyű** visszavisz a `Level1Scene`-re — kizárólag azért, hogy a `Level1 → Boss → átvezető → Level2` lánc manuálisan körbejárható legyen. A valódi Level 2 elkészültekor törlendő
 - A `BOSS_VICTORY_NARRATION` szövege placeholder lore — a végleges a Phase 9 – Lore-ban készül
 - A `BootScene` "Betöltés..." szövege + progress-sávja nyers `add.text` / `Graphics` — a `ui/` modulba költözik, amint több asset (sprite-ok) is betöltendő lesz
@@ -1143,9 +1276,34 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 
 ## Következő lépés
 
-**LEVEL 1 FINOMHANGOLÁS — 2. kör.** Ez az aktuális feladat. Az 1. kör (A szakasz gödre +
+**A DÖNTÉSI PONT ELDŐLT: „Többi Enemy típus, Level2 és 2. Boss".** Ezen belül az
+**Enemy 2 (Gravecaller) KÉSZ** — lásd fentebb. Ami a választott irányból még hátravan:
+
+1. **Level 2 – The Crowless Forest.** Jelenleg placeholder scene. A Project_plan 14. pontja
+   szerint „Archer / sötétebb környezet / több platforming" — a Gravecallerrel az „Archer"
+   szerep már megvan, tehát a Level 2 lehet az első pálya, ahol több példány is szerepel.
+   *(A Level 1 layout-ja `Level1Layout.ts`-ként Phaser-mentes adatmodul + unit-tesztelt
+   invariánsok — ezt a mintát érdemes átvinni.)*
+2. **Boss 2.** Jelölt aréna-háttér már van: `2D helper/level/Bossbackground_2.png`
+   (angyal-szobros katedrális, nyitott égbolttal) — külön aréna, nem a Boss 1 variánsa.
+3. **Enemy 3 – Beast** (opcionális, a terv szerint is): gyorsabb, agresszívebb.
+   `PATROL → DETECT → CHARGE → ATTACK → COOLDOWN`.
+
+Hasznos, hogy a Gravecaller iterációja **általánosította a scene enemy-kezelését**: a
+`LevelEnemy` interfész + a `type` mező az `ENEMY_SPAWNS`-ban, tehát a Beast (vagy egy új
+lény a Level 2-n) egy tömb + egy `spawnEnemies()` ág.
+
+---
+
+**LEVEL 1 FINOMHANGOLÁS — 2. kör (továbbra is NYITVA).** Az 1. kör (A szakasz gödre +
 földi enemy üldözés) KÉSZ, lásd fentebb. **A blokk addig nyitva marad**, amíg a user
-elégedett nem lesz a pályával.
+elégedett nem lesz a pályával. Új hangolópont a Gravecaller érkezésével:
+
+- **A Gravecaller nehézsége az E szakaszban.** A `PROJECTILE_DAMAGE` (10) és a
+  `REPOSITION_MS` (1200) a két elsődleges knob; a lövés-ciklus jelenleg 2360 ms. Ha túl
+  ártalmatlannak bizonyul, a `RETREAT_SPEED` (70) emelése vagy a `MAX_HP` (24) növelése a
+  következő lépés — de mindkettő SZÁNDÉKOSAN alacsony (a user kérése: legyen könnyű
+  megközelíteni és karddal megölni).
 
 A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FELVETETTEK
 (megfigyelés, nem javaslat — a döntés a useré):
@@ -1175,7 +1333,7 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
   `Footsteps/`, `Spell Impact`, `Doors Gates and Chests` (checkpoint) és `Torch` is.
 - **Environment sprite-ok** — a player (2. it.), a CrowHarvester (3. it.), a Level 1 háttere
   (4. it.), a boss aréna háttere (5. it.), a boss (6. it.) és a Level 1 terrainje (10. it.)
-  kész; **már csak a hazardok** (tüske, reaper, checkpoint-jelölő) **és a két lövedék**
+  kész; **már csak a hazardok** (tüske, reaper, checkpoint-jelölő) **és a HÁROM lövedék**
   placeholder.
   A `2D helper/Sprites/` alatt van még Enemy01/02/03/05 és egy "Gino Character" — ha
   bármelyik enemy-jelöltként bejön, számíts rá, hogy szintén off-center lesz; a
@@ -1193,7 +1351,7 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),
   narration ambient (`NarrationScene.create()`), victory sting (`BossScene.scheduleVictory()`).
 - A maradék kódból generált placeholder téglalapok cseréje valódi pixel art sprite-okra
-  (`assets/effects/`): a hazardok (tüske, reaper, checkpoint-jelölő) és a két lövedék.
+  (`assets/effects/`): a hazardok (tüske, reaper, checkpoint-jelölő) és a három lövedék.
   **Mindkét háttér, mind a három karakter és a Level 1 terrainje kész.**
 - `ui/` modul: valódi HUD a debug `add.text`-ek helyett, és a boss HP-bar átköltöztetése
   a `BossScene.drawBossHealthBar()`-ból. Ide kerülhet a `BootScene` betöltésjelzője is.

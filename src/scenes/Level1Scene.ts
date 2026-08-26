@@ -3,6 +3,11 @@ import Player, { LadderContact } from '../player/Player';
 import PlayerController from '../player/PlayerController';
 import Fireball from '../combat/Projectile';
 import CrowHarvester from '../enemies/CrowHarvester';
+import Gravecaller, {
+  PROJECTILE_DAMAGE as GRAVECALLER_PROJECTILE_DAMAGE,
+  PROJECTILE_SIZE as GRAVECALLER_PROJECTILE_SIZE,
+  PROJECTILE_SPEED as GRAVECALLER_PROJECTILE_SPEED,
+} from '../enemies/Gravecaller';
 import CheckpointSystem from '../systems/CheckpointSystem';
 import ParallaxBackground, {
   LEVEL1_BACKGROUND_LAYERS,
@@ -24,12 +29,13 @@ import {
   DOOR_CHECKPOINT,
   ENEMY_SPAWNS,
   enemyChaseBounds,
+  enemySpawnOffset,
+  enemyType,
   FALL_DEATH_Y,
   FALL_DEPTH,
   GROUND_CENTER_Y,
   GROUND_SEGMENTS,
   GROUND_TOP,
-  HARVESTER_SPAWN_OFFSET,
   LADDER,
   MID_CHECKPOINT,
   PLATFORMS,
@@ -62,7 +68,18 @@ import {
   TERRAIN_DEPTH,
   TILE_TEXTURES,
 } from '../levels/LevelTileset';
-import type { PhysicsOverlapObject } from '../combat/DamageSystem';
+import type { Damageable, PhysicsOverlapObject } from '../combat/DamageSystem';
+
+/**
+ * Amit a scene EGY enemytől elvár, típustól függetlenül. A CrowHarvester és a Gravecaller
+ * strukturálisan kielégíti — nincs közös ősük, és nem is kell: a scene-nek pontosan ennyi
+ * kell, és ennyivel a következő enemy típus is ingyen beköthető.
+ */
+interface LevelEnemy extends Damageable {
+  readonly y: number;
+  getMaxHP(): number;
+  update(player: Player): void;
+}
 
 /**
  * A LÁTHATATLAN fizikai testek csempemérete (`ground-placeholder` 64x32,
@@ -115,7 +132,10 @@ export default class Level1Scene extends Phaser.Scene {
   private midCheckpointActivated = false;
 
   private fireballs: Fireball[] = [];
+  /** A Gravecallerek lövedékei — külön tömb, mert a PLAYERT sebzik (mint a bossProjectiles). */
+  private enemyProjectiles: Fireball[] = [];
   private enemies: CrowHarvester[] = [];
+  private gravecallers: Gravecaller[] = [];
 
   constructor() {
     super('Level1Scene');
@@ -128,7 +148,9 @@ export default class Level1Scene extends Phaser.Scene {
     // őket — különben a régi, már megsemmisített (destroyed body-jú) CrowHarvester/Fireball
     // objektumok bennmaradnának, és az update() rajtuk hívott setVelocityX stb. elszállna.
     this.fireballs = [];
+    this.enemyProjectiles = [];
     this.enemies = [];
+    this.gravecallers = [];
     this.reapers = [];
     this.isTransitioning = false;
     this.respawnScheduled = false;
@@ -199,20 +221,32 @@ export default class Level1Scene extends Phaser.Scene {
     this.physics.add.collider(this.player, platforms);
 
     this.spawnEnemies();
-    // FIGYELEM: ezek a colliderek a this.enemies tömb REFERENCIÁJÁRA kötődnek, és a Phaser
-    // minden physics stepben újraiterálja a tartalmát. Ezért tudja a resetEnemies() helyben
-    // (splice + push) kicserélni a lakóit anélkül, hogy újra kellene regisztrálni bármit —
-    // és ezért TILOS a tömböt új tömbre cserélni (lásd CLAUDE.md 2. tanulság).
-    this.physics.add.collider(this.enemies, ground);
-    this.physics.add.collider(this.enemies, platforms);
-
-    this.physics.add.overlap(
-      this.player.getAttackHitbox(),
-      this.enemies,
-      this.handlePlayerHitEnemy,
-      undefined,
-      this
-    );
+    // FIGYELEM: ezek a colliderek az enemy-tömbök REFERENCIÁJÁRA kötődnek, és a Phaser
+    // minden physics stepben újraiterálja a tartalmukat. Ezért tudja a resetEnemies() helyben
+    // (splice + push) kicserélni a lakóikat anélkül, hogy újra kellene regisztrálni bármit —
+    // és ezért TILOS a tömböket új tömbre cserélni (lásd CLAUDE.md 2. tanulság).
+    //
+    // A két enemy-fajta ugyanazt a négy regisztrációt kapja: a handlerek csak a Damageable
+    // felületet használják, tehát típusfüggetlenek.
+    const enemyGroups: Phaser.Physics.Arcade.Sprite[][] = [this.enemies, this.gravecallers];
+    for (const group of enemyGroups) {
+      this.physics.add.collider(group, ground);
+      this.physics.add.collider(group, platforms);
+      this.physics.add.overlap(
+        this.player.getAttackHitbox(),
+        group,
+        this.handlePlayerHitEnemy,
+        undefined,
+        this
+      );
+      this.physics.add.overlap(
+        this.fireballs,
+        group,
+        this.handleFireballHitEnemy,
+        undefined,
+        this
+      );
+    }
 
     this.player.on('fireball-cast', (x: number, y: number, direction: number) => {
       const fireball = new Fireball(this, x, y, direction);
@@ -222,22 +256,25 @@ export default class Level1Scene extends Phaser.Scene {
 
     this.player.on('sword-swing', () => this.audio.playSfx(SFX_KEYS.SWORD_SWING));
 
+    // Az enemy-lövedékek a PLAYERT sebzik — ugyanaz a minta, mint a BossScene
+    // bossProjectiles × player overlapje.
     this.physics.add.overlap(
-      this.fireballs,
-      this.enemies,
-      this.handleFireballHitEnemy,
+      this.enemyProjectiles,
+      this.player,
+      this.handleEnemyProjectileHitPlayer,
       undefined,
       this
     );
 
-    this.physics.add.collider(this.fireballs, ground, (fireballObj) => {
-      const fireball = fireballObj as Fireball;
-      if (fireball.active) fireball.onImpact();
-    });
-    this.physics.add.collider(this.fireballs, platforms, (fireballObj) => {
-      const fireball = fireballObj as Fireball;
-      if (fireball.active) fireball.onImpact();
-    });
+    // Mindkét lövedék-fajta becsapódik a terepbe.
+    for (const projectiles of [this.fireballs, this.enemyProjectiles]) {
+      for (const surface of [ground, platforms]) {
+        this.physics.add.collider(projectiles, surface, (projectileObj) => {
+          const projectile = projectileObj as Fireball;
+          if (projectile.active) projectile.onImpact();
+        });
+      }
+    }
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.controller = new PlayerController(this, this.player);
@@ -498,17 +535,38 @@ export default class Level1Scene extends Phaser.Scene {
     for (const def of ENEMY_SPAWNS) {
       const surface = surfaceSpan(def.surfaceId);
       const chase = enemyChaseBounds(def);
-      const enemy = new CrowHarvester(
-        this,
-        def.x,
-        surface.top - HARVESTER_SPAWN_OFFSET,
-        {
-          patrolMinX: def.patrolMinX,
-          patrolMaxX: def.patrolMaxX,
-          chaseMinX: chase.min,
-          chaseMaxX: chase.max,
-        }
-      );
+      // A séta- és üldözési határok mindkét lénynél ugyanaz az objektum-alak
+      // (GravecallerConfig ≡ CrowHarvesterConfig), csak a spawn Y talp-offsetje típusfüggő.
+      const bounds = {
+        patrolMinX: def.patrolMinX,
+        patrolMaxX: def.patrolMaxX,
+        chaseMinX: chase.min,
+        chaseMaxX: chase.max,
+      };
+      const spawnY = surface.top - enemySpawnOffset(def);
+
+      if (enemyType(def) === 'gravecaller') {
+        const caster = new Gravecaller(this, def.x, spawnY, bounds);
+
+        // A lövedéket a scene hozza létre (mint a player 'fireball-cast'-jánál és a boss
+        // 'boss-projectile'-jánál) — a Gravecaller csak a helyet és az irányt emittálja.
+        caster.on('gravecaller-projectile', (x: number, y: number, direction: number) => {
+          this.enemyProjectiles.push(
+            new Fireball(this, x, y, direction, {
+              texture: 'gravecaller-projectile-placeholder',
+              damage: GRAVECALLER_PROJECTILE_DAMAGE,
+              speed: GRAVECALLER_PROJECTILE_SPEED,
+              size: GRAVECALLER_PROJECTILE_SIZE,
+            })
+          );
+          this.audio.playSfx(SFX_KEYS.GRAVECALLER_CAST);
+        });
+
+        this.gravecallers.push(caster);
+        continue;
+      }
+
+      const enemy = new CrowHarvester(this, def.x, spawnY, bounds);
 
       // Csapás-hang. Távolság-alapú némítás NEM kell: a CrowHarvester csak ATTACK_RANGE-en
       // (42px) belül támad, tehát egy csapkodó lény definíció szerint a player mellett áll,
@@ -527,19 +585,23 @@ export default class Level1Scene extends Phaser.Scene {
    * referenciára kötődnek (CLAUDE.md 2. tanulság), ezért splice + push, sosem új tömb.
    */
   private resetEnemies(): void {
-    for (const enemy of this.enemies) {
-      enemy.destroy();
+    for (const group of [this.enemies, this.gravecallers]) {
+      for (const enemy of group) {
+        enemy.destroy();
+      }
+      group.splice(0, group.length);
     }
-    this.enemies.splice(0, this.enemies.length);
     this.spawnEnemies();
   }
 
-  /** Ugyanaz a helyben-csere, mint a resetEnemies()-nél: a fireball-colliderek is a tömbre kötnek. */
+  /** Ugyanaz a helyben-csere, mint a resetEnemies()-nél: a lövedék-colliderek is a tömbre kötnek. */
   private clearFireballs(): void {
-    for (const fireball of this.fireballs) {
-      fireball.destroy();
+    for (const projectiles of [this.fireballs, this.enemyProjectiles]) {
+      for (const projectile of projectiles) {
+        projectile.destroy();
+      }
+      projectiles.splice(0, projectiles.length);
     }
-    this.fireballs.splice(0, this.fireballs.length);
   }
 
   update(_time: number, delta: number): void {
@@ -562,19 +624,16 @@ export default class Level1Scene extends Phaser.Scene {
       `HP: ${this.player.getHP()}/${this.player.getMaxHP()} | ${this.player.playerState}`
     );
 
-    for (const enemy of this.enemies) {
-      // Biztosíték: a patrol-határok ezt elvileg kizárják, de egy szakadékba került enemy
-      // enélkül némán "patrolozna" a világ alján, a képernyőn kívül.
-      if (!enemy.isDead() && enemy.y > FALL_DEATH_Y) {
-        enemy.takeDamage(enemy.getMaxHP());
-        continue;
-      }
-      enemy.update(this.player);
-    }
+    this.updateEnemies(this.enemies);
+    this.updateEnemies(this.gravecallers);
 
-    for (let i = this.fireballs.length - 1; i >= 0; i--) {
-      if (!this.fireballs[i].active) {
-        this.fireballs.splice(i, 1);
+    // Az inaktív lövedékek kitakarítása MINDIG helyben, splice()-szal: a tömbök referenciája
+    // be van kötve a physics.add.overlap-ba (CLAUDE.md 2. tanulság).
+    for (const projectiles of [this.fireballs, this.enemyProjectiles]) {
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        if (!projectiles[i].active) {
+          projectiles.splice(i, 1);
+        }
       }
     }
 
@@ -623,6 +682,22 @@ export default class Level1Scene extends Phaser.Scene {
         // épp a tüskékbe visszaéledő player egy ablaknyi ideig sebezhetetlen lenne.
         this.hazardGate.reset();
       });
+    }
+  }
+
+  /**
+   * Egy enemy-csoport frissítése. Típusfüggetlen: a `LevelEnemy` felület pontosan annyit
+   * kér, amennyit a scene használ, tehát a következő enemy típus ingyen beköthető.
+   */
+  private updateEnemies(enemies: LevelEnemy[]): void {
+    for (const enemy of enemies) {
+      // Biztosíték: a patrol-határok ezt elvileg kizárják, de egy szakadékba került enemy
+      // enélkül némán "patrolozna" a világ alján, a képernyőn kívül.
+      if (!enemy.isDead() && enemy.y > FALL_DEATH_Y) {
+        enemy.takeDamage(enemy.getMaxHP());
+        continue;
+      }
+      enemy.update(this.player);
     }
   }
 
@@ -702,11 +777,14 @@ export default class Level1Scene extends Phaser.Scene {
     this.cameras.main.fadeOut(TRANSITION_FADE_MS, 0, 0, 0);
   }
 
+  // A két handler MINDKÉT enemy-fajtát kiszolgálja: csak a Damageable felületet használják
+  // (+ a GameObject identitást a hasHitTarget/registerHit halmazához), tehát nem kell tudniuk,
+  // melyik lényt találták el.
   private handlePlayerHitEnemy(
     hitbox: PhysicsOverlapObject,
     enemyObj: PhysicsOverlapObject
   ): void {
-    const enemy = enemyObj as CrowHarvester;
+    const enemy = enemyObj as Phaser.Physics.Arcade.Sprite & Damageable;
     if (enemy.isDead() || this.player.hasHitTarget(enemy)) return;
 
     const damage = (hitbox as Phaser.GameObjects.Zone).getData('damage') as number;
@@ -722,10 +800,23 @@ export default class Level1Scene extends Phaser.Scene {
     enemyObj: PhysicsOverlapObject
   ): void {
     const fireball = fireballObj as Fireball;
-    const enemy = enemyObj as CrowHarvester;
+    const enemy = enemyObj as Phaser.Physics.Arcade.Sprite & Damageable;
     if (!fireball.active || fireball.hasAlreadyHit() || enemy.isDead()) return;
 
     enemy.takeDamage(fireball.getDamage());
     fireball.onImpact();
+  }
+
+  /** A Gravecaller lövedéke × player — a BossScene.handleBossProjectileHitPlayer mintája. */
+  private handleEnemyProjectileHitPlayer(
+    projectileObj: PhysicsOverlapObject,
+    playerObj: PhysicsOverlapObject
+  ): void {
+    const projectile = projectileObj as Fireball;
+    const player = playerObj as Player;
+    if (!projectile.active || projectile.hasAlreadyHit() || player.isDead()) return;
+
+    player.takeDamage(projectile.getDamage());
+    projectile.onImpact();
   }
 }

@@ -12,6 +12,11 @@ import {
   TEXTURE_KEY as HARVESTER_TEXTURE_KEY,
 } from '../enemies/CrowHarvesterAnimations';
 import {
+  createGravecallerAnimations,
+  FRAME_SIZE as GRAVECALLER_FRAME_SIZE,
+  GRAVECALLER_TEXTURES,
+} from '../enemies/GravecallerAnimations';
+import {
   createGraftedWingBreakerAnimations,
   CLEAN_TEXTURE_KEY as BOSS_CLEAN_TEXTURE_KEY,
   FRAME_HEIGHT as BOSS_FRAME_HEIGHT,
@@ -38,6 +43,7 @@ import enemySwingUrl from '../../assets/audio/sfx/sword-attack-3.wav';
 import fireballCastUrl from '../../assets/audio/sfx/fireball-2.wav';
 import bossProjectileUrl from '../../assets/audio/sfx/fireball-3.wav';
 import bossSpellImpactUrl from '../../assets/audio/sfx/firebuff-2.wav';
+import gravecallerCastUrl from '../../assets/audio/sfx/fireball-1.wav';
 // Player sprite sheetek (2D_SL_Knight_v1.0, lásd assets/sprites/knight/license.txt).
 // Mind 128x64-es blokkokra van vágva.
 import knightIdleUrl from '../../assets/sprites/knight/Idle.png';
@@ -50,6 +56,20 @@ import knightClimbUrl from '../../assets/sprites/knight/Climb.png';
 import knightCastUrl from '../../assets/sprites/knight/Health.png';
 // CrowHarvester (Enemy 1): egyetlen 1792x64-es csík, 28 db 64x64-es frame.
 import crowHarvesterSheetUrl from '../../assets/sprites/crow-harvester/enemy04_sheet.png';
+// Gravecaller (Enemy 2): a "Necromancer" csomag, ÖT külön sheet, mind 96x96-os frame-ekkel.
+// NINCS mellette licenc, és a `2D helper/Credits.txt`-ben sem szerepel — nyitott jogi tétel,
+// publikálás előtt tisztázandó (lásd CLAUDE.md). Ezért maradtak meg az EREDETI fájlnevek:
+// ez az egyetlen kapocs a forráscsomaghoz.
+//
+// Az Attack sheet SZÁRMAZTATOTT asset: a forrás 6016x128-as (128x128-as frame-ekkel), abból
+// lett frame-enként (16,16,96,96) kivágással 4512x96. A 128-as frame ugyanis a 96-osnak
+// pontosan 16px-es kerettel kipárnázott változata, és két frame-mérettel a FacingGeometry
+// animációnként más lenne. A kivágás veszteségmentes (0 nem-üres levágott pixel).
+import gravecallerIdleUrl from '../../assets/sprites/gravecaller/spr_NecromancerIdle_strip50.png';
+import gravecallerWalkUrl from '../../assets/sprites/gravecaller/spr_NecromancerWalk_strip10.png';
+import gravecallerCastSheetUrl from '../../assets/sprites/gravecaller/spr_NecromancerAttackWithoutEffect_strip47.png';
+import gravecallerHitUrl from '../../assets/sprites/gravecaller/spr_NecromancerGetHit_strip9.png';
+import gravecallerDeathUrl from '../../assets/sprites/gravecaller/spr_NecromancerDeath_strip52.png';
 // Boss (The Grafted Wing-Breaker): a "Bringer of Death" csomag (Clembod — személyes és
 // kereskedelmi használat + módosítás engedélyezett, újraértékesítés nem). Mindkét sheet
 // 1120x744 = 8x8 db 140x93-as frame, AZONOS elrendezéssel; a `_no-Effect` változatból
@@ -131,6 +151,18 @@ const SFX_SOUNDS: Array<{ key: string; url: string }> = [
   { key: SFX_KEYS.FIREBALL_CAST, url: fireballCastUrl },
   { key: SFX_KEYS.BOSS_PROJECTILE, url: bossProjectileUrl },
   { key: SFX_KEYS.BOSS_SPELL_IMPACT, url: bossSpellImpactUrl },
+  { key: SFX_KEYS.GRAVECALLER_CAST, url: gravecallerCastUrl },
+];
+
+// Gravecaller (Enemy 2): öt külön sheet, mind 96x96-os frame-ekkel — a knight
+// (PLAYER_SHEETS) mintájára. A Phaser animációi (textúra, frame) párokat tárolnak, tehát a
+// `play()` magától átvált a megfelelő textúrára.
+const GRAVECALLER_SHEETS: Array<{ key: string; url: string }> = [
+  { key: GRAVECALLER_TEXTURES.IDLE, url: gravecallerIdleUrl },
+  { key: GRAVECALLER_TEXTURES.WALK, url: gravecallerWalkUrl },
+  { key: GRAVECALLER_TEXTURES.CAST, url: gravecallerCastSheetUrl },
+  { key: GRAVECALLER_TEXTURES.HIT, url: gravecallerHitUrl },
+  { key: GRAVECALLER_TEXTURES.DEATH, url: gravecallerDeathUrl },
 ];
 
 // Sima képek (nem sprite sheetek): a Level 1 parallax rétegei + a boss aréna álló háttere.
@@ -192,6 +224,13 @@ export default class BootScene extends Phaser.Scene {
       frameHeight: HARVESTER_FRAME_SIZE,
     });
 
+    for (const sheet of GRAVECALLER_SHEETS) {
+      this.load.spritesheet(sheet.key, sheet.url, {
+        frameWidth: GRAVECALLER_FRAME_SIZE,
+        frameHeight: GRAVECALLER_FRAME_SIZE,
+      });
+    }
+
     for (const sheet of [
       { key: BOSS_TEXTURE_KEY, url: bossSheetUrl },
       { key: BOSS_CLEAN_TEXTURE_KEY, url: bossCleanSheetUrl },
@@ -212,6 +251,7 @@ export default class BootScene extends Phaser.Scene {
     // és minden későbbi scene (Level1Scene, BossScene) ugyanazt használja.
     createPlayerAnimations(this);
     createCrowHarvesterAnimations(this);
+    createGravecallerAnimations(this);
     createGraftedWingBreakerAnimations(this);
 
     this.scene.start('Level1Scene');
@@ -357,5 +397,17 @@ export default class BootScene extends Phaser.Scene {
     bossProjectileGfx.fillCircle(10, 10, 10);
     bossProjectileGfx.generateTexture('boss-projectile-placeholder', 20, 20);
     bossProjectileGfx.destroy();
+
+    // Gravecaller lövedék: HARMADIK szín, mert három lövedék-forrás van a pályán. A player
+    // narancs (0xff7a1a), a bossé lila (0xa855f7) — ez mérgeszöld, ami a Level 1 vörösesbarna
+    // palettáján a legerősebben elválik mindkettőtől. Méretben a playeréhez igazodik (16px),
+    // hogy „normál enemy lövedék"-ként olvasson, ne bossosan.
+    const gravecallerProjectileGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    gravecallerProjectileGfx.fillStyle(0x3e7d4f, 1);
+    gravecallerProjectileGfx.fillCircle(8, 8, 8);
+    gravecallerProjectileGfx.fillStyle(0x8ef2a8, 1);
+    gravecallerProjectileGfx.fillCircle(8, 8, 4); // világos mag: a sötét háttér előtt is látszik
+    gravecallerProjectileGfx.generateTexture('gravecaller-projectile-placeholder', 16, 16);
+    gravecallerProjectileGfx.destroy();
   }
 }

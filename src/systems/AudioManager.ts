@@ -22,6 +22,12 @@ export const SFX_KEYS = {
   BOSS_PROJECTILE: 'sfx-boss-projectile',
   /** A Shadow Spell BECSAPÓDÁSA — nem a cast, és nem is a telegraph alatt. */
   BOSS_SPELL_IMPACT: 'sfx-boss-spell-impact',
+  /**
+   * A Gravecaller lövedéke, a KIOLDÁS pillanatában. Harmadik, saját tűzgolyó-hang: a
+   * player (Fireball 2) és a boss (Fireball 3) mellé a csomag addig nem használt
+   * Fireball 1-e — így három lövedék-forrás hallás után is megkülönböztethető.
+   */
+  GRAVECALLER_CAST: 'sfx-gravecaller-cast',
   /** A CrowHarvester ÉS a boss közelharci csapása — közös hang. */
   ENEMY_SWING: 'sfx-enemy-swing',
 } as const;

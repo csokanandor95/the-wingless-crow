@@ -426,6 +426,45 @@ ATTACK
 REPOSITION
 ```
 
+> **Implementálva (2026-08-26) — a lény neve `Gravecaller`.** A választott archetípus a
+> **Caster** (nem az Archer): egyetlen távoli támadása egy árny-tűzgolyó. A név tematikus,
+> nem az asset csomagé (*Necromancer*) — a 16. pont lore-ja szerint pont az ilyen lény hívja
+> vissza a holtakat, vagyis azt sérti meg, amit Lazarus őriz. Ugyanaz a névadási elv, mint a
+> `Hollow → CrowHarvester`-nél. Fájlok: `enemies/Gravecaller.ts`,
+> `enemies/GravecallerAnimations.ts`. **A fenti öt doboz 1:1 a state machine.**
+>
+> **A user által megadott követelmények, és hogy melyik szám valósítja meg őket:**
+>
+> | követelmény | megvalósítás |
+> |---|---|
+> | „messzebbről vegye észre a playert, mint a CrowHarvester" | `DETECTION_RANGE = 400` (a CrowHarvesteré 220) |
+> | „ha kilépünk a range-ből, térjen vissza patrolba" | `LOSE_RANGE = 520`, vízszintes-only hiszterézis — ugyanaz a minta |
+> | „próbáljon távolságot tartani" | `RETREAT_RANGE 140` / `PREFERRED_RANGE 300` sáv |
+> | „de ne legyen nehéz közel menni és karddal megölni" | `RETREAT_SPEED = 70` ≪ player 200; `MAX_HP = 24` (3 csapás); cast közben ÁLL |
+>
+> **A legfontosabb tervezési döntés: VÍZSZINTES lövedék + VERTIKÁLIS detektálási kapu.**
+> A lövedék — a playeréhez és a bosséhoz hasonlóan — vízszintesen repül (a `Fireball` osztály
+> nem változott), ezért a Gravecaller csak nagyjából azonos magasságban lévő playert vesz
+> észre ÉS lő (`VERTICAL_DETECTION_RANGE = 80`). Enélkül a Level 1 `E2` platformján álló
+> lény a talajon futó playerre is tüzelne, és a lövedék elmenne a feje fölött.
+> **A kapu a tüzelésre is érvényes, nem csak a detektálásra:** a sebzés — a CrowHarvesterhez
+> hasonlóan — PATROL-ból azonnal ébreszt, tehát egy alulról indított tűzgolyó felkelti;
+> kapu nélkül onnantól a végtelenségig lőné a levegőt.
+>
+> **A MAINTAIN DISTANCE csak akkor valódi állapot, ha a cast ÁLLÓ helyzetet igényel.** Az
+> első változat az észlelés pillanatában, mozgás nélkül castolt — a „távolságtartás" tehát
+> egyetlen frame-es átjáró volt. A hibát nem kézi végigjátszás találta meg, hanem a unit
+> teszt (a „túl közeli player → hátrál" eset `velocity 0`-t kapott). A javítás egyben jobb
+> gameplay: a lény előbb lőtávba sétál / hátrál, és csak utána emeli a staffot. Sarokba
+> szorítva viszont tüzel, mert a peremen a hátrálás `velocity 0`-t ad — nem válik bábuvá.
+>
+> **A REPOSITION MAGA a cooldown:** a cast után 1200 ms-ig mozoghat, de nem castolhat —
+> nincs külön flag. Két lövés között így 2360 ms telik el.
+>
+> A közelharci CrowHarvester `ATTACK_RANGE`-éhez hasonlóan itt sincs külön hitbox-zóna: a
+> lövedéket a scene hozza létre egy `'gravecaller-projectile'` eventre (ugyanaz a delegálás,
+> mint a `Player` `'fireball-cast'`-ja és a boss `'boss-projectile'`-ja).
+
 ## Enemy 3 – Beast
 
 Opcionális.
@@ -702,6 +741,16 @@ Főbb elemek:
 >    mechanika — a meglévő `CheckpointSystem` új elhelyezése, azzal a különbséggel, hogy
 >    ÉRINTÉSRE aktiválódik (nem `E`-re, mint az ajtó), hogy ne versenyezzen annak promptjával.
 
+> **Kiegészítés (2026-08-26) — Enemy 2 a Level 1-en.** A döntési pont után az első lépés az
+> `E-platform-1` CrowHarvester lecserélése **Gravecallerre** (11. pont) az `E2` platformon.
+> Ezzel az `E` szakasz platform-lánca (`E1 → E2 → E3`) *ranged-fenyegetettségű útvonallá*
+> vált: a talajon végigfutó player biztonságban van, aki viszont felmegy a platformokra,
+> azt lövik. A `G5` talaj szándékosan kimarad a lény vertikális hatóköréből — ezt a
+> `tests/unit/level1Layout.test.ts` futtatható állításként őrzi (a magasságkülönbségek:
+> `E1` 32 px, `E2` 4 px, `E3` 70 px, a talaj **106 px**, a kapu 80).
+>
+> A pálya többi enemyje változatlan; a Level 1-en így **7 CrowHarvester + 1 Gravecaller** van.
+
 ### Level 2 – The Crowless Forest
 
 Elátkozott erdő.
@@ -711,6 +760,11 @@ Elátkozott erdő.
 - Archer
 - sötétebb környezet
 - több platforming
+
+> **Megjegyzés (2026-08-26):** az „Archer" szerepét a **Gravecaller** (Enemy 2, 11. pont)
+> tölti be, ami már létezik és a Level 1-en bemutatkozik. A Level 2 lehet az első pálya,
+> ahol több példány is szerepel belőle, illetve ahol a magasságkülönbségekre épített
+> ranged-fenyegetés a fő tervezési motívum.
 
 ### Level 3 – The Throne of the Damned
 
@@ -888,6 +942,13 @@ A cél, hogy lehetőleg ne kelljen manuálisan asseteket vadászni és szerkeszt
 >   elhalkulva leáll, ha a player VAGY a boss meghal.
 > - **Még nincs:** sound effectek (a fenti lista), level/menü ambient, fázisváltás-sting,
 >   narráció alatti zene, globális hangerő/némítás vezérlő.
+>
+> **Frissítés (2026-08-26):** a fenti „még nincs" lista nagyrészt teljesült (lásd a
+> `CLAUDE.md` Audio szakaszát): a teljes harci hangkép és a Level 1 ambient kész. A
+> Gravecallerrel egy **harmadik** tűzgolyó-hang is bekerült (`Fireball 1`) — a player
+> (`Fireball 2`) és a boss (`Fireball 3`) mellé. **Ez elv, nem véletlen:** ahány lövedék-
+> forrás van a pályán, annyi külön hang, hogy hallás után is meg lehessen mondani, kié a
+> lövedék — ugyanaz a logika, ami a három különböző lövedék-színt is indokolja.
 > - **Betöltés:** a `BootScene.preload()` tölt be minden audiót, egy minimális
 >   "Betöltés…" + progress kijelzéssel. Az assetet Vite-import hozza be
 >   (nem a `public/` mappából), így a build hash-eli, a base path (32. pont, GitHub Pages)
@@ -1047,6 +1108,43 @@ Ez önmagában is érdekes QA feladat.
 >   logika. (Szemben a 4. iteráció `ParallaxBackground`-jával, ahol a scroll → textúra-
 >   eltolás leképezés valódi, elronthatóan viselkedő kód.)
 
+> **Implementációs állapot (2026-08-26) — Gravecaller (Enemy 2) sprite:**
+>
+> - Negyedszer is **kész, külső pixel art csomag**, nem AI-generált: a *Necromancer* csomag
+>   (`2D helper/enemy/Necromancer`). Öt sheet került be az `assets/sprites/gravecaller/`
+>   alá (idle 50, walk 10, gethit 9, death 52, attack 47 frame).
+> - **Nyitott jogi tétel.** A csomagban **egyáltalán nincs licenc/readme fájl**, és a
+>   `2D helper/Credits.txt`-ben **sem szerepel** — ugyanaz a kategória, mint a
+>   CrowHarvesteré. Publikálás előtt tisztázni kell, és a `Credits.txt`-be felvenni. Ezért
+>   maradtak meg az eredeti `spr_Necromancer*_strip*.png` fájlnevek. *(Nyom: a
+>   `spr_<név>_strip<N>.png` GameMaker-konvenció, ami a **penusbmic** itch.io-s
+>   dark-fantasy csomagjaira jellemző.)*
+> - A 19. pont hibalistájából itt **négy** dolog jött elő, mind a betöltés előtti
+>   ellenőrzésen — vagyis a 30. pont (asset testing) ismét megtérült:
+>   - *rossz sprite méret (a legfontosabb):* a csomag **kevert frame-méretű** — az
+>     idle/walk/hit/death 96×96, az attack (és a nem használt spawn) 128×128. A 128-as
+>     frame a 96-osnak PONTOSAN 16 px-es kerettel kipárnázott változata. Két frame-mérettel
+>     a fordulás-kompenzáció geometriája (`FacingGeometry`) animációnként MÁS lenne, tehát
+>     minden animáció-váltásnál újra kellene alkalmazni — pont az a hibaosztály, amit a
+>     `systems/SpriteFacing.ts` megszüntetett. **Megoldás: az attack sheet KIVÁGVA került a
+>     repóba** (6016×128 → 4512×96, frame-enként `(16,16,96,96)`). A kivágás
+>     **veszteségmentes**: a levágott keretben 0 db nem-üres pixel volt, és a kivágott f0
+>     alpha-bounding boxa bitre az idle f0-éval egyezik.
+>   - *rossz transparency:* a csomag minden animációjából van `*WithBkg` változat is, ami
+>     **teljesen átlátszatlan** (9216/9216 px mérve) — mindig a sima változat kell.
+>   - *asset naming / duplikáció:* az attackből három változat van (`Effect` = csak az
+>     effekt, `WithEffect`, `WithoutEffect`). A `WithoutEffect` kell, mert a lövedéket
+>     amúgy is külön `Fireball` adja — és mellesleg csak az fér bele a kivágásba.
+>   - *hiányzó licenc* (lásd fent).
+> - **Ami tudatosan kimaradt:** a `Jump` (12 frame — a Gravecaller nem ugrik) és a `Spawn`
+>   (20 frame — belépő-effekt, nincs hozzá state) sheet.
+> - **A lövedék MARAD placeholder** (mérgeszöld gömb). A csomag cast-effektje mérés szerint
+>   egy szétfoszló BECSAPÓDÁS (30→4 px), nem loopolható repülő bolt — valódi lövedék-art az
+>   `assets/effects/` iterációban.
+> - A leképezés (`animKeyForState`) itt is **pure** függvény, és a geometria/időzítés
+>   **levezetett** (talp-offset a body-ból, `CAST_STARTUP_MS` a frame-listából) — mindkettőt
+>   unit teszt őrzi (`tests/unit/gravecallerAnimations.test.ts`).
+
 ---
 
 # 20. Javasolt projektstruktúra
@@ -1079,7 +1177,7 @@ the-wingless-crow/
 │   │
 │   ├── enemies/
 │   │   ├── CrowHarvester.ts
-│   │   ├── Archer.ts
+│   │   ├── Archer.ts          # -> ténylegesen: Gravecaller.ts (Caster, lásd 11. pont)
 │   │   └── Beast.ts
 │   │
 │   ├── bosses/
@@ -1216,7 +1314,7 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
   **boss** (6. iteráció) valódi pixel artot és animációkat kapott, lásd 19. pont. A **Level 1
   terrainje** (talaj, platformok, létra, boss-ajtó) a 10. iterációban cserélődött le
   (`assets/tiles/cathedral/`). Már csak a **hazardok** (tüske, reaper, checkpoint-jelölő) és a
-  **két lövedék** placeholder.*
+  **három lövedék** placeholder.*
 - backgrounds — ***kész**: a **Level 1** háromrétegű parallax hátteret (4. iteráció), a
   **boss aréna** pedig egy álló festményt kapott (5. iteráció). Lásd 19. pont.*
 - particles
@@ -1233,6 +1331,23 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 ## Döntési pont: 
 
 - Többi Enemy típus, Level és Bossok létrehozása VAGY haladunk tovább a Lore, QA irányba és ha mindez megvan, akkor bővítjük csak a többi Enemy, Level és Boss hozzáadásával.
+
+> **ELDŐLT (2026-08-26): a „Többi Enemy típus, Level2 és 2. Boss" irány.** A Lore (Phase 9)
+> és a QA (Phase 10) hátrébb csúszik — a QA-ból a CI/CD első mérföldköve már megvan (31.
+> pont), és a unit tesztek minden új elemmel együtt bővülnek, tehát a Phase 10 nem áll meg.
+>
+> A választott irány lépései és állapotuk:
+>
+> 1. **Enemy 2 – Caster (`Gravecaller`) — KÉSZ.** Lásd a 11. pontot. A Level 1 `E2`
+>    platformján áll, a korábbi CrowHarvester helyén (14. pont).
+> 2. **Level 2 – The Crowless Forest** — hátravan (jelenleg placeholder scene).
+> 3. **Boss 2** — hátravan. Jelölt aréna-háttér: `2D helper/level/Bossbackground_2.png`
+>    (angyal-szobros katedrália, nyitott égbolttal) — külön aréna, nem a Boss 1 variánsa.
+> 4. **Enemy 3 – Beast** — opcionális, a 11. pont szerint is.
+>
+> A Gravecaller iterációja **általánosította a scene enemy-kezelését** (`LevelEnemy`
+> strukturális interfész + `type` mező az `ENEMY_SPAWNS`-ban), tehát a Beast vagy egy új
+> Level 2-es lény már csak egy tömb + egy `spawnEnemies()` ág.
 
 ## Phase 9 – Lore
 

@@ -3,6 +3,10 @@ import { JUMP_VELOCITY, MOVE_SPEED } from '../player/Player';
 import { BODY_WIDTH as PLAYER_BODY_WIDTH } from '../player/PlayerAnimations';
 import { BODY_WIDTH as HARVESTER_BODY_WIDTH } from '../enemies/CrowHarvesterAnimations';
 import {
+  BODY_WIDTH as GRAVECALLER_BODY_WIDTH,
+  FEET_OFFSET_Y as GRAVECALLER_FEET_OFFSET_Y,
+} from '../enemies/GravecallerAnimations';
+import {
   DOOR_APERTURE,
   DOOR_TILE_HEIGHT,
   DOOR_TILE_WIDTH,
@@ -59,13 +63,21 @@ export const PLAYER_HALF_HEIGHT = 24;
 export const HARVESTER_SPAWN_OFFSET = 24;
 
 /**
+ * Ugyanaz a Gravecallerre, csak LEVEZETVE: a talpa a `sprite.y + FEET_OFFSET_Y`-nál van
+ * (19), a +1 pedig ugyanaz az 1px-es ejtés, mint fent. Egy jövőbeli sprite-csere így nem
+ * hagyhatja itt a régi számot.
+ */
+export const GRAVECALLER_SPAWN_OFFSET = GRAVECALLER_FEET_OFFSET_Y + 1; // 20
+
+/**
  * A TESTEK szélessége — nem csak a középpontokkal kell tervezni. Az ugrás-számítások és a
  * patrol-határok is ezekre támaszkodnak: egy szakadékot a player TESTÉNEK kell átérnie, és
  * egy enemy TESTE sem lóghat le a peremen. Az animációs modulokból jönnek, hogy egy
  * sprite-csere ne hagyja itt a régi számot.
  */
-export { PLAYER_BODY_WIDTH, HARVESTER_BODY_WIDTH };
+export { PLAYER_BODY_WIDTH, HARVESTER_BODY_WIDTH, GRAVECALLER_BODY_WIDTH };
 export const HARVESTER_HALF_BODY_WIDTH = HARVESTER_BODY_WIDTH / 2;
+export const GRAVECALLER_HALF_BODY_WIDTH = GRAVECALLER_BODY_WIDTH / 2;
 
 /** Friss játék kezdőpontja = a CheckpointSystem default-ja. */
 export const START_X = 100;
@@ -373,15 +385,37 @@ export const REAPER_ENEMY_CLEARANCE = 80;
  */
 export const EDGE_INSET = 24;
 
+/**
+ * Melyik lény spawnol. Elhagyva `crow-harvester` — így a Gravecaller bevezetése nem
+ * érintette a többi hét spawn sorát.
+ */
+export type EnemyType = 'crow-harvester' | 'gravecaller';
+
 export interface EnemySpawnDef {
   id: string;
-  /** Spawn X. A spawn Y a `surfaceId` felszínéből számítódik. */
+  /** Spawn X. A spawn Y a `surfaceId` felszínéből és a típus talp-offsetjéből számítódik. */
   x: number;
   /** Ground szegmens VAGY platform id — lásd `surfaceSpan()`. */
   surfaceId: string;
   patrolMinX: number;
   patrolMaxX: number;
+  /** Default: `crow-harvester`. */
+  type?: EnemyType;
 }
+
+export const enemyType = (def: EnemySpawnDef): EnemyType => def.type ?? 'crow-harvester';
+
+/**
+ * A lény TESTÉNEK félszélessége — a peremeket ezzel együtt kell vizsgálni (egy enemy teste
+ * sem lóghat le a felületről). Típusfüggő, hogy egy jövőbeli, szélesebb lény ne csendben
+ * örökölje a CrowHarvester számát.
+ */
+export const enemyHalfBodyWidth = (def: EnemySpawnDef): number =>
+  enemyType(def) === 'gravecaller' ? GRAVECALLER_HALF_BODY_WIDTH : HARVESTER_HALF_BODY_WIDTH;
+
+/** A spawn Y a felület felszínéből: a lény talpa (majdnem) pontosan a felszínre kerül. */
+export const enemySpawnOffset = (def: EnemySpawnDef): number =>
+  enemyType(def) === 'gravecaller' ? GRAVECALLER_SPAWN_OFFSET : HARVESTER_SPAWN_OFFSET;
 
 /**
  * A `patrolMinX/patrolMaxX` KIZÁRÓLAG a nyugalmi séta-körzet — az ÜLDÖZÉS határa ennél
@@ -400,7 +434,20 @@ export const ENEMY_SPAWNS: EnemySpawnDef[] = [
 
   // E — kombinált kihívás: két földi + két platformon álló.
   { id: 'E-ground-1', x: 3350, surfaceId: 'G5', patrolMinX: 3280, patrolMaxX: 3460 },
-  { id: 'E-platform-1', x: 3420, surfaceId: 'E2', patrolMinX: 3348, patrolMaxX: 3492 },
+
+  // A pálya EGYETLEN távolsági ellenfele (Enemy 2). Az E2 platformon áll, tehát a
+  // platform-lánc (E1 -> E2 -> E3) mostantól ranged-fenyegetettségű útvonal — a talajon
+  // futó playert a VERTICAL_DETECTION_RANGE miatt nem lövi (a vízszintes lövedék amúgy is
+  // elvétené). A patrol/chase határok VÁLTOZATLANOK a korábbi CrowHarvesteréhez képest:
+  // a testszélessége is 20, tehát az enemyChaseBounds() levezetése ugyanazt adja.
+  {
+    id: 'E-platform-1',
+    x: 3420,
+    surfaceId: 'E2',
+    patrolMinX: 3348,
+    patrolMaxX: 3492,
+    type: 'gravecaller',
+  },
   { id: 'E-platform-2', x: 3960, surfaceId: 'E4', patrolMinX: 3888, patrolMaxX: 4032 },
   { id: 'E-ground-2', x: 4120, surfaceId: 'G5', patrolMinX: 4030, patrolMaxX: 4210 },
 

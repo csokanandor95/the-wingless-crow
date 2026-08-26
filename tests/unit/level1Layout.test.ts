@@ -16,12 +16,14 @@ import {
   DOOR_CHECKPOINT,
   ENEMY_SPAWNS,
   enemyChaseBounds,
+  enemyHalfBodyWidth,
+  enemyType,
   FALL_DEATH_Y,
   FALL_DEPTH,
+  GRAVECALLER_SPAWN_OFFSET,
   GROUND_SEGMENTS,
   GROUND_TOP,
   groundGaps,
-  HARVESTER_HALF_BODY_WIDTH,
   horizontalReachForRise,
   LADDER,
   MAX_JUMP_DISTANCE,
@@ -59,6 +61,10 @@ import {
   LADDER_TILE_WIDTH,
   PLATFORM_TILE_HEIGHT,
 } from '../../src/levels/LevelTileset';
+import {
+  DETECTION_RANGE as GRAVECALLER_DETECTION_RANGE,
+  VERTICAL_DETECTION_RANGE as GRAVECALLER_VERTICAL_RANGE,
+} from '../../src/enemies/Gravecaller';
 
 vi.mock('phaser', async () => {
   const { createFakePhaserModule } = await import('./helpers/fakePhaser');
@@ -320,11 +326,11 @@ describe('ENEMY_SPAWNS', () => {
       const chase = enemyChaseBounds(enemy);
 
       expect(
-        chase.min - HARVESTER_HALF_BODY_WIDTH,
+        chase.min - enemyHalfBodyWidth(enemy),
         `${enemy.id} üldözés közben balra lelép a peremről`
       ).toBeGreaterThanOrEqual(surface.left);
       expect(
-        chase.max + HARVESTER_HALF_BODY_WIDTH,
+        chase.max + enemyHalfBodyWidth(enemy),
         `${enemy.id} üldözés közben jobbra lelép a peremről`
       ).toBeLessThanOrEqual(surface.right);
     }
@@ -337,8 +343,8 @@ describe('ENEMY_SPAWNS', () => {
       const chase = enemyChaseBounds(enemy);
 
       for (const field of SPIKE_FIELDS) {
-        const reachesLeft = chase.min - HARVESTER_HALF_BODY_WIDTH;
-        const reachesRight = chase.max + HARVESTER_HALF_BODY_WIDTH;
+        const reachesLeft = chase.min - enemyHalfBodyWidth(enemy);
+        const reachesRight = chase.max + enemyHalfBodyWidth(enemy);
         const overlaps = reachesRight > field.startX && reachesLeft < field.endX;
 
         expect(overlaps, `${enemy.id} üldözés közben belesétál a(z) ${field.id} mezőbe`).toBe(
@@ -372,13 +378,81 @@ describe('ENEMY_SPAWNS', () => {
     for (const enemy of ENEMY_SPAWNS) {
       const surface = surfaceSpan(enemy.surfaceId);
       expect(
-        enemy.patrolMinX - HARVESTER_HALF_BODY_WIDTH,
+        enemy.patrolMinX - enemyHalfBodyWidth(enemy),
         `${enemy.id} balra lelóg a(z) ${enemy.surfaceId} peremén`
       ).toBeGreaterThanOrEqual(surface.left);
       expect(
-        enemy.patrolMaxX + HARVESTER_HALF_BODY_WIDTH,
+        enemy.patrolMaxX + enemyHalfBodyWidth(enemy),
         `${enemy.id} jobbra lelóg a(z) ${enemy.surfaceId} peremén`
       ).toBeLessThanOrEqual(surface.right);
+    }
+  });
+});
+
+// --- Gravecaller (Enemy 2) elhelyezése --------------------------------------
+//
+// Ez a blokk azt a DÖNTÉST teszi futtatható állítássá, amiért a Gravecaller lövedéke
+// vízszintes lehet: a lény az E platform-láncot uralja, a talajon futó playert viszont
+// nem lövi — mert azt a vízszintes lövedék amúgy is elvétené (a player mellmagassága
+// ott ~106 px-szel a lény alatt van).
+//
+// Ha valaha elmozdul az E2 platform vagy változik a VERTICAL_DETECTION_RANGE, ez bukik.
+describe('Gravecaller (Enemy 2) elhelyezése', () => {
+  const casters = ENEMY_SPAWNS.filter((e) => enemyType(e) === 'gravecaller');
+
+  /** A lény középpontja: a felszíne mínusz a talp-offset. */
+  const casterCenterY = (surfaceId: string): number =>
+    surfaceSpan(surfaceId).top - GRAVECALLER_SPAWN_OFFSET;
+
+  /** Az adott felületen ÁLLÓ player középpontja. */
+  const playerCenterY = (surfaceId: string): number =>
+    surfaceSpan(surfaceId).top - PLAYER_HALF_HEIGHT;
+
+  it('pontosan egy van belőle, és PLATFORMON áll', () => {
+    // Egy 6000px-es, egyébként közelharcra hangolt pályán egyetlen távolsági lény elég,
+    // hogy az archetípus bemutatkozzon. A platform az, ami a magasságkülönbséget megadja.
+    expect(casters).toHaveLength(1);
+    expect(PLATFORMS.some((p) => p.id === casters[0].surfaceId)).toBe(true);
+  });
+
+  it('a vertikális detektálása LEFEDI a szomszédos platformokat', () => {
+    const caster = casters[0];
+    const casterY = casterCenterY(caster.surfaceId);
+
+    // A saját platformja + a hozzá vezető lépőkő + a fölötte lévő következő lépcsőfok.
+    for (const surfaceId of ['E1', 'E2', 'E3']) {
+      expect(
+        Math.abs(playerCenterY(surfaceId) - casterY),
+        `${surfaceId}: a Gravecaller nem venné észre az ott álló playert`
+      ).toBeLessThanOrEqual(GRAVECALLER_VERTICAL_RANGE);
+    }
+  });
+
+  it('a TALAJON futó playert NEM veszi észre — oda nem is érne el a lövedéke', () => {
+    const caster = casters[0];
+    const groundSegment = GROUND_SEGMENTS.find(
+      (g) => g.startX <= caster.x && caster.x < g.endX
+    );
+    expect(groundSegment, 'a Gravecaller alatt nincs talaj-szegmens').toBeDefined();
+
+    expect(
+      Math.abs(playerCenterY(groundSegment!.id) - casterCenterY(caster.surfaceId)),
+      'a talajon futó player a vertikális detektálási sávba esik'
+    ).toBeGreaterThan(GRAVECALLER_VERTICAL_RANGE);
+  });
+
+  it('a vízszintes detektálása ELÉR a szomszédos platformokig', () => {
+    // Ettől „távolsági" a lény: már az E1-re felugorva tüzelni kezd, nem csak akkor,
+    // amikor a player mellé ér.
+    const caster = casters[0];
+
+    for (const surfaceId of ['E1', 'E3']) {
+      const span = surfaceSpan(surfaceId);
+      const nearestX = Math.max(span.left, Math.min(caster.x, span.right));
+      expect(
+        Math.abs(nearestX - caster.x),
+        `${surfaceId} kívül esik a Gravecaller vízszintes hatókörén`
+      ).toBeLessThanOrEqual(GRAVECALLER_DETECTION_RANGE);
     }
   });
 });
@@ -434,8 +508,8 @@ describe('SPIKE_FIELDS', () => {
     // Ez tisztán LAYOUT-kérdés — az enemy kódjában nincs hazard-tudat, és nem is kell.
     for (const enemy of ENEMY_SPAWNS) {
       for (const field of SPIKE_FIELDS) {
-        const reachesLeft = enemy.patrolMinX - HARVESTER_HALF_BODY_WIDTH;
-        const reachesRight = enemy.patrolMaxX + HARVESTER_HALF_BODY_WIDTH;
+        const reachesLeft = enemy.patrolMinX - enemyHalfBodyWidth(enemy);
+        const reachesRight = enemy.patrolMaxX + enemyHalfBodyWidth(enemy);
         const overlaps = reachesRight > field.startX && reachesLeft < field.endX;
 
         expect(overlaps, `${enemy.id} belesétál a(z) ${field.id} mezőbe`).toBe(false);
@@ -497,8 +571,8 @@ describe('REAPERS', () => {
       const dangerRight = sweep.right + REAPER_ENEMY_CLEARANCE;
 
       for (const enemy of ENEMY_SPAWNS) {
-        const reachesLeft = enemy.patrolMinX - HARVESTER_HALF_BODY_WIDTH;
-        const reachesRight = enemy.patrolMaxX + HARVESTER_HALF_BODY_WIDTH;
+        const reachesLeft = enemy.patrolMinX - enemyHalfBodyWidth(enemy);
+        const reachesRight = enemy.patrolMaxX + enemyHalfBodyWidth(enemy);
         const overlaps = reachesRight > dangerLeft && reachesLeft < dangerRight;
 
         expect(overlaps, `${enemy.id} a(z) ${def.id} söprési sávjában van`).toBe(false);
