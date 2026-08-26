@@ -32,6 +32,7 @@ import {
   MAX_SAFE_RISE,
   MID_CHECKPOINT,
   PLATFORMS,
+  PLAYER_BODY_HEIGHT,
   PLAYER_BODY_WIDTH,
   PLAYER_HALF_HEIGHT,
   platformById,
@@ -49,6 +50,7 @@ import {
   TUTORIAL_HINTS,
   WORLD_HEIGHT,
   WORLD_WIDTH,
+  type EnemySpawnDef,
   type PlatformDef,
   type Span,
 } from '../../src/levels/Level1Layout';
@@ -63,6 +65,8 @@ import {
 } from '../../src/levels/LevelTileset';
 import {
   DETECTION_RANGE as GRAVECALLER_DETECTION_RANGE,
+  PROJECTILE_SIZE as GRAVECALLER_PROJECTILE_SIZE,
+  PROJECTILE_SPAWN_OFFSET_Y as GRAVECALLER_PROJECTILE_OFFSET_Y,
   VERTICAL_DETECTION_RANGE as GRAVECALLER_VERTICAL_RANGE,
 } from '../../src/enemies/Gravecaller';
 
@@ -392,13 +396,25 @@ describe('ENEMY_SPAWNS', () => {
 // --- Gravecaller (Enemy 2) elhelyezése --------------------------------------
 //
 // Ez a blokk azt a DÖNTÉST teszi futtatható állítássá, amiért a Gravecaller lövedéke
-// vízszintes lehet: a lény az E platform-láncot uralja, a talajon futó playert viszont
-// nem lövi — mert azt a vízszintes lövedék amúgy is elvétené (a player mellmagassága
-// ott ~106 px-szel a lény alatt van).
+// VÍZSZINTES lehet: a lény azt a magasság-sávot uralja, amiben áll — a talajon futó
+// playert nem lövi, mert azt a vízszintes bolt amúgy is elvétené.
 //
-// Ha valaha elmozdul az E2 platform vagy változik a VERTICAL_DETECTION_RANGE, ez bukik.
+// A legfontosabb eset a 2. teszt: az, hogy a caster ÉSZLEL egy playert, még nem jelenti,
+// hogy EL IS TALÁLJA. Pont ez a hiba jött elő kézi teszten az E1 lépőkövön (a bolt 6 px-szel
+// a fej fölött ment el), ezért a cél-felületeknél a TÉNYLEGES sáv-átfedést ellenőrizzük,
+// nem csak a detektálási kaput.
 describe('Gravecaller (Enemy 2) elhelyezése', () => {
   const casters = ENEMY_SPAWNS.filter((e) => enemyType(e) === 'gravecaller');
+
+  /**
+   * A design SZÁNDÉKA: melyik casternek mely felületeken álló playert kell eltalálnia.
+   * Kézzel karbantartott tábla — pont ez a lényege: a szándékot rögzíti, nem a jelenlegi
+   * számokból vezeti le (különben tautológia lenne).
+   */
+  const CASTER_TARGETS: Record<string, string[]> = {
+    'E-platform-1': ['E1', 'E2'],
+    'F-caster': ['F1', 'F2'],
+  };
 
   /** A lény középpontja: a felszíne mínusz a talp-offset. */
   const casterCenterY = (surfaceId: string): number =>
@@ -408,52 +424,106 @@ describe('Gravecaller (Enemy 2) elhelyezése', () => {
   const playerCenterY = (surfaceId: string): number =>
     surfaceSpan(surfaceId).top - PLAYER_HALF_HEIGHT;
 
-  it('pontosan egy van belőle, és PLATFORMON áll', () => {
-    // Egy 6000px-es, egyébként közelharcra hangolt pályán egyetlen távolsági lény elég,
-    // hogy az archetípus bemutatkozzon. A platform az, ami a magasságkülönbséget megadja.
-    expect(casters).toHaveLength(1);
-    expect(PLATFORMS.some((p) => p.id === casters[0].surfaceId)).toBe(true);
+  /** A kilőtt lövedék függőleges sávja (a physics body 16x16, origin 0.5). */
+  const projectileBand = (caster: EnemySpawnDef): { top: number; bottom: number } => {
+    const center = casterCenterY(caster.surfaceId) + GRAVECALLER_PROJECTILE_OFFSET_Y;
+    return {
+      top: center - GRAVECALLER_PROJECTILE_SIZE / 2,
+      bottom: center + GRAVECALLER_PROJECTILE_SIZE / 2,
+    };
+  };
+
+  /** Egy `T` tetejű felületen álló player TESTE — a talpa a felszínen, 46 px magas. */
+  const playerBand = (surfaceId: string): { top: number; bottom: number } => {
+    const top = surfaceSpan(surfaceId).top;
+    return { top: top - PLAYER_BODY_HEIGHT, bottom: top };
+  };
+
+  it('minden Gravecaller PLATFORMON áll', () => {
+    // A magasságkülönbség a lény lényege: a platform az, ami a saját sávjába emeli, és
+    // kiveszi belőle a talajon futó playert.
+    expect(casters.length).toBeGreaterThan(0);
+
+    for (const caster of casters) {
+      expect(
+        PLATFORMS.some((p) => p.id === caster.surfaceId),
+        `${caster.id} nem platformon áll`
+      ).toBe(true);
+      expect(CASTER_TARGETS[caster.id], `${caster.id}: nincs cél-felület deklarálva`)
+        .toBeDefined();
+    }
   });
 
-  it('a vertikális detektálása LEFEDI a szomszédos platformokat', () => {
-    const caster = casters[0];
-    const casterY = casterCenterY(caster.surfaceId);
+  it('a lövedék ELTALÁLJA a cél-felületeken álló playert', () => {
+    // REGRESSZIÓ: az E1 eredeti magasságával (top 344) a bolt sávja [276, 292] volt, a
+    // player teste [298, 344] — 6 px-szel elkerülték egymást, tehát a caster tüzelt, de
+    // sosem talált. Nem elég detektálni: a két sávnak fednie kell egymást.
+    for (const caster of casters) {
+      const bolt = projectileBand(caster);
 
-    // A saját platformja + a hozzá vezető lépőkő + a fölötte lévő következő lépcsőfok.
-    for (const surfaceId of ['E1', 'E2', 'E3']) {
-      expect(
-        Math.abs(playerCenterY(surfaceId) - casterY),
-        `${surfaceId}: a Gravecaller nem venné észre az ott álló playert`
-      ).toBeLessThanOrEqual(GRAVECALLER_VERTICAL_RANGE);
+      for (const surfaceId of CASTER_TARGETS[caster.id]) {
+        const body = playerBand(surfaceId);
+        const overlap = Math.min(bolt.bottom, body.bottom) - Math.max(bolt.top, body.top);
+
+        expect(
+          overlap,
+          `${caster.id}: a lövedék elmegy a(z) ${surfaceId}-n álló player mellett`
+        ).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('a cél-felületek a VERTIKÁLIS detektálási sávon belül vannak', () => {
+    for (const caster of casters) {
+      const casterY = casterCenterY(caster.surfaceId);
+
+      for (const surfaceId of CASTER_TARGETS[caster.id]) {
+        expect(
+          Math.abs(playerCenterY(surfaceId) - casterY),
+          `${caster.id}: nem venné észre a(z) ${surfaceId}-n álló playert`
+        ).toBeLessThanOrEqual(GRAVECALLER_VERTICAL_RANGE);
+      }
+    }
+  });
+
+  it('a cél-felületek TELJES hosszukban a vízszintes hatókörön belül vannak', () => {
+    // A user kérése az F-caster-re: "kezdjen el tüzelni, AMINT a player a reaper
+    // platformjára ugrik". A legrosszabb eset tehát az, amikor a caster a patroljának
+    // TÁVOLABBI végén jár, a player pedig a cél-felület átellenes peremén áll.
+    for (const caster of casters) {
+      for (const surfaceId of CASTER_TARGETS[caster.id]) {
+        const span = surfaceSpan(surfaceId);
+        const worstCase = Math.max(
+          Math.abs(caster.patrolMaxX - span.left),
+          Math.abs(caster.patrolMinX - span.right)
+        );
+
+        expect(
+          worstCase,
+          `${caster.id}: a(z) ${surfaceId} nem fér bele a detektálási körébe`
+        ).toBeLessThanOrEqual(GRAVECALLER_DETECTION_RANGE);
+      }
     }
   });
 
   it('a TALAJON futó playert NEM veszi észre — oda nem is érne el a lövedéke', () => {
-    const caster = casters[0];
-    const groundSegment = GROUND_SEGMENTS.find(
-      (g) => g.startX <= caster.x && caster.x < g.endX
-    );
-    expect(groundSegment, 'a Gravecaller alatt nincs talaj-szegmens').toBeDefined();
+    for (const caster of casters) {
+      const groundSegment = GROUND_SEGMENTS.find(
+        (g) => g.startX <= caster.x && caster.x < g.endX
+      );
+      expect(groundSegment, `${caster.id} alatt nincs talaj-szegmens`).toBeDefined();
 
-    expect(
-      Math.abs(playerCenterY(groundSegment!.id) - casterCenterY(caster.surfaceId)),
-      'a talajon futó player a vertikális detektálási sávba esik'
-    ).toBeGreaterThan(GRAVECALLER_VERTICAL_RANGE);
+      expect(
+        Math.abs(playerCenterY(groundSegment!.id) - casterCenterY(caster.surfaceId)),
+        `${caster.id}: a talajon futó player a vertikális detektálási sávba esik`
+      ).toBeGreaterThan(GRAVECALLER_VERTICAL_RANGE);
+    }
   });
 
-  it('a vízszintes detektálása ELÉR a szomszédos platformokig', () => {
-    // Ettől „távolsági" a lény: már az E1-re felugorva tüzelni kezd, nem csak akkor,
-    // amikor a player mellé ér.
-    const caster = casters[0];
-
-    for (const surfaceId of ['E1', 'E3']) {
-      const span = surfaceSpan(surfaceId);
-      const nearestX = Math.max(span.left, Math.min(caster.x, span.right));
-      expect(
-        Math.abs(nearestX - caster.x),
-        `${surfaceId} kívül esik a Gravecaller vízszintes hatókörén`
-      ).toBeLessThanOrEqual(GRAVECALLER_DETECTION_RANGE);
-    }
+  it('az F-caster párkánya PONTOSAN a Swinging Reaper platformjának szintjén van', () => {
+    // Ez a user explicit kérése, és nem véletlen egybeesés: a vízszintes lövedék csak
+    // azonos szintű célpontot ér el (lásd a fenti sáv-átfedés tesztet).
+    expect(platformTop(platformById('F2'))).toBe(platformTop(platformById('F1')));
   });
 });
 

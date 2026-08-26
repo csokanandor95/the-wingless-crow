@@ -1,6 +1,9 @@
 import { GRAVITY_Y } from '../config/physics';
 import { JUMP_VELOCITY, MOVE_SPEED } from '../player/Player';
-import { BODY_WIDTH as PLAYER_BODY_WIDTH } from '../player/PlayerAnimations';
+import {
+  BODY_HEIGHT as PLAYER_BODY_HEIGHT,
+  BODY_WIDTH as PLAYER_BODY_WIDTH,
+} from '../player/PlayerAnimations';
 import { BODY_WIDTH as HARVESTER_BODY_WIDTH } from '../enemies/CrowHarvesterAnimations';
 import {
   BODY_WIDTH as GRAVECALLER_BODY_WIDTH,
@@ -70,12 +73,21 @@ export const HARVESTER_SPAWN_OFFSET = 24;
 export const GRAVECALLER_SPAWN_OFFSET = GRAVECALLER_FEET_OFFSET_Y + 1; // 20
 
 /**
- * A TESTEK szélessége — nem csak a középpontokkal kell tervezni. Az ugrás-számítások és a
+ * A TESTEK mérete — nem csak a középpontokkal kell tervezni. Az ugrás-számítások és a
  * patrol-határok is ezekre támaszkodnak: egy szakadékot a player TESTÉNEK kell átérnie, és
  * egy enemy TESTE sem lóghat le a peremen. Az animációs modulokból jönnek, hogy egy
  * sprite-csere ne hagyja itt a régi számot.
+ *
+ * A `PLAYER_BODY_HEIGHT` egy harmadik szerepet is betölt: egy `T` tetejű felületen álló
+ * player teste PONTOSAN `[T - PLAYER_BODY_HEIGHT, T]` — ebből dől el, hogy a Gravecaller
+ * vízszintes lövedéke eltalálja-e (lásd az E1 magasságát és a level1Layout.test.ts-t).
  */
-export { PLAYER_BODY_WIDTH, HARVESTER_BODY_WIDTH, GRAVECALLER_BODY_WIDTH };
+export {
+  PLAYER_BODY_WIDTH,
+  PLAYER_BODY_HEIGHT,
+  HARVESTER_BODY_WIDTH,
+  GRAVECALLER_BODY_WIDTH,
+};
 export const HARVESTER_HALF_BODY_WIDTH = HARVESTER_BODY_WIDTH / 2;
 export const GRAVECALLER_HALF_BODY_WIDTH = GRAVECALLER_BODY_WIDTH / 2;
 
@@ -184,7 +196,13 @@ export const PLATFORMS: PlatformDef[] = [
   { id: 'C3', x: 2140, y: 268, tiles: 2 }, // a szakasz csúcspontja
 
   // --- E: kombinált kihívás (harc + platforming) ---
-  { id: 'E1', x: 3190, y: 352, tiles: 1 }, // lépőkő a gap3-ban
+  // Az E1 magassága NEM esztétikai döntés: az E2-n álló Gravecaller lövedéke VÍZSZINTESEN
+  // repül, a sávja pedig [276, 292] (= E2.top - GRAVECALLER_SPAWN_OFFSET
+  // + PROJECTILE_SPAWN_OFFSET_Y, ± PROJECTILE_SIZE/2). A korábbi 352-es y mellett a lapon
+  // álló player teste [298, 344] volt, tehát a bolt 6 px-szel a FEJE FÖLÖTT ment el — a
+  // caster tüzelt, de sosem talált. 328-cal a test [274, 320], amiben a lövedék sávja
+  // TELJESEN benne van. A `level1Layout.test.ts` ezt őrzi.
+  { id: 'E1', x: 3190, y: 328, tiles: 1 }, // lépőkő a gap3-ban
   { id: 'E2', x: 3420, y: 316, tiles: 3 }, // platform-enemy
   { id: 'E3', x: 3700, y: 250, tiles: 2 },
   { id: 'E4', x: 3960, y: 210, tiles: 3 }, // elevated platform, platform-enemy
@@ -192,6 +210,16 @@ export const PLATFORMS: PlatformDef[] = [
 
   // --- F: a Swinging Reaper alatti középső platform (a 400px-es gap4 áthidalása) ---
   { id: 'F1', x: 4500, y: 340, tiles: 2 },
+
+  // A kaszán TÚLI part fölé lebegő párkány, PONTOSAN az F1 szintjén (top 332) — ezért van
+  // ugyanaz az y. Egy Gravecaller áll rajta, ami az F1-re érkező playert lövi: a szakasz
+  // így nem csak időzítés, hanem ranged nyomás is. A magasság-egyezés KÖTELEZŐ, nem
+  // véletlen: a vízszintes lövedék csak nagyjából azonos szintű célpontot ér el.
+  //
+  // A pozíciót két kényszer fogja közre (mindkettőt unit teszt őrzi):
+  //   - balról a kasza söprési sávja + REAPER_ENEMY_CLEARANCE -> a patrol 4739.8 fölött;
+  //   - jobbról a user kérése, hogy az EGÉSZ F1 a caster DETECTION_RANGE-én belül legyen.
+  { id: 'F2', x: 4800, y: 340, tiles: 2 },
 
   // --- H: boss-ajtó ---
   // A jobb széle PONTOSAN a pálya széle (5808 + 6*32 = 6000): a szakasz így valódi
@@ -451,6 +479,19 @@ export const ENEMY_SPAWNS: EnemySpawnDef[] = [
   { id: 'E-platform-2', x: 3960, surfaceId: 'E4', patrolMinX: 3888, patrolMaxX: 4032 },
   { id: 'E-ground-2', x: 4120, surfaceId: 'G5', patrolMinX: 4030, patrolMaxX: 4210 },
 
+  // F — a kaszán túli párkányon álló távolsági őr. A patrol SZŰK (40px), és mindkét
+  // pereme számít: balra a kasza söprési sávja, jobbra a DETECTION_RANGE határolja.
+  // Az áthelyezkedési tere ennél tágabb (enemyChaseBounds -> 4760..4840), tehát ha a
+  // player felugrik hozzá, van hova hátrálnia — de a párkány végén sarokba szorul.
+  {
+    id: 'F-caster',
+    x: 4790,
+    surfaceId: 'F2',
+    patrolMinX: 4770,
+    patrolMaxX: 4810,
+    type: 'gravecaller',
+  },
+
   // G — a létrát őrző pár, a boss-ajtó előtti utolsó harc.
   { id: 'G-1', x: 5050, surfaceId: 'G6', patrolMinX: 4930, patrolMaxX: 5170 },
   { id: 'G-2', x: 5350, surfaceId: 'G6', patrolMinX: 5230, patrolMaxX: 5470 },
@@ -651,7 +692,10 @@ export const DECOR_PROPS: DecorPropDef[] = [
   { id: 'E-wagon', texture: PROP_TEXTURES.WAGON, x: 3960, surfaceId: 'G5', flipX: true },
 
   // G — a kasza utáni partot a kút jelöli meg ("átértél"), majd a záró harc díszlete.
-  { id: 'G-well', texture: PROP_TEXTURES.WELL, x: 4790, surfaceId: 'G6' },
+  // 4960, nem 4790: a régi helyén az F2 párkány ALÁ esne, és a kút teteje (353) mindössze
+  // 5 px-re maradna a lap aljától (348) — ütközés-artefaktnak nézne ki. Balra egyébként sem
+  // mehet: 4772 alatt már a kasza söprési sávjának biztonsági zónájába lógna.
+  { id: 'G-well', texture: PROP_TEXTURES.WELL, x: 4960, surfaceId: 'G6' },
   { id: 'G-crates', texture: PROP_TEXTURES.CRATE_STACK, x: 5195, surfaceId: 'G6' },
 
   // H — a két lámpa KÖZREFOGJA a létra lábát (LADDER.x ± 40), tehát a felfelé vezető út

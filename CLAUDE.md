@@ -639,10 +639,24 @@ sérti meg, amit Lazarus őriz. Ugyanaz a névadási elv, mint a `Hollow → Cro
     rögzítjük, hanem a slot-időt, mert a kioldás frame-jének (`f31`) pontos pillanatban
     kell képre kerülnie. A 47 frame-ből a statikus tartókockák ki vannak ritkítva; a
     staff FELEMELÉSE (`f23–30`) viszont sűrűn megy — az a telegraph.
-- **Elhelyezés a Level 1-en:** egyetlen példány, az `E2` platformon (`E-platform-1`), a
-  korábbi CrowHarvester helyén. A patrol/chase határok **bitre változatlanok** (a
-  testszélessége is 20). A vertikális kapu így pont az `E1`/`E2`/`E3` platform-láncot fedi
-  le, a `G5` talajt nem — ezt a `level1Layout.test.ts` futtatható állításként őrzi.
+- **Elhelyezés a Level 1-en: KÉT példány**, mindkettő platformon (a magasságkülönbség a lény
+  lényege — az emeli a saját sávjába, és veszi ki belőle a talajon futó playert):
+  - `E-platform-1` az **`E2`**-n, a korábbi CrowHarvester helyén (patrol/chase határok bitre
+    változatlanok, a testszélessége is 20);
+  - `F-caster` az **`F2`**-n, a Swinging Reaper után — lásd a Level1Scene szakaszt.
+- **A LÖVEDÉK MAGASSÁGA ÉS A PLATFORMOK MAGASSÁGA ÖSSZETARTOZIK.** A bolt vízszintesen
+  repül, a sávja `[casterY + PROJECTILE_SPAWN_OFFSET_Y ± PROJECTILE_SIZE/2]`, a `T` tetejű
+  felületen álló player teste pedig `[T − PLAYER_BODY_HEIGHT, T]`. **Ha a kettő nem fedi
+  egymást, a caster tüzel, de sosem talál** — ez a hiba jött elő az `E1`-en (lásd ott).
+  Ezért van a `level1Layout.test.ts`-ben egy `CASTER_TARGETS` tábla: casterenként felsorolja,
+  MELY felületeken álló playert kell eltalálnia, és a tényleges sáv-átfedést ellenőrzi.
+  **Egy platform elmozdítása után ezt kell először megnézni.**
+- **ISMERT, ELFOGADOTT KORLÁT:** a `VERTICAL_DETECTION_RANGE` (80) tágabb, mint az a sáv,
+  amit a lövedék ténylegesen elér (~±26). Emiatt az `E3` platformon (top 242, 66 px-szel az
+  `E2` fölött) állva az `E2` casterje ÉSZLEL és TÜZEL, de a bolt ~34 px-szel a player lába
+  ALATT megy el. **User-döntés, hogy ez így marad** (a szigorítás megváltoztatná az `E2`
+  caster feelingjét). A javítás iránya, ha valaha előkerül, lentebb a nyitott
+  polish-tételek között van.
 
 ### Level1Scene (`src/scenes/Level1Scene.ts` + `src/levels/Level1Layout.ts`)
 
@@ -679,17 +693,44 @@ sérti meg, amit Lazarus őriz. Ugyanaz a névadási elv, mint a `Hollow → Cro
   adja a tényleges hatótávot adott emelkedéshez (magasabbra ugorva rövidebbet lehet
   ugrani). A teszt ezzel **bejárja a pályát** (BFS a start szegmensről) és bizonyítja,
   hogy minden felület elérhető
-- **13 platform** a `PLATFORMS` tömbben (adatvezérelt: az enemy patrol-határok ugyanebből a
+- **14 platform** a `PLATFORMS` tömbben (adatvezérelt: az enemy patrol-határok ugyanebből a
   forrásból származnak, `platformTop/Left/Right` helperekkel). `H1` `oneWay: true` →
   `checkCollision.down = false`, a létra ezen megy át
-- **8 enemy: 7 CrowHarvester + 1 Gravecaller** (az `E2` platformon — lásd az Enemy 2
-  szakaszt). A típust az `ENEMY_SPAWNS` opcionális `type` mezője adja, aminek a default-ja
-  `'crow-harvester'` — ezért nem kellett a többi hét sorhoz hozzányúlni. A séta-körzetük
+- **KÉT platform magassága NEM szabadon hangolható**, mert egy Gravecaller lő rájuk (a
+  bolt vízszintesen repül, tehát a magasság dönti el, hogy talál-e):
+  - **`E1` (a gap3 lépőköve) `y = 328`, nem 352.** Az eredeti magassággal az `E2`-n álló
+    caster ÉSZLELTE és lőtte az ott álló playert, a bolt sávja (`[276, 292]`) viszont
+    6 px-szel a teste (`[298, 344]`) FÖLÖTT ment el — kézi teszten talált hiba. 328-cal a
+    test `[274, 320]`, amiben a bolt sávja teljesen benne van.
+  - **`F2` (a kasza utáni párkány) `y = 340` — PONTOSAN az `F1` szintje.** Lásd lentebb.
+  - A `level1Layout.test.ts` „a lövedék ELTALÁLJA a cél-felületeken álló playert" tesztje
+    ezt őrzi: az `E1` visszaállításával azonnal bukik.
+- **9 enemy: 7 CrowHarvester + 2 Gravecaller** (az `E2` és az `F2` platformon — lásd az
+  Enemy 2 szakaszt). A típust az `ENEMY_SPAWNS` opcionális `type` mezője adja, aminek a
+  default-ja `'crow-harvester'` — ezért nem kellett a többi sorhoz hozzányúlni. A séta-körzetük
   (`patrolMinX/MaxX`) az `ENEMY_SPAWNS` adata, az ÜLDÖZÉSI (illetve a Gravecallernél
   ÁTHELYEZKEDÉSI) határuk viszont **levezetett**: az `enemyChaseBounds()` a felület
   pereméből (`EDGE_INSET`-tel behúzva) számítja, majd **elvágja a spike-mezőkkel**. Így egy
   platform elmozdítása vagy egy új tüskemező automatikusan átméretezi a pórázt, és nem lehet
   elrontani. A platformon állóknál a kettő egybeesik (a platform pereme MAGA a patrol-határ)
+- **Az `F` szakasz (Swinging Reaper) ranged nyomást is kapott.** A kaszától jobbra, a
+  `G6` part fölött lebeg az **`F2`** párkány (4736..4864, top **332** = pontosan az `F1`
+  szintje), rajta az **`F-caster`** Gravecallerrel. A pozícióját két kényszer fogja közre,
+  és a köztük lévő sáv szűk — ezért van mindkettőre unit teszt:
+  - **balról** a kasza söprési sávja + `REAPER_ENEMY_CLEARANCE` (80) → a patrol bal széle a
+    testtel együtt ≥ 4739,8; a `patrolMinX = 4770` ezt 20 px-szel teljesíti;
+  - **jobbról** az a követelmény, hogy az EGÉSZ `F1` a caster `DETECTION_RANGE`-én belül
+    legyen (tüzeljen, amint a player odaugrik) → `4810 − 4436 = 374 ≤ 400`.
+  - **A bolt a LÉZENGÉST bünteti, nem a tiszta átkelést** (user-döntés): 720 ms windup +
+    ~1,2 s repülés = ~1,9 s a landolástól, miközben a kasza félperiódusa 1,2 s. A telegraph
+    (felemelt staff) viszont AZONNAL látszik, tehát a nyomás megvan. **Ez szándékos, nem
+    hiányosság:** `F1` fölött söpör a penge és alatta 400 px szakadék van — egy kikerülhetetlen
+    találat ott igazságtalan halál lenne (a layout-spec „avoid unavoidable damage" elve, amin
+    a tüskék vízszintes visszalökése is elbukott).
+  - Az `F2` az `F1`-ről 172 px-es ugrással (épp a `MAX_SAFE_GAP` 175 alatt) VAGY a `G6`
+    talajról felugorva érhető el — utóbbi a kényelmes út a caster megöléséhez.
+  - A `G-well` dekor emiatt költözött **4790 → 4960**: a régi helyén az `F2` ALÁ esett volna,
+    és a kút teteje (353) 5 px-re maradt volna a lap aljától (348).
 - **A két enemy-fajta KÉT KÜLÖN tömbben él** (`enemies`, `gravecallers`), de UGYANAZT a négy
   regisztrációt kapja egy ciklusban (talaj-, platform-collider + kard- és tűzgolyó-overlap).
   A handlerek csak a `Damageable` felületet használják, tehát típusfüggetlenek; a frissítést
@@ -1299,11 +1340,15 @@ lény a Level 2-n) egy tömb + egy `spawnEnemies()` ág.
 földi enemy üldözés) KÉSZ, lásd fentebb. **A blokk addig nyitva marad**, amíg a user
 elégedett nem lesz a pályával. Új hangolópont a Gravecaller érkezésével:
 
-- **A Gravecaller nehézsége az E szakaszban.** A `PROJECTILE_DAMAGE` (10) és a
+- **A Gravecaller nehézsége az E és az F szakaszban.** A `PROJECTILE_DAMAGE` (10) és a
   `REPOSITION_MS` (1200) a két elsődleges knob; a lövés-ciklus jelenleg 2360 ms. Ha túl
   ártalmatlannak bizonyul, a `RETREAT_SPEED` (70) emelése vagy a `MAX_HP` (24) növelése a
   következő lépés — de mindkettő SZÁNDÉKOSAN alacsony (a user kérése: legyen könnyű
   megközelíteni és karddal megölni).
+- **HP-mérleg: a MÁSODIK caster (`F-caster`) új nyomást tesz az F szakaszra**, ami eddig
+  tisztán időzítés volt. Ha a boss-arénába túl sérülten érkezik a player, itt az `F-caster`
+  a legkönnyebben visszavehető elem (törölhető, vagy a `patrolMaxX` jobbra tolásával
+  kivihető a `DETECTION_RANGE`-ből — utóbbit a layout-teszt azonnal jelzi).
 
 A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FELVETETTEK
 (megfigyelés, nem javaslat — a döntés a useré):
@@ -1363,6 +1408,18 @@ többi Enemy típus + Level + Bossok, VAGY tovább a Lore (Phase 9) / QA (Phase 
 Nyitott, nem blokkoló polish-tételek:
 - ~~Szakadékok (gap) bevezetése a Level 1 layoutjába (Project_plan.md 13. pont).~~
   **KÉSZ** — Level 1 Redesign, 1. iteráció: négy szakadék + zuhanás-halál.
+- **A Gravecaller `VERTICAL_DETECTION_RANGE`-e (80) tágabb, mint a lövedék tényleges
+  találati sávja**, ezért az `E3` platformon állva az `E2` casterje tüzel, de a bolt a
+  player lába alatt megy el (lásd az Enemy 2 szakaszt). User-döntés, hogy egyelőre marad.
+  **Ha valaha javítjuk, a levezetés készen van** — a kaput nem hangolni kell, hanem
+  származtatni:
+  ```
+  kapu = PROJECTILE_SIZE/2 (8) + PLAYER_BODY_HEIGHT/2 (23)
+       − minimum átfedés (6) − a két lény középpont-magasságának eltérése (5)   = 20
+  ```
+  (a „középpont-eltérés" = `PLAYER_HALF_HEIGHT` 24 − a Gravecaller `FEET_OFFSET_Y`-ja 19).
+  Mellékhatás, amivel számolni kell: 20-as kapunál a caster UGRÁS közben nem indít castot,
+  tehát a lövedékeit át lehet ugrani — mint a bossét.
 - A knight csomagban van még **landolás** (`Jump.png` `f6–7`), és több nem használt sheet
   (Roll, Slide, crouch, Hanging, Pray, attack_from_air) az eredeti forrásmappában. Ezekhez
   nincs state a játékban, és a Project_plan.md sem tervez ilyet — csak akkor kerüljenek be,

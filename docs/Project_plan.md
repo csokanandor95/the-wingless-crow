@@ -464,6 +464,22 @@ REPOSITION
 > A közelharci CrowHarvester `ATTACK_RANGE`-éhez hasonlóan itt sincs külön hitbox-zóna: a
 > lövedéket a scene hozza létre egy `'gravecaller-projectile'` eventre (ugyanaz a delegálás,
 > mint a `Player` `'fireball-cast'`-ja és a boss `'boss-projectile'`-ja).
+>
+> **Kiegészítés a finomhangolás után — a vízszintes lövedéknek LAYOUT-következménye van.**
+> A bolt magassága és a platformok magassága összetartozik: a lövedék sávja
+> `[casterY + PROJECTILE_SPAWN_OFFSET_Y ± PROJECTILE_SIZE/2]`, egy `T` tetejű felületen álló
+> player teste pedig `[T − PLAYER_BODY_HEIGHT, T]`. Ha a kettő nem fedi egymást, a caster
+> **tüzel, de sosem talál** — vagyis a lény némán elveszíti a funkcióját.
+>
+> Pontosan ez történt kézi teszten az `E1` lépőkövön: a bolt 6 px-szel a player feje fölött
+> ment el. A javítás nem a lényen, hanem a PÁLYÁN történt (a platform 24 px-szel feljebb),
+> és azóta a `level1Layout.test.ts` egy `CASTER_TARGETS` táblából ellenőrzi casterenként,
+> hogy a cél-felületeken álló playert a bolt sávja ténylegesen metszi-e.
+>
+> **Ismert, elfogadott korlát:** a `VERTICAL_DETECTION_RANGE` (80) tágabb ennél a valódi
+> találati sávnál (~±26), tehát létezhet olyan felület, amit a caster észlel, de nem tud
+> eltalálni (a Level 1-en az `E3`). User-döntés, hogy egyelőre így marad; a levezetett
+> (szigorúbb) kapu képlete a `CLAUDE.md` nyitott polish-tételei között készen áll.
 
 ## Enemy 3 – Beast
 
@@ -750,6 +766,31 @@ Főbb elemek:
 > `E1` 32 px, `E2` 4 px, `E3` 70 px, a talaj **106 px**, a kapu 80).
 >
 > A pálya többi enemyje változatlan; a Level 1-en így **7 CrowHarvester + 1 Gravecaller** van.
+
+> **Finomhangolás, 2. kör (2026-08-26) — két kézi teszten talált tétel.**
+>
+> **1. Az `E1` lépőkő 24 px-szel feljebb került (y 352 → 328).** Az `E2`-n álló Gravecaller
+> észlelte és lőtte az ott álló playert, de a bolt sávja (`[276, 292]`) 6 px-szel a teste
+> (`[298, 344]`) FÖLÖTT ment el. A magasság tehát nem esztétikai szám: a vízszintes lövedék
+> miatt ez dönti el, hogy a lény működik-e egyáltalán. Az új magasságnál a bolt sávja
+> teljesen a testen belül van. Az ugrás-invariánsok megmaradtak: a `G4 → E1` emelkedés 74-ről
+> 98-ra nőtt, a plafon 117.
+>
+> **2. Az `F` szakasz (Swinging Reaper) ranged nyomást kapott.** Új platform (`F2`, top 332 =
+> PONTOSAN az `F1` szintje, a `G6` part fölött lebegve), rajta a második Gravecallerrel
+> (`F-caster`). A pozíciót két kényszer fogja közre — balról a kasza söprési sávjának
+> biztonsági zónája, jobbról az a követelmény, hogy az EGÉSZ `F1` a caster detektálási
+> körében legyen —, és a köztük maradó sáv szűk; mindkét kényszer unit-teszt.
+>
+> **A bolt szándékosan a LÉZENGÉST bünteti, nem a tiszta átkelést** (jóváhagyott
+> user-döntés). A telegraph (felemelt staff) azonnal látszik, amint a player az `F1`-re ér,
+> de a 720 ms windup + ~1,2 s repülés miatt a becsapódás ~1,9 s-nál lenne, miközben a kasza
+> félperiódusa 1,2 s. **Ez nem hiányosság, hanem ugyanaz az elv, amin a tüskék vízszintes
+> visszalökése is elbukott:** `F1` fölött söpör a penge és alatta 400 px szakadék van, tehát
+> egy kikerülhetetlen találat ott olyan halált okozna, amire nem lehet reagálni („avoid
+> unavoidable damage"). Jól időzített átkelés: 0 sebzés. Ácsorgás: kasza 20 + bolt 10.
+>
+> A Level 1-en így **7 CrowHarvester + 2 Gravecaller** van, és **14 platform**.
 
 ### Level 2 – The Crowless Forest
 
