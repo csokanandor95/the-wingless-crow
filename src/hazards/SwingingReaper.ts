@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { SwingingReaperDef } from '../levels/Level1Layout';
+import type { SwingingReaperDef } from '../levels/LevelGeometry';
 
 /**
  * Lengő kasza (Level 1, F szakasz) — az első MOZGÓ, időzítés-alapú hazard.

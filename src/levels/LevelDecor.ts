@@ -1,6 +1,11 @@
 import type Phaser from 'phaser';
 import { DECOR_DEPTH } from './LevelTileset';
-import { PROP_ASSETS, surfaceSpan, type DecorPropDef } from './Level1Layout';
+import {
+  PROP_ASSETS,
+  surfaceSpan,
+  type DecorPropDef,
+  type LevelGeometry,
+} from './LevelGeometry';
 
 /**
  * Hangulati propok kirakása — nem ütköző háttér-dekoráció.
@@ -10,7 +15,9 @@ import { PROP_ASSETS, surfaceSpan, type DecorPropDef } from './Level1Layout';
  * kezelni sem; a Phaser a scene shutdownjakor amúgy is megsemmisíti a display listát.
  *
  * A helper létezésének egyetlen oka, hogy a HÁROM együtt érvényes render-szabály
- * (`origin`, `depth`, `tint`) egy helyen legyen, és a Level 2-n is ugyanúgy érvényesüljön:
+ * (`origin`, `depth`, `tint`) egy helyen legyen, és minden pályán ugyanúgy érvényesüljön.
+ * A `level` paraméter ezért kell: a prop a `surfaceId`-je felszínére kerül, és azt a
+ * megosztott `surfaceSpan()` az ADOTT pálya geometriájából oldja fel:
  *
  *  - **`origin (0.5, 1)`** — a prop a TALPÁNÁL van pozicionálva, tehát pontosan a felület
  *    felszínén áll. Középpontos originnél minden propnál kézzel kellene felezni a magasságot.
@@ -24,10 +31,11 @@ import { PROP_ASSETS, surfaceSpan, type DecorPropDef } from './Level1Layout';
  */
 export default function createDecorProps(
   scene: Phaser.Scene,
-  defs: DecorPropDef[]
+  defs: DecorPropDef[],
+  level: LevelGeometry
 ): Phaser.GameObjects.Image[] {
   return defs.map((def) => {
-    const surface = surfaceSpan(def.surfaceId);
+    const surface = surfaceSpan(level, def.surfaceId);
 
     return scene.add
       .image(def.x, surface.top, def.texture)

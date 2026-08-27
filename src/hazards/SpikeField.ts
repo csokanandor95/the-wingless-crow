@@ -5,7 +5,7 @@ import {
   SPIKE_HITBOX_INSET_X,
   SPIKE_TILE_WIDTH,
   type SpikeFieldDef,
-} from '../levels/Level1Layout';
+} from '../levels/LevelGeometry';
 
 /**
  * Statikus tüskemezők (Level 1, D szakasz).

@@ -250,6 +250,63 @@ function createMockText() {
   return text;
 }
 
+/**
+ * Az `Arcade.StaticGroup` minimális mása a `MovingPlatform`-hoz. A lap a scene STATIKUS
+ * platform-groupjába kerül (nem sajátba), ezért a teszt is így kapja meg; a `refreshBody`
+ * hívásszáma pedig fontos állítás: static bodynál enélkül a fizika a régi helyén maradna.
+ */
+export interface MockStaticSprite {
+  x: number;
+  y: number;
+  texture: string;
+  scaleX: number;
+  tint: number | null;
+  refreshCount: number;
+  setScale(sx: number, sy: number): MockStaticSprite;
+  setTint(v: number): MockStaticSprite;
+  setPosition(x: number, y: number): MockStaticSprite;
+  refreshBody(): MockStaticSprite;
+}
+
+export function createMockStaticGroup() {
+  const created: MockStaticSprite[] = [];
+
+  return {
+    created,
+    create: vi.fn((x: number, y: number, texture: string) => {
+      const sprite: MockStaticSprite = {
+        x,
+        y,
+        texture,
+        scaleX: 1,
+        tint: null,
+        refreshCount: 0,
+        setScale(sx) {
+          sprite.scaleX = sx;
+          return sprite;
+        },
+        setTint(v) {
+          sprite.tint = v;
+          return sprite;
+        },
+        setPosition(nx, ny) {
+          sprite.x = nx;
+          sprite.y = ny;
+          return sprite;
+        },
+        refreshBody() {
+          sprite.refreshCount++;
+          return sprite;
+        },
+      };
+      created.push(sprite);
+      return sprite;
+    }),
+  };
+}
+
+export type MockStaticGroup = ReturnType<typeof createMockStaticGroup>;
+
 export function createMockScene() {
   return {
     add: {

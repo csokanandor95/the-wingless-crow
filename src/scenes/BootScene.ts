@@ -112,11 +112,21 @@ import wellUrl from '../../assets/props/gothic-town/well.png';
 import crateUrl from '../../assets/props/gothic-town/crate.png';
 import crateStackUrl from '../../assets/props/gothic-town/crate-stack.png';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
-import { PROP_TEXTURES, SPIKE_HEIGHT, SPIKE_TILE_WIDTH } from '../levels/Level1Layout';
+import { PROP_TEXTURES, SPIKE_HEIGHT, SPIKE_TILE_WIDTH } from '../levels/LevelGeometry';
 import { DOOR_APERTURE, TILE_TEXTURES } from '../levels/LevelTileset';
 
 const LOADING_BAR_WIDTH = 320;
 const LOADING_BAR_HEIGHT = 14;
+
+/**
+ * Melyik pályán induljon a játék a betöltés után.
+ *
+ * NORMÁL érték: `'Level1Scene'`. A `'Level2Scene'`-re átírva a Level 2 KÖZVETLENÜL
+ * tesztelhető, anélkül hogy végig kellene játszani a Level1 -> Boss -> átvezető láncot —
+ * fejlesztés közben ez a leggyorsabb út az új szakaszokhoz. **Commit előtt mindig állítsd
+ * vissza `'Level1Scene'`-re.**
+ */
+const START_SCENE = 'Level2Scene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a
@@ -125,6 +135,16 @@ const LOADING_BAR_HEIGHT = 14;
  */
 const DOOR_INTERIOR_NEAR = [0x2a, 0x1f, 0x24] as const;
 const DOOR_INTERIOR_FAR = [0x0d, 0x09, 0x0c] as const;
+
+/**
+ * A Level 2 placeholder létra- és ajtó-textúrája. A méretek a `Level2Layout` `LADDERS`
+ * `width`-jével és `DOOR`-jával tartoznak össze: a létra csempéje 32 széles (a mászási zóna
+ * 28 — a RAJZOLT létra szélessége, mint a Level 1-en), az ajtó pedig 48x72.
+ */
+const LADDER_PLACEHOLDER_WIDTH = 32;
+const LADDER_PLACEHOLDER_HEIGHT = 16;
+const DOOR_PLACEHOLDER_WIDTH = 48;
+const DOOR_PLACEHOLDER_HEIGHT = 72;
 
 const PLAYER_SHEETS: Array<{ key: string; url: string }> = [
   { key: PLAYER_TEXTURES.IDLE, url: knightIdleUrl },
@@ -254,7 +274,7 @@ export default class BootScene extends Phaser.Scene {
     createGravecallerAnimations(this);
     createGraftedWingBreakerAnimations(this);
 
-    this.scene.start('Level1Scene');
+    this.scene.start(START_SCENE);
   }
 
   // Ideiglenes, minimális betöltésjelző — a boss theme ~2 MB, ami első betöltéskor
@@ -310,9 +330,45 @@ export default class BootScene extends Phaser.Scene {
     platformGfx.generateTexture('platform-placeholder', 64, 16);
     platformGfx.destroy();
 
-    // A `ladder-placeholder`, a `pillar-placeholder` és a `door-placeholder` TÖRÖLVE:
-    // a létra és az ajtó valódi csempét kapott (TILE_IMAGES), a létra mögötti hátfal-oszlop
-    // pedig szándékosan megszűnt — a létra a lebegő platformnak van támasztva.
+    // A `pillar-placeholder` TÖRÖLVE (a Level 1 létrája a lebegő platformnak van támasztva,
+    // a mélység-illúziót pedig a parallax rétegek adják).
+    //
+    // A `ladder-placeholder` és a `door-placeholder` VISSZAKERÜLT a Level 2 miatt: az a pálya
+    // egyelőre placeholder skinnel renderel (nincs erdő-tileset), és a cathedral `door-gate`
+    // csempéje se nem illik oda, se nem érvényes — annak a geometriája (DOOR_APERTURE,
+    // DOOR_THRESHOLD_PX) ehhez a konkrét PNG-hez van mérve. A Level 1 továbbra is a valódi
+    // csempéket használja.
+
+    // Létra: FÜGGŐLEGESEN varratmentes csempe (két oldalléc + egy fok), hogy a tileSprite a
+    // létra teljes hosszában ismételhesse — ugyanaz a szerep, mint a `tile-ladder`-é.
+    const ladderGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    ladderGfx.fillStyle(0x53422f, 1);
+    ladderGfx.fillRect(2, 0, 6, LADDER_PLACEHOLDER_HEIGHT); // bal oldalléc
+    ladderGfx.fillRect(24, 0, 6, LADDER_PLACEHOLDER_HEIGHT); // jobb oldalléc
+    ladderGfx.fillStyle(0x6d5a41, 1);
+    ladderGfx.fillRect(2, 5, 28, 5); // fok
+    ladderGfx.generateTexture(
+      'ladder-placeholder',
+      LADDER_PLACEHOLDER_WIDTH,
+      LADDER_PLACEHOLDER_HEIGHT
+    );
+    ladderGfx.destroy();
+
+    // Boss-ajtó: egyszerű, sötét boltív-nyílás kőkerettel. A trigger-zóna MAGA az ajtó
+    // (nincs külön alpha-lyuk, mint a cathedral csempénél), tehát nincs mit elcsúsztatni.
+    const doorGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    doorGfx.fillStyle(0x3b3326, 1);
+    doorGfx.fillRect(0, 0, DOOR_PLACEHOLDER_WIDTH, DOOR_PLACEHOLDER_HEIGHT); // kőkeret
+    doorGfx.fillStyle(0x120e12, 1);
+    doorGfx.fillRect(6, 8, DOOR_PLACEHOLDER_WIDTH - 12, DOOR_PLACEHOLDER_HEIGHT - 8); // nyílás
+    doorGfx.fillStyle(0x1d1820, 1);
+    doorGfx.fillRect(6, 8, DOOR_PLACEHOLDER_WIDTH - 12, 6); // szemöldökfa
+    doorGfx.generateTexture(
+      'door-placeholder',
+      DOOR_PLACEHOLDER_WIDTH,
+      DOOR_PLACEHOLDER_HEIGHT
+    );
+    doorGfx.destroy();
 
     // A boss-ajtó mögötti folyosó. A `door-gate` csempe boltíve ÁTLÁTSZÓ, tehát nélküle a
     // parallax égbolt látszik át rajta: az ajtó "lyuk a falban" lenne, nem átjáró. A textúra

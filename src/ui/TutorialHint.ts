@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { TutorialHintDef } from '../levels/Level1Layout';
+import type { TutorialHintDef } from '../levels/LevelGeometry';
 
 /**
  * Rövid, egyszer megjelenő billentyű-súgó a pálya tutorial-szakaszaihoz.
