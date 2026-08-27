@@ -206,8 +206,10 @@ export default class Level2Scene extends Phaser.Scene {
     // FIGYELEM: ezek a colliderek az enemy-tömbök REFERENCIÁJÁRA kötődnek, és a Phaser minden
     // physics stepben újraiterálja a tartalmukat. Ezért tudja a resetEnemies() helyben
     // (splice + push) kicserélni a lakóikat — és ezért TILOS a tömböket új tömbre cserélni
-    // (CLAUDE.md 2. tanulság). A tömbök most üresek: az enemyk a 3. iterációban jönnek, és
-    // akkor ez a bekötés már készen áll.
+    // (CLAUDE.md 2. tanulság).
+    //
+    // A két enemy-fajta ugyanazt a négy regisztrációt kapja: a handlerek csak a Damageable
+    // felületet használják, tehát típusfüggetlenek.
     const enemyGroups: Phaser.Physics.Arcade.Sprite[][] = [this.enemies, this.gravecallers];
     for (const group of enemyGroups) {
       this.physics.add.collider(group, ground);

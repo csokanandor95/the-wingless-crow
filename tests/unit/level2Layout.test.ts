@@ -19,10 +19,13 @@ import {
   CHECKPOINT_ZONE,
   DOOR,
   DOOR_CHECKPOINT,
+  ENEMY_SPAWNS,
+  GRAVECALLER_SPAWN_OFFSET,
   GROUND_SEGMENTS,
   GROUND_TOP,
   JUMP_CORRIDOR_MARGIN,
   LADDERS,
+  LADDER_EXIT_CLEARANCE,
   MAX_JUMP_HEIGHT,
   MAX_SAFE_GAP,
   MAX_SAFE_RISE,
@@ -34,10 +37,14 @@ import {
   PLAYER_BODY_WIDTH,
   PLAYER_HALF_HEIGHT,
   REAPERS,
+  REAPER_ENEMY_CLEARANCE,
   SPIKE_FIELDS,
   SPIKE_TILE_WIDTH,
   START_X,
   WORLD_WIDTH,
+  enemyChaseBounds,
+  enemyHalfBodyWidth,
+  enemyType,
   groundGaps,
   horizontalReachForRise,
   movingPlatformExtremes,
@@ -55,6 +62,13 @@ import {
 } from '../../src/levels/Level2Layout';
 import { REAPER_HIT_RADIUS } from '../../src/hazards/SwingingReaper';
 import { MOVE_SPEED } from '../../src/player/Player';
+import { ATTACK_RANGE as HARVESTER_ATTACK_RANGE } from '../../src/enemies/CrowHarvester';
+import {
+  DETECTION_RANGE as GRAVECALLER_DETECTION_RANGE,
+  PROJECTILE_SIZE as GRAVECALLER_PROJECTILE_SIZE,
+  PROJECTILE_SPAWN_OFFSET_Y as GRAVECALLER_PROJECTILE_OFFSET_Y,
+  VERTICAL_DETECTION_RANGE as GRAVECALLER_VERTICAL_RANGE,
+} from '../../src/enemies/Gravecaller';
 import { LADDER_TILE_WIDTH, PLATFORM_TILE_HEIGHT } from '../../src/levels/LevelTileset';
 
 vi.mock('phaser', async () => {
@@ -804,6 +818,354 @@ describe('LADDERS', () => {
       expect(target!.oneWay, `${ladder.id} célja nem oneWay — a létra nem menne át rajta`).toBe(
         true
       );
+    }
+  });
+});
+
+// --- Enemyk -----------------------------------------------------------------
+
+describe('ENEMY_SPAWNS', () => {
+  it('az id-k egyediek, és a spawn a patrol-tartományon belül van', () => {
+    const ids = ENEMY_SPAWNS.map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    for (const enemy of ENEMY_SPAWNS) {
+      expect(enemy.patrolMaxX, `${enemy.id}`).toBeGreaterThan(enemy.patrolMinX);
+      expect(enemy.x, `${enemy.id} spawn a patrolon kívül`).toBeGreaterThanOrEqual(
+        enemy.patrolMinX
+      );
+      expect(enemy.x, `${enemy.id} spawn a patrolon kívül`).toBeLessThanOrEqual(enemy.patrolMaxX);
+    }
+  });
+
+  it('a doksi darabszámai: 10 CrowHarvester + 4 Gravecaller', () => {
+    const crows = ENEMY_SPAWNS.filter((e) => enemyType(e) === 'crow-harvester');
+    const casters = ENEMY_SPAWNS.filter((e) => enemyType(e) === 'gravecaller');
+    expect(crows).toHaveLength(10);
+    expect(casters).toHaveLength(4);
+  });
+
+  it('EGYETLEN enemy sem áll mozgó platformon', () => {
+    // A layout-spec 19/7 pontja. A mozgó lapok nincsenek is a `surfaceSpan()`-ban, tehát egy
+    // ilyen próbálkozás amúgy is dobna — de a szándékot rögzítjük.
+    const moverIds = new Set(MOVING_PLATFORMS.map((m) => m.id));
+    for (const enemy of ENEMY_SPAWNS) {
+      expect(moverIds.has(enemy.surfaceId), `${enemy.id} mozgó platformon áll`).toBe(false);
+    }
+  });
+
+  it('egyetlen patrol-tartomány sem lóg le a felületéről (a TESTTEL együtt)', () => {
+    for (const enemy of ENEMY_SPAWNS) {
+      const surface = surfaceSpan(enemy.surfaceId);
+      expect(
+        enemy.patrolMinX - enemyHalfBodyWidth(enemy),
+        `${enemy.id} balra lelóg a(z) ${enemy.surfaceId} peremén`
+      ).toBeGreaterThanOrEqual(surface.left);
+      expect(
+        enemy.patrolMaxX + enemyHalfBodyWidth(enemy),
+        `${enemy.id} jobbra lelóg a(z) ${enemy.surfaceId} peremén`
+      ).toBeLessThanOrEqual(surface.right);
+    }
+  });
+
+  it('az üldözési határ TARTALMAZZA a patrolt, és a felületen BELÜL marad', () => {
+    // Ha szűkebb lenne, az enemy a saját sétakörzetében ütközne láthatatlan falba — pont az
+    // a hiba, amit a Level 1 finomhangolásának 1. köre javított.
+    for (const enemy of ENEMY_SPAWNS) {
+      const chase = enemyChaseBounds(enemy);
+      const surface = surfaceSpan(enemy.surfaceId);
+      const half = enemyHalfBodyWidth(enemy);
+
+      expect(chase.min, `${enemy.id} üldözése balra szűkebb a patrolnál`).toBeLessThanOrEqual(
+        enemy.patrolMinX
+      );
+      expect(chase.max, `${enemy.id} üldözése jobbra szűkebb a patrolnál`).toBeGreaterThanOrEqual(
+        enemy.patrolMaxX
+      );
+      expect(chase.min - half, `${enemy.id} üldözés közben lelép balra`).toBeGreaterThanOrEqual(
+        surface.left
+      );
+      expect(chase.max + half, `${enemy.id} üldözés közben lelép jobbra`).toBeLessThanOrEqual(
+        surface.right
+      );
+    }
+  });
+
+  it('sem a patrol, sem az ÜLDÖZÉS nem enged tüskébe lépni', () => {
+    for (const enemy of ENEMY_SPAWNS) {
+      const chase = enemyChaseBounds(enemy);
+      const half = enemyHalfBodyWidth(enemy);
+
+      for (const field of SPIKE_FIELDS) {
+        for (const [label, min, max] of [
+          ['patrol', enemy.patrolMinX, enemy.patrolMaxX],
+          ['üldözés', chase.min, chase.max],
+        ] as const) {
+          const overlaps = max + half > field.startX && min - half < field.endX;
+          expect(overlaps, `${enemy.id} ${label} közben belesétál a(z) ${field.id} mezőbe`).toBe(
+            false
+          );
+        }
+      }
+    }
+  });
+
+  it('a tüske-szigeteken a patrol-határ a landolópont ATTACK_RANGE-én KÍVÜL marad', () => {
+    // A layout-spec `C-crow-1`-re megfogalmazott követelménye, általánosítva: aki átugorja a
+    // mezőt, annak legyen ideje megfordulni a landolás után. Enélkül a szigetre érkezés
+    // kikerülhetetlen csapást jelentene.
+    for (const enemy of ENEMY_SPAWNS) {
+      const half = enemyHalfBodyWidth(enemy);
+
+      for (const field of SPIKE_FIELDS) {
+        if (field.surfaceId !== enemy.surfaceId) continue;
+
+        // A mező JOBB széle mögé landoló player, illetve a BAL széle elé érkező.
+        if (field.endX <= enemy.patrolMinX) {
+          expect(
+            enemy.patrolMinX - half - field.endX,
+            `${enemy.id} túl közel áll a(z) ${field.id} utáni landolóponthoz`
+          ).toBeGreaterThanOrEqual(HARVESTER_ATTACK_RANGE);
+        }
+        if (field.startX >= enemy.patrolMaxX) {
+          expect(
+            field.startX - (enemy.patrolMaxX + half),
+            `${enemy.id} túl közel áll a(z) ${field.id} előtti landolóponthoz`
+          ).toBeGreaterThanOrEqual(HARVESTER_ATTACK_RANGE);
+        }
+      }
+    }
+  });
+
+  it('EGYETLEN enemy sem áll kasza söprési sávjában', () => {
+    for (const def of REAPERS) {
+      const sweep = reaperSweep(def);
+      const dangerLeft = sweep.left - REAPER_ENEMY_CLEARANCE;
+      const dangerRight = sweep.right + REAPER_ENEMY_CLEARANCE;
+
+      for (const enemy of ENEMY_SPAWNS) {
+        const half = enemyHalfBodyWidth(enemy);
+        const overlaps =
+          enemy.patrolMaxX + half > dangerLeft && enemy.patrolMinX - half < dangerRight;
+        expect(overlaps, `${enemy.id} a(z) ${def.id} söprési sávjában van`).toBe(false);
+      }
+    }
+  });
+
+  it('az F szakaszon NINCS enemy', () => {
+    // A layout-spec explicit követelménye: két független kasza-időzítés már önmagában a
+    // szakasz leckéje, egy lövedék vagy lökés ott kikerülhetetlen halált okozna.
+    const gapF = groundGaps()[2];
+    const fSurfaces = new Set(
+      PLATFORMS.filter(
+        (p) => platformRight(p) > gapF.startX && platformLeft(p) < gapF.endX
+      ).map((p) => p.id)
+    );
+
+    for (const enemy of ENEMY_SPAWNS) {
+      expect(fSurfaces.has(enemy.surfaceId), `${enemy.id} az F szakaszon áll`).toBe(false);
+    }
+  });
+
+  it('a létra KIJÁRATÁNÁL nincs enemy attack range-en belül', () => {
+    // Csak a FELSŐ felületre: a létra tövénél a player normálisan tud harcolni (a
+    // `H-crow-1` kifejezetten oda van szánva kapuőrnek), a tetején viszont védtelenül lép ki.
+    for (const ladder of LADDERS) {
+      for (const enemy of ENEMY_SPAWNS) {
+        if (enemy.surfaceId !== ladder.toSurfaceId) continue;
+
+        const half = enemyHalfBodyWidth(enemy);
+        const distance = Math.max(
+          ladder.x - (enemy.patrolMaxX + half),
+          enemy.patrolMinX - half - ladder.x
+        );
+        expect(
+          distance,
+          `${enemy.id} túl közel van a(z) ${ladder.id} kijáratához`
+        ).toBeGreaterThanOrEqual(LADDER_EXIT_CLEARANCE);
+      }
+    }
+  });
+
+  it('a FÖLDI enemyk üldözési tere érdemben tágabb a patroljuknál', () => {
+    const groundEnemies = ENEMY_SPAWNS.filter((e) =>
+      GROUND_SEGMENTS.some((g) => g.id === e.surfaceId)
+    );
+    expect(groundEnemies.length).toBeGreaterThan(0);
+
+    for (const enemy of groundEnemies) {
+      const chase = enemyChaseBounds(enemy);
+      expect(
+        chase.max - chase.min,
+        `${enemy.id} üldözési tere nem tágabb a patroljánál`
+      ).toBeGreaterThan(enemy.patrolMaxX - enemy.patrolMinX);
+    }
+  });
+});
+
+// --- Gravecallerek elhelyezése ----------------------------------------------
+//
+// A legfontosabb állítás itt is az, ami a Level 1-en kézi teszten bukott ki: az, hogy egy
+// caster ÉSZLEL egy playert, még nem jelenti, hogy EL IS TALÁLJA. A vízszintes lövedék csak
+// egy szűk magasság-sávot ér el, ezért a cél-felületeknél a TÉNYLEGES sáv-átfedést nézzük.
+
+describe('Gravecallerek (Enemy 2) elhelyezése', () => {
+  const casters = ENEMY_SPAWNS.filter((e) => enemyType(e) === 'gravecaller');
+
+  /**
+   * A design SZÁNDÉKA: melyik casternek mely felületeken álló playert kell eltalálnia.
+   * Kézzel karbantartott tábla — pont ez a lényege: a szándékot rögzíti, nem a jelenlegi
+   * számokból vezeti le (különben tautológia lenne).
+   *
+   * A `G-caster-2`-nél a `G-P1` SZÁNDÉKOSAN hiányzik: a felső útvonal ELSŐ hopja még a
+   * hatókörén kívül esik, a nyomás csak a másodiktól kezdődik.
+   */
+  const CASTER_TARGETS: Record<string, string[]> = {
+    'D-caster-1': ['D2', 'D3'],
+    'E-caster-1': ['G3'],
+    'G-caster-1': ['G4'],
+    'G-caster-2': ['G-P2', 'G-P3'],
+  };
+
+  const casterCenterY = (surfaceId: string): number =>
+    surfaceSpan(surfaceId).top - GRAVECALLER_SPAWN_OFFSET;
+
+  /** A kilőtt lövedék függőleges sávja (a physics body 16x16, origin 0.5). */
+  const projectileBand = (caster: (typeof casters)[number]) => {
+    const center = casterCenterY(caster.surfaceId) + GRAVECALLER_PROJECTILE_OFFSET_Y;
+    return {
+      top: center - GRAVECALLER_PROJECTILE_SIZE / 2,
+      bottom: center + GRAVECALLER_PROJECTILE_SIZE / 2,
+    };
+  };
+
+  /** Egy `T` tetejű felületen álló player TESTE — a talpa a felszínen. */
+  const playerBand = (surfaceId: string) => {
+    const top = surfaceSpan(surfaceId).top;
+    return { top: top - PLAYER_BODY_HEIGHT, bottom: top };
+  };
+
+  it('mindegyikhez tartozik deklarált cél-felület', () => {
+    expect(casters.length).toBeGreaterThan(0);
+    for (const caster of casters) {
+      expect(CASTER_TARGETS[caster.id], `${caster.id}: nincs cél-felület deklarálva`).toBeDefined();
+      expect(CASTER_TARGETS[caster.id].length).toBeGreaterThan(0);
+    }
+  });
+
+  it('KETTŐ a TALAJON áll — tudatos megfordítása a Level 1-es döntésnek', () => {
+    // A Level 1-en minden caster platformon állt, és a futósáv szándékosan kimaradt a
+    // hatókörükből. Itt maga a futósáv lőtt terület, és ez az egyik oka, hogy a Level 2-n
+    // nem lehet átszaladni.
+    const onGround = casters.filter((c) => GROUND_SEGMENTS.some((g) => g.id === c.surfaceId));
+    expect(onGround.map((c) => c.id).sort()).toEqual(['E-caster-1', 'G-caster-1']);
+  });
+
+  it('a lövedék ELTALÁLJA a cél-felületeken álló playert', () => {
+    // REGRESSZIÓ a Level 1-es `E1`-hiba osztálya ellen: ott a bolt 6 px-szel a fej fölött
+    // ment el, tehát a caster tüzelt, de sosem talált. Nem elég detektálni — a két sávnak
+    // fednie kell egymást.
+    for (const caster of casters) {
+      const bolt = projectileBand(caster);
+
+      for (const surfaceId of CASTER_TARGETS[caster.id]) {
+        const body = playerBand(surfaceId);
+        const overlap = Math.min(bolt.bottom, body.bottom) - Math.max(bolt.top, body.top);
+
+        expect(
+          overlap,
+          `${caster.id}: a lövedék elmegy a(z) ${surfaceId}-n álló player mellett`
+        ).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('a cél-felületek a VERTIKÁLIS detektálási sávon belül vannak', () => {
+    for (const caster of casters) {
+      const casterY = casterCenterY(caster.surfaceId);
+
+      for (const surfaceId of CASTER_TARGETS[caster.id]) {
+        expect(
+          Math.abs(surfaceSpan(surfaceId).top - PLAYER_HALF_HEIGHT - casterY),
+          `${caster.id}: nem venné észre a(z) ${surfaceId}-n álló playert`
+        ).toBeLessThanOrEqual(GRAVECALLER_VERTICAL_RANGE);
+      }
+    }
+  });
+
+  it('a PLATFORM cél-felületek TELJES hosszukban a vízszintes hatókörön belül vannak', () => {
+    // A legrosszabb eset: a caster a patroljának TÁVOLABBI végén jár, a player pedig a
+    // cél-felület átellenes peremén áll. Ez a kényszer szűkíti a `D-caster-1` patrolját
+    // 30 px-re: a `D2` teljes hosszának a hatókörén belül kell lennie.
+    //
+    // CSAK platformokra: egy platform zárt, elkötelezett terep — oda felugorva a playernek
+    // AZONNAL számítania kell a tűzre. Egy 900–1640 px-es TALAJSZEGMENSNÉL ez értelmetlen
+    // követelmény lenne (a `DETECTION_RANGE` 400), és a ground caster nem is a teljes
+    // szegmenst uralja, hanem a saját celláját. Ott a lényegi állítás a sáv-átfedés, amit a
+    // fenti teszt bizonyít.
+    for (const caster of casters) {
+      for (const surfaceId of CASTER_TARGETS[caster.id]) {
+        if (!PLATFORMS.some((p) => p.id === surfaceId)) continue;
+
+        const span = surfaceSpan(surfaceId);
+        const worstCase = Math.max(
+          Math.abs(caster.patrolMaxX - span.left),
+          Math.abs(caster.patrolMinX - span.right)
+        );
+
+        expect(
+          worstCase,
+          `${caster.id}: a(z) ${surfaceId} nem fér bele a detektálási körébe`
+        ).toBeLessThanOrEqual(GRAVECALLER_DETECTION_RANGE);
+      }
+    }
+  });
+
+  it('a TALAJON álló casterek látják a cellájuk BEJÁRATÁT', () => {
+    // A ground caster megfelelője a fenti platform-tesztnek, a lényegi állításra szűkítve.
+    //
+    // A player MINDIG balról érkezik, tehát az számít, hogy a caster már a cella bal végén
+    // észlelje — "amint kijössz a tüskékből, ő már tüzel". A cella JOBB vége szándékosan nincs
+    // állítva: a `G-caster-1` cellája a szegmens végéig (7176) tart, ami a `DETECTION_RANGE`
+    // (400) kétszerese — a mögötte lévő létra-szakaszt nem is kell uralnia.
+    for (const caster of casters) {
+      if (!GROUND_SEGMENTS.some((g) => g.id === caster.surfaceId)) continue;
+
+      const cell = enemyChaseBounds(caster);
+      const reachLeft = caster.patrolMinX - GRAVECALLER_DETECTION_RANGE;
+
+      expect(reachLeft, `${caster.id} nem látja a cellája bejáratát`).toBeLessThanOrEqual(
+        cell.min
+      );
+    }
+  });
+
+  it('EGYETLEN bolt-sáv sem metszi mozgó platform pályáját', () => {
+    // A layout-spec 19/4 invariánsa: mozgó platformon a player nem tud kitérni, ott egy
+    // lövedék kikerülhetetlen sebzés lenne. Pontosan ez a kényszer emelte az `E-lift` alsó
+    // állását +20-ról +70-re.
+    //
+    // A vízszintes hatókört is nézni KELL: a bolt-sáv magassága önmagában hamis riasztást
+    // adna olyan platformokra, amik a pálya túlsó végén vannak.
+    for (const caster of casters) {
+      const bolt = projectileBand(caster);
+      const reachLeft = caster.patrolMinX - GRAVECALLER_DETECTION_RANGE;
+      const reachRight = caster.patrolMaxX + GRAVECALLER_DETECTION_RANGE;
+
+      for (const mover of MOVING_PLATFORMS) {
+        const path = movingPlatformPathBounds(mover);
+        if (path.right < reachLeft || path.left > reachRight) continue;
+
+        // A lapon álló player teste, a mozgás MINDEN állásában.
+        const tops = movingPlatformExtremes(mover).map((s) => s.top);
+        const body = { top: Math.min(...tops) - PLAYER_BODY_HEIGHT, bottom: Math.max(...tops) };
+        const overlap = Math.min(bolt.bottom, body.bottom) - Math.max(bolt.top, body.top);
+
+        expect(
+          overlap,
+          `${caster.id} lövi a(z) ${mover.id} mozgó platformon állót — ott nincs kitérés`
+        ).toBeLessThanOrEqual(0);
+      }
     }
   });
 });

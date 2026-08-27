@@ -54,8 +54,10 @@ export {
   EDGE_INSET,
   FALL_DEATH_Y,
   FALL_DEPTH,
+  GRAVECALLER_SPAWN_OFFSET,
   GROUND_CENTER_Y,
   GROUND_TOP,
+  HARVESTER_SPAWN_OFFSET,
   JUMP_CORRIDOR_MARGIN,
   MAX_JUMP_DISTANCE,
   MAX_JUMP_HEIGHT,
@@ -451,14 +453,124 @@ export const DOOR_CHECKPOINT = {
   y: surfaceSpan('boss-ledge').top - PLAYER_HALF_HEIGHT,
 } as const;
 
-// --- Enemyk (a 3. iterációban töltjük fel) ----------------------------------
+// --- Enemyk -----------------------------------------------------------------
 
 /**
- * Egyelőre ÜRES: az 1. iteráció célja a járható váz. A tömb azért létezik már most, hogy a
- * `Level2Scene` enemy-kezelése (spawn/reset/collider-regisztráció) a Level 1 mintája szerint
- * be legyen kötve, és a 3. iteráció tisztán adat-hozzáadás legyen.
+ * 10 CrowHarvester + 4 Gravecaller.
+ *
+ * A `patrolMinX/patrolMaxX` KIZÁRÓLAG a nyugalmi séta-körzet — az ÜLDÖZÉS (illetve a
+ * Gravecallernél az ÁTHELYEZKEDÉS) határa ennél tágabb, és nem itt van felsorolva, hanem az
+ * `enemyChaseBounds()` SZÁMÍTJA a felület pereméből és a tüskemezőkből. Így egy platform
+ * elmozdítása vagy egy új mező automatikusan átméretezi a pórázt.
+ *
+ * Négy, egymástól független kényszer fogja közre a pozíciókat — mind a négyet unit teszt őrzi:
+ *
+ *   1. a TEST se a peremen, se tüskemezőn ne lógjon túl;
+ *   2. egyetlen patrol se érjen a kaszák söprési sávjának `REAPER_ENEMY_CLEARANCE`-ébe;
+ *   3. a tüske-szigeteken a patrol-határ maradjon `ATTACK_RANGE`-en KÍVÜL a sziget peremétől
+ *      (különben a szigetre landoló player kikerülhetetlen csapást kapna);
+ *   4. a létra KIJÁRATÁNÁL (a felső felületen) ne álljon enemy `LADDER_EXIT_CLEARANCE`-en belül.
+ *
+ * A `F` szakaszon SZÁNDÉKOSAN nincs enemy: két független kasza-időzítés már önmagában a
+ * szakasz leckéje, és egy lövedék vagy közelharci lökés ott olyan halált okozna egy 960 px-es
+ * szakadék fölött, amire nem lehet reagálni.
  */
-export const ENEMY_SPAWNS: EnemySpawnDef[] = [];
+export const ENEMY_SPAWNS: EnemySpawnDef[] = [
+  // --- A: bemelegítés. Egyetlen, magányos közelharci ellenfél, tágas sík terepen. ---
+  { id: 'A-crow-1', x: 690, surfaceId: 'G1', patrolMinX: 520, patrolMaxX: 860 },
+
+  // --- C: tüskeritmus. A szigetek harctérré válnak. ---
+  // A KÖZÉPSŐ szigeten (2224–2374) áll: a mezőt átugró player harcba landol. A patrol
+  // mindkét pereme `ATTACK_RANGE`-en (42) kívül van a sziget szélétől (46 és 44 px), tehát a
+  // landolás pillanatában még van ideje megfordulni.
+  { id: 'C-crow-1', x: 2300, surfaceId: 'G2', patrolMinX: 2280, patrolMaxX: 2320 },
+  // A `CP-1` (2860) őre: a checkpointot ki kell érdemelni.
+  { id: 'C-crow-2', x: 2835, surfaceId: 'G2', patrolMinX: 2810, patrolMaxX: 2865 },
+
+  // --- D: a lépcsőt lövő caster. ---
+  // A patrol SZŰK (30 px), és nem esztétikai döntés: a `D2` (3436–3564) TELJES hosszának a
+  // `DETECTION_RANGE`-en (400) belül kell lennie, hogy a lépcsőre lépő playert azonnal
+  // észlelje. A legrosszabb eset (patrolMax -> D2 távolabbi pereme) így 374 px.
+  //
+  // ISMERT, ELFOGADOTT KORLÁT (ugyanaz, mint a Level 1-en): a `D1`-en (+100) álló player a
+  // vertikális detektálási sávban van (66 <= 80), tehát a caster TÜZEL rá, de a bolt sávja
+  // [216, 232] a teste [272, 318] fölött megy el. Itt ez inkább előny: a lövedékek a fej
+  // fölött elhúzva telegrafálják a fenyegetést, MIELŐTT a player felmászna a lőtt zónába.
+  {
+    id: 'D-caster-1',
+    x: 3795,
+    surfaceId: 'D-C1',
+    patrolMinX: 3780,
+    patrolMaxX: 3810,
+    type: 'gravecaller',
+  },
+
+  // --- E: talajszintű kombinált harc. ---
+  // A kasza ELŐTT, a söprési sáv biztonsági zónáján kívül (a teste 3860-ig ér, a zóna 3880.9-től).
+  { id: 'E-crow-1', x: 3800, surfaceId: 'G3', patrolMinX: 3760, patrolMaxX: 3850 },
+
+  // A pálya ELSŐ TALAJON álló casterje — tudatos megfordítása a Level 1-es döntésnek, ahol a
+  // caster mindig platformon állt, és a futósáv szándékosan kimaradt a hatóköréből. Itt maga
+  // a futósáv lőtt terület: a bolt sávja [386, 402], a talajon álló player teste [372, 418].
+  //
+  // A kasza+tüske szakaszra is rálát (DETECTION_RANGE 400), és ez SZÁNDÉKOS: aki megáll a
+  // penge ritmusát számolgatni, azt megbünteti. A bolt viszont VÍZSZINTES, tehát pont az az
+  // ugrás kerüli ki, amit a tüskék miatt amúgy is meg kell tenni.
+  {
+    id: 'E-caster-1',
+    x: 4340,
+    surfaceId: 'G3',
+    patrolMinX: 4300,
+    patrolMaxX: 4380,
+    type: 'gravecaller',
+  },
+  // A caster kísérője: távolsági és közelharci nyomás egyszerre. A lift alatt patrolozik, de
+  // arra NEM tud felmenni — a liften álló player 70 px-re van fölötte, a CrowHarvester
+  // `VERTICAL_DETECTION_RANGE`-e viszont 50, tehát a lift valódi menekülőút.
+  { id: 'E-crow-2', x: 4485, surfaceId: 'G3', patrolMinX: 4440, patrolMaxX: 4530 },
+
+  // --- G: záró aréna, HÁROM cella a két tüskemező között. ---
+  { id: 'G-crow-1', x: 5775, surfaceId: 'G4', patrolMinX: 5700, patrolMaxX: 5850 },
+  // A 2. cella (6064–6256) a pálya legszűkebb harctere: KÉT lény osztozik rajta.
+  { id: 'G-crow-2', x: 6140, surfaceId: 'G4', patrolMinX: 6120, patrolMaxX: 6160 },
+  { id: 'G-crow-3', x: 6190, surfaceId: 'G4', patrolMinX: 6180, patrolMaxX: 6200 },
+  // A 3. cella talajon álló casterje: a második tüskemezőn átkelő playert fogadja.
+  {
+    id: 'G-caster-1',
+    x: 6440,
+    surfaceId: 'G4',
+    patrolMinX: 6400,
+    patrolMaxX: 6480,
+    type: 'gravecaller',
+  },
+  // A FELSŐ útvonal ára. A `G-P3`-on áll, tehát a felső sorral AZONOS magasságban: a bolt
+  // sávja [276, 292], az ott álló player teste [262, 308]. A `G-P1` (az első hop) még kívül
+  // esik a hatókörén — a nyomás a második hoptól kezdődik, és a `G-P3`-ra felugorva karddal
+  // lerendezhető.
+  {
+    id: 'G-caster-2',
+    x: 6415,
+    surfaceId: 'G-P3',
+    patrolMinX: 6390,
+    patrolMaxX: 6440,
+    type: 'gravecaller',
+  },
+
+  // --- H: a létrát őrző pár. ---
+  // A létrán NEM lehet támadni (dokumentált, tudatos korlát), ezért a `H-crow-1`-et a létra
+  // ELŐTT le kell rendezni — ettől "kapuőr" a szakasz.
+  { id: 'H-crow-1', x: 6630, surfaceId: 'G4', patrolMinX: 6560, patrolMaxX: 6700 },
+  // A párkányon, de a létra KIJÁRATÁTÓL (6790) 100 px-re: a felmászó playert ne érje
+  // kikerülhetetlen csapás abban a pillanatban, amikor még a létrán áll.
+  { id: 'H-crow-2', x: 6940, surfaceId: 'H-ledge', patrolMinX: 6890, patrolMaxX: 6990 },
+];
+
+/**
+ * A létra KIJÁRATA körüli tiltott sáv. Csak a FELSŐ felületre vonatkozik: a létra TÖVÉNÉL a
+ * player normálisan tud harcolni (a `H-crow-1` kifejezetten oda van szánva kapuőrnek), a
+ * tetején viszont védtelenül lép ki.
+ */
+export const LADDER_EXIT_CLEARANCE = 80;
 
 /** A talaj-szint referenciája a scene-nek (a tüskék és a jelölők ide ülnek). */
 export const LEVEL2_GROUND_TOP = GROUND_TOP;
