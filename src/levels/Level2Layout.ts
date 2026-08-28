@@ -140,7 +140,15 @@ export const SPIKE_FIELDS: SpikeFieldDef[] = [
   // --- C: tüskeritmus. Négy mező, köztük 150 px-es biztonságos szigetekkel. ---
   // Egyik sem szélesebb 128-nál: a player TESTÉVEL együtt 156 px-t kell átérni, ami a
   // MAX_SAFE_GAP (175) alatt van, tehát tiszta átkelésnél 0 sebzés.
-  { id: 'C-spikes-1', startX: 1850, endX: 1946, surfaceId: 'G2' }, // 96
+  // Az ELSŐ mező PONTOSAN a szegmens bal peremén kezdődik (user-döntés): nincs biztonságos
+  // landolósáv előtte, tehát a `B-mover-2`-ről EGYENESEN át kell ugrani rajta. A geometria
+  // ezt precíziós ugrássá teszi, és a unit teszt mindkét felét őrzi:
+  //   - a mover JOBB szélsőállásából (perem 1616) a mező mögé 208 px -> a lejtmenetes
+  //     hatótáv (268) bőven elég;
+  //   - a BAL szélsőállásból (perem 1536) 288 px -> NEM elérhető.
+  // A hiba ára viszont NEM halál: a gap 1700-nál véget ér, tehát a rövidre sikerült ugrás a
+  // tüskékre esik (15 sebzés), nem a szakadékba.
+  { id: 'C-spikes-1', startX: 1700, endX: 1796, surfaceId: 'G2' }, // 96
   { id: 'C-spikes-2', startX: 2096, endX: 2224, surfaceId: 'G2' }, // 128
   { id: 'C-spikes-3', startX: 2374, endX: 2470, surfaceId: 'G2' }, // 96
   { id: 'C-spikes-4', startX: 2620, endX: 2748, surfaceId: 'G2' }, // 128
@@ -162,11 +170,11 @@ export const SPIKE_FIELDS: SpikeFieldDef[] = [
 // A `y` a sprite KÖZÉPPONTJA, tehát `y = 418 - N + 8` (a lap 16 px magas).
 
 export const PLATFORMS: PlatformDef[] = [
-  // --- A: bemelegítés (0–900). Opcionális perch-ek, nem kötelező útvonal. ---
-  // A1 SZÁNDÉKOSAN +70, nem a doksi +45-je: `MIN_WALK_UNDER_RISE` (62) alatt a lap ELZÁRNÁ
-  // a talajsávot, tehát nem opcionális perch lenne, hanem lépcső, amit meg kell mászni.
-  { id: 'A1', x: 495, y: 356, tiles: 2 }, // +70
-  { id: 'A2', x: 710, y: 306, tiles: 2 }, // +120
+  // --- A: bemelegítés (0–900). ---
+  // NINCS lebegő platform (user-döntés): a szakasz egyetlen dolga, hogy a boss fight után
+  // visszaszoktasson az irányításba egy magányos közelharci ellenfélen. A doksi két
+  // opcionális perch-e a gyakorlatban semmit nem adott hozzá — a crow karddal is, tűzgolyóval
+  // is lerendezhető a talajról.
 
   // --- B: mozgó platform bevezetése (gap 900–1700). ---
   // A két mozgó lap KÖZÖTTI szilárd pihenő: a player itt gyakorolhatja a "leszállást" úgy,
@@ -419,22 +427,28 @@ export interface CheckpointDef {
 }
 
 /**
- * HÁROM köztes checkpoint, mind ÉRINTÉSRE aktiválódik (az ajtó `E`-jével szemben, hogy ne
- * versenyezzenek annak promptjával) — a Level 1 köztes checkpointjának mintája.
+ * EGYETLEN köztes checkpoint (+ a pálya végi ajtó). ÉRINTÉSRE aktiválódik, az ajtó `E`-jével
+ * szemben, hogy ne versenyezzenek egymás promptjával — a Level 1 köztes checkpointjának mintája.
  *
- * A levezetés szabálya: *checkpoint kerül minden olyan szakasz ELÉ, ami zuhanással tud ölni.*
- * A `B` a kivétel: ott a pálya eleje van 900 px-re, tehát a visszaút amúgy is olcsó.
+ * **Eltérés a `docs/level2-layout.md` 16. pontjától** (user-döntés). A doksi hármat írt elő, a
+ * *„checkpoint kerül minden olyan szakasz ELÉ, ami zuhanással tud ölni"* szabályból levezetve —
+ * de maga is jelezte (22/1), hogy három valószínűleg sok. A `CP-1` (2860) és a `CP-3` (5620)
+ * törölve.
  *
- * Három sok lehet egy 7200 px-es pályán — a doksi 22/1 pontja szerint az első kézi
- * végigjátszásig maradnak, utána mérés alapján döntünk a `CP-3`-ról.
+ * A megmaradt pont helye ezért MOST MÁR nem szabad: ez az egyetlen köztes mentés, tehát oda
+ * kell tenni, ahol a LEGTÖBB szakadékot hagyja maga mögött. A gap `B` és a gap `D` is előtte
+ * van, a gap `F` (960 px, a pálya leghosszabbja) utána — aki egyszer megérintette, annak sem a
+ * mozgó platformokat, sem a caster-tűz alatti lépcsőt nem kell újra teljesítenie.
+ *
+ * KÖVETKEZMÉNY, amivel számolni kell: az `A`–`E` szakaszokban a respawn a PÁLYA ELEJE, tehát
+ * egy halál a `D` szakadékban a `B` és a `C` újrajátszását jelenti. Ez a nehézség-hangolás
+ * elsődleges visszavehető eleme.
  */
 export const CHECKPOINTS: CheckpointDef[] = [
-  { id: 'CP-1', x: 2860, surfaceId: 'G2' }, // a C szakasz vége, a D szakadék ELŐTT
   // A lift TETEJÉN, hogy az F-ben elhalálozó player ne kényszerüljön újra liftezni.
   // 4580, nem 4600: az `E-ledge` átlóg a gap F fölé, és a checkpointnak a szakadék PEREME
   // ELŐTT kell lennie — pont ott, ahol a liftről lelépve a player földet ér.
   { id: 'CP-2', x: 4580, surfaceId: 'E-ledge' },
-  { id: 'CP-3', x: 5620, surfaceId: 'G4' }, // közvetlenül az F kasza-szakadék UTÁN
 ];
 
 /** A respawn-pont: a felszínen álló player középpontja. */
@@ -479,12 +493,37 @@ export const ENEMY_SPAWNS: EnemySpawnDef[] = [
   // --- A: bemelegítés. Egyetlen, magányos közelharci ellenfél, tágas sík terepen. ---
   { id: 'A-crow-1', x: 690, surfaceId: 'G1', patrolMinX: 520, patrolMaxX: 860 },
 
+  // --- B: a két mozgó lap közötti pihenő ŐRE (user-döntés). ---
+  // Ez a projekt EGYETLEN olyan casterje, ami SZÁNDÉKOSAN lövi a mozgó platformon állót — a
+  // `B-pillar` (+50) pontosan a két mover szintjén van, tehát a bolt sávja [336, 352] teljes
+  // egészében beleesik a lapon álló player testébe [322, 368]. A layout-spec 19/4 invariánsa
+  // ezt tiltaná; itt DEKLARÁLT kivétel, és a teszt csak a NEM deklarált metszéseket bukja.
+  //
+  // Miért vállalható itt, és miért nem lenne az máshol:
+  //   - a lövedék NEM lök vissza (a `Player.takeDamage()` a velocityhez sem nyúl), tehát a
+  //     találat 10 sebzés, NEM a szakadékba taszítás — nincs kikerülhetetlen HALÁL;
+  //   - a `B` szakasz a pálya elején van, a respawn a start: a hiba ára a legolcsóbb;
+  //   - a `B-mover-1` TÁVOLABBI szélsőállása kicsúszik a `DETECTION_RANGE`-ből (440 > 400),
+  //     tehát a fenyegetés pont akkor éled fel, amikor a lap a pillér felé közelít — a
+  //     telegraph és a leszállási ablak egybeesik.
+  //
+  // A `G1` peremén álló playert (394) a vertikális kapu még beengedi (46 <= 80), de a bolt a
+  // feje fölött megy el — ez itt ELŐNY: a bolt látványa figyelmeztet, mielőtt felszállnál.
+  {
+    id: 'B-caster-1',
+    x: 1355,
+    surfaceId: 'B-pillar',
+    patrolMinX: 1330,
+    patrolMaxX: 1380,
+    type: 'gravecaller',
+  },
+
   // --- C: tüskeritmus. A szigetek harctérré válnak. ---
   // A KÖZÉPSŐ szigeten (2224–2374) áll: a mezőt átugró player harcba landol. A patrol
   // mindkét pereme `ATTACK_RANGE`-en (42) kívül van a sziget szélétől (46 és 44 px), tehát a
   // landolás pillanatában még van ideje megfordulni.
   { id: 'C-crow-1', x: 2300, surfaceId: 'G2', patrolMinX: 2280, patrolMaxX: 2320 },
-  // A `CP-1` (2860) őre: a checkpointot ki kell érdemelni.
+  // A `C` szakasz záró harca, a `G2` biztonságos végén.
   { id: 'C-crow-2', x: 2835, surfaceId: 'G2', patrolMinX: 2810, patrolMaxX: 2865 },
 
   // --- D: a lépcsőt lövő caster. ---
@@ -531,12 +570,21 @@ export const ENEMY_SPAWNS: EnemySpawnDef[] = [
 
   // --- G: záró aréna, HÁROM cella a két tüskemező között. ---
   { id: 'G-crow-1', x: 5775, surfaceId: 'G4', patrolMinX: 5700, patrolMaxX: 5850 },
-  // A 2. cella (6064–6256) a pálya legszűkebb harctere: KÉT lény osztozik rajta.
+  // A 2. cella (6064–6256) a pálya legszűkebb harctere, a `G-P2` lap alatt. KÉT lény
+  // osztozik rajta, de KÜLÖNBÖZŐ szerepben (user-döntés): elöl a közelharci crow, mögötte
+  // caster. A player így nem tud egyszerűen berohanni — a crow tartja fel, amíg a caster lő.
   { id: 'G-crow-2', x: 6140, surfaceId: 'G4', patrolMinX: 6120, patrolMaxX: 6160 },
-  { id: 'G-crow-3', x: 6190, surfaceId: 'G4', patrolMinX: 6180, patrolMaxX: 6200 },
-  // A 3. cella talajon álló casterje: a második tüskemezőn átkelő playert fogadja.
   {
     id: 'G-caster-1',
+    x: 6190,
+    surfaceId: 'G4',
+    patrolMinX: 6180,
+    patrolMaxX: 6200,
+    type: 'gravecaller',
+  },
+  // A 3. cella talajon álló casterje: a második tüskemezőn átkelő playert fogadja.
+  {
+    id: 'G-caster-2',
     x: 6440,
     surfaceId: 'G4',
     patrolMinX: 6400,
@@ -548,7 +596,7 @@ export const ENEMY_SPAWNS: EnemySpawnDef[] = [
   // esik a hatókörén — a nyomás a második hoptól kezdődik, és a `G-P3`-ra felugorva karddal
   // lerendezhető.
   {
-    id: 'G-caster-2',
+    id: 'G-caster-3',
     x: 6415,
     surfaceId: 'G-P3',
     patrolMinX: 6390,

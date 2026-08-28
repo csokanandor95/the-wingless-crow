@@ -506,10 +506,15 @@ describe('SPIKE_FIELDS', () => {
       const surface = surfaceSpan(surfaceId);
       const sorted = [...fields].sort((a, b) => a.startX - b.startX);
 
-      expect(
-        sorted[0].startX - surface.left,
-        `${sorted[0].id} előtt nincs elég talaj`
-      ).toBeGreaterThanOrEqual(SAFE_BAND);
+      // KIVÉTEL: ha a mező PONTOSAN a szegmens peremén kezdődik, akkor szándékosan nincs
+      // landolósáv előtte — a playernek a szakadékon túlról, egyenesen át kell ugrania rajta
+      // (lásd a `C-spikes-1`-et és a következő tesztet, ami ezt bizonyítja is).
+      if (sorted[0].startX > surface.left) {
+        expect(
+          sorted[0].startX - surface.left,
+          `${sorted[0].id} előtt nincs elég talaj`
+        ).toBeGreaterThanOrEqual(SAFE_BAND);
+      }
       expect(
         surface.right - sorted[sorted.length - 1].endX,
         `${sorted[sorted.length - 1].id} után nincs elég talaj`
@@ -521,6 +526,43 @@ describe('SPIKE_FIELDS', () => {
           `${sorted[i - 1].id} és ${sorted[i].id} között nincs biztonságos sáv`
         ).toBeGreaterThanOrEqual(SAFE_BAND);
       }
+    }
+  });
+
+  it('a szegmens PEREMÉN kezdődő mező CSAK a mozgó lap közelebbi végállásából ugorható át', () => {
+    // A `C-spikes-1` design-szándéka futtatható állításként (user-döntés): a mező előtt nincs
+    // biztonságos landolósáv, tehát a `B-mover-2`-ről egyenesen át kell ugrani rajta — és ez
+    // CSAK a lap jobb szélsőállásából megy. Két állítás, mert az egyik önmagában semmit nem
+    // érne: ha a távolabbi állásból is menne, a mozgó platform időzítése lényegtelen lenne.
+    const edgeFields = SPIKE_FIELDS.filter(
+      (f) => f.startX === surfaceSpan(f.surfaceId).left
+    );
+    expect(edgeFields.length).toBeGreaterThan(0);
+
+    for (const field of edgeFields) {
+      // A szakadékon túli mozgó lap két végállása; a "közelebbi" a jobb szélső.
+      const extremes = MOVING_PLATFORMS.flatMap(movingPlatformExtremes)
+        .filter((span) => span.right < field.startX)
+        .sort((a, b) => a.right - b.right);
+      expect(extremes.length, `${field.id} elé nincs kilövőállás`).toBeGreaterThan(0);
+
+      const landing = field.endX + PLAYER_BODY_WIDTH / 2;
+      const jumpFrom = (span: Span): { distance: number; reach: number } => ({
+        distance: landing - (span.right - PLAYER_BODY_WIDTH / 2),
+        reach: horizontalReachForRise(span.top - GROUND_TOP),
+      });
+
+      const near = jumpFrom(extremes[extremes.length - 1]);
+      expect(
+        near.distance,
+        `${field.id} a közelebbi végállásból sem ugorható át`
+      ).toBeLessThanOrEqual(near.reach);
+
+      const far = jumpFrom(extremes[0]);
+      expect(
+        far.distance,
+        `${field.id} a TÁVOLABBI végállásból is átugorható — a mover időzítése lényegtelenné válik`
+      ).toBeGreaterThan(far.reach);
     }
   });
 
@@ -838,11 +880,14 @@ describe('ENEMY_SPAWNS', () => {
     }
   });
 
-  it('a doksi darabszámai: 10 CrowHarvester + 4 Gravecaller', () => {
+  it('9 CrowHarvester + 6 Gravecaller', () => {
+    // A doksi 10 + 4-et írt; a hangoló kör KÉT casterrel bővítette (a `B-pillar` őre) és
+    // eggyel átsorolta (a `G` 2. cellájában a második crow -> caster), hogy a szűk cellában
+    // NE két azonos szerep álljon egymás mellett.
     const crows = ENEMY_SPAWNS.filter((e) => enemyType(e) === 'crow-harvester');
     const casters = ENEMY_SPAWNS.filter((e) => enemyType(e) === 'gravecaller');
-    expect(crows).toHaveLength(10);
-    expect(casters).toHaveLength(4);
+    expect(crows).toHaveLength(9);
+    expect(casters).toHaveLength(6);
   });
 
   it('EGYETLEN enemy sem áll mozgó platformon', () => {
@@ -1021,14 +1066,43 @@ describe('Gravecallerek (Enemy 2) elhelyezése', () => {
    * hatókörén kívül esik, a nyomás csak a másodiktól kezdődik.
    */
   const CASTER_TARGETS: Record<string, string[]> = {
+    // A `B-mover-*` MOZGÓ platform, és ez SZÁNDÉKOS kivétel a 19/4 invariáns alól: a pillér
+    // pontosan a moverek szintjén van, tehát a bolt a rajtuk állót éri. A deklaráció maga a
+    // kivétel — ami NINCS itt felsorolva, azt a lenti negatív teszt továbbra is bukja.
+    'B-caster-1': ['B-mover-1', 'B-mover-2'],
     'D-caster-1': ['D2', 'D3'],
     'E-caster-1': ['G3'],
     'G-caster-1': ['G4'],
-    'G-caster-2': ['G-P2', 'G-P3'],
+    'G-caster-2': ['G4'],
+    'G-caster-3': ['G-P2', 'G-P3'],
   };
 
   const casterCenterY = (surfaceId: string): number =>
     surfaceSpan(surfaceId).top - GRAVECALLER_SPAWN_OFFSET;
+
+  /**
+   * Egy cél-id feloldása arra a sávra, amit a rajta ÁLLÓ player teste elfoglal. A cél lehet
+   * talaj-szegmens, statikus platform VAGY mozgó lap; utóbbinál a mozgás minden állását
+   * lefedő UNIÓT adjuk (a `B-mover-*` két végállása azonos magasságú, tehát ott pontos).
+   */
+  const targetBand = (id: string): { top: number; bottom: number } => {
+    const mover = MOVING_PLATFORMS.find((m) => m.id === id);
+    if (mover) {
+      const tops = movingPlatformExtremes(mover).map((s) => s.top);
+      return { top: Math.min(...tops) - PLAYER_BODY_HEIGHT, bottom: Math.max(...tops) };
+    }
+    const top = surfaceSpan(id).top;
+    return { top: top - PLAYER_BODY_HEIGHT, bottom: top };
+  };
+
+  /** A cél-felületen álló player KÖZÉPPONTJA (mozgó lapnál a legtávolabbi állás). */
+  const targetCenterYs = (id: string): number[] => {
+    const mover = MOVING_PLATFORMS.find((m) => m.id === id);
+    const tops = mover
+      ? movingPlatformExtremes(mover).map((s) => s.top)
+      : [surfaceSpan(id).top];
+    return tops.map((top) => top - PLAYER_HALF_HEIGHT);
+  };
 
   /** A kilőtt lövedék függőleges sávja (a physics body 16x16, origin 0.5). */
   const projectileBand = (caster: (typeof casters)[number]) => {
@@ -1039,12 +1113,6 @@ describe('Gravecallerek (Enemy 2) elhelyezése', () => {
     };
   };
 
-  /** Egy `T` tetejű felületen álló player TESTE — a talpa a felszínen. */
-  const playerBand = (surfaceId: string) => {
-    const top = surfaceSpan(surfaceId).top;
-    return { top: top - PLAYER_BODY_HEIGHT, bottom: top };
-  };
-
   it('mindegyikhez tartozik deklarált cél-felület', () => {
     expect(casters.length).toBeGreaterThan(0);
     for (const caster of casters) {
@@ -1053,12 +1121,16 @@ describe('Gravecallerek (Enemy 2) elhelyezése', () => {
     }
   });
 
-  it('KETTŐ a TALAJON áll — tudatos megfordítása a Level 1-es döntésnek', () => {
+  it('HÁROM a TALAJON áll — tudatos megfordítása a Level 1-es döntésnek', () => {
     // A Level 1-en minden caster platformon állt, és a futósáv szándékosan kimaradt a
     // hatókörükből. Itt maga a futósáv lőtt terület, és ez az egyik oka, hogy a Level 2-n
     // nem lehet átszaladni.
     const onGround = casters.filter((c) => GROUND_SEGMENTS.some((g) => g.id === c.surfaceId));
-    expect(onGround.map((c) => c.id).sort()).toEqual(['E-caster-1', 'G-caster-1']);
+    expect(onGround.map((c) => c.id).sort()).toEqual([
+      'E-caster-1',
+      'G-caster-1',
+      'G-caster-2',
+    ]);
   });
 
   it('a lövedék ELTALÁLJA a cél-felületeken álló playert', () => {
@@ -1068,13 +1140,13 @@ describe('Gravecallerek (Enemy 2) elhelyezése', () => {
     for (const caster of casters) {
       const bolt = projectileBand(caster);
 
-      for (const surfaceId of CASTER_TARGETS[caster.id]) {
-        const body = playerBand(surfaceId);
+      for (const targetId of CASTER_TARGETS[caster.id]) {
+        const body = targetBand(targetId);
         const overlap = Math.min(bolt.bottom, body.bottom) - Math.max(bolt.top, body.top);
 
         expect(
           overlap,
-          `${caster.id}: a lövedék elmegy a(z) ${surfaceId}-n álló player mellett`
+          `${caster.id}: a lövedék elmegy a(z) ${targetId}-n álló player mellett`
         ).toBeGreaterThan(0);
       }
     }
@@ -1084,11 +1156,13 @@ describe('Gravecallerek (Enemy 2) elhelyezése', () => {
     for (const caster of casters) {
       const casterY = casterCenterY(caster.surfaceId);
 
-      for (const surfaceId of CASTER_TARGETS[caster.id]) {
-        expect(
-          Math.abs(surfaceSpan(surfaceId).top - PLAYER_HALF_HEIGHT - casterY),
-          `${caster.id}: nem venné észre a(z) ${surfaceId}-n álló playert`
-        ).toBeLessThanOrEqual(GRAVECALLER_VERTICAL_RANGE);
+      for (const targetId of CASTER_TARGETS[caster.id]) {
+        for (const centerY of targetCenterYs(targetId)) {
+          expect(
+            Math.abs(centerY - casterY),
+            `${caster.id}: nem venné észre a(z) ${targetId}-n álló playert`
+          ).toBeLessThanOrEqual(GRAVECALLER_VERTICAL_RANGE);
+        }
       }
     }
   });
@@ -1153,6 +1227,10 @@ describe('Gravecallerek (Enemy 2) elhelyezése', () => {
       const reachRight = caster.patrolMaxX + GRAVECALLER_DETECTION_RANGE;
 
       for (const mover of MOVING_PLATFORMS) {
+        // A DEKLARÁLT célok kivételek: a `B-caster-1` szándékosan lövi a moverjeit (lásd a
+        // CASTER_TARGETS kommentjét). Ami nincs deklarálva, az továbbra is hiba.
+        if (CASTER_TARGETS[caster.id].includes(mover.id)) continue;
+
         const path = movingPlatformPathBounds(mover);
         if (path.right < reachLeft || path.left > reachRight) continue;
 
@@ -1211,20 +1289,34 @@ describe('CHECKPOINTS', () => {
     }
   });
 
-  it('MINDEN zuhanással ölő szakasz előtt van checkpoint (a B kivételével)', () => {
-    // A szabály, amiből a checkpointok levezethetők. A `B` a kivétel: ott a pálya eleje van
-    // 900 px-re, tehát a visszaút amúgy is olcsó.
-    const gaps = groundGaps();
-    const checkpointXs = CHECKPOINTS.map((c) => c.x);
+  it('az EGYETLEN köztes checkpoint a leghosszabb szakadék ELŐTT áll', () => {
+    // A doksi eredeti szabálya („checkpoint minden zuhanással ölő szakasz elé") a `CP-1` és a
+    // `CP-3` törlésével (user-döntés) érvényét vesztette. Ami HELYETTE igaz, és amit el lehet
+    // rontani: egyetlen mentési pontnál annak a LEGDRÁGÁBB szakasz elé kell kerülnie.
+    expect(CHECKPOINTS).toHaveLength(1);
 
-    for (const gap of gaps.slice(1)) {
-      const hasCheckpointBefore = checkpointXs.some(
-        (x) => x < gap.startX && x > gap.startX - 1500
-      );
+    const gaps = groundGaps();
+    const longest = gaps.reduce((a, b) => (b.width > a.width ? b : a));
+
+    expect(
+      CHECKPOINTS[0].x,
+      'a checkpoint nem a leghosszabb szakadék előtt van'
+    ).toBeLessThanOrEqual(longest.startX);
+  });
+
+  it('a köztes checkpoint MÖGÖTT hagyja az összes többi szakadékot', () => {
+    // Ez adja a helyének a valódi értékét: aki megérintette, annak sem a mozgó platformokat
+    // (gap B), sem a caster-tűz alatti lépcsőt (gap D) nem kell újra teljesítenie. Ha valaki
+    // balra tolná, egy `F`-beli halál a `D` újrajátszását is jelentené.
+    const gaps = groundGaps();
+    const longest = gaps.reduce((a, b) => (b.width > a.width ? b : a));
+
+    for (const gap of gaps) {
+      if (gap === longest) continue;
       expect(
-        hasCheckpointBefore,
-        `a ${gap.startX}–${gap.endX} szakadék előtt nincs checkpoint`
-      ).toBe(true);
+        gap.endX,
+        `a ${gap.startX}–${gap.endX} szakadék a checkpoint UTÁN van — újra kellene játszani`
+      ).toBeLessThanOrEqual(CHECKPOINTS[0].x);
     }
   });
 });
