@@ -52,6 +52,36 @@ import fireballCastUrl from '../../assets/audio/sfx/fireball-2.wav';
 import bossProjectileUrl from '../../assets/audio/sfx/fireball-3.wav';
 import bossSpellImpactUrl from '../../assets/audio/sfx/firebuff-2.wav';
 import gravecallerCastUrl from '../../assets/audio/sfx/fireball-1.wav';
+// Player léptek + ugrás: UGYANEZ a TomMusic csomag, a `Footsteps/Stone/` almappából.
+// A csomag minden lépéshangot KÉT változatban ad: `Stone X` és `Stone Chain X`. A kettő
+// alapfelvétele azonos csúcsú és időzítésű, a Chain-en viszont rá van rétegezve egy
+// láncing-csörgés (mérve: magasfrekvenciás energia-arány run 0.121 -> 0.165, jump
+// 0.267 -> 0.501).
+//
+// A KETTŐ KÖZÜL NEM UGYANAZ NYER — és ez kézi teszten dőlt el, nem elvből:
+//  - a LÉPÉS a `Chain` változat: a csörgés egy 285ms-os kadenciában a páncélos lovag
+//    járásaként olvas;
+//  - az UGRÁS viszont a SIMA változat. A Chain-jump borítékja ~300ms-nál VISSZAEMELKEDIK
+//    a csúcs 81%-ára (a simánál csak 45%), tehát a hang VÉGÉN külön csörgő/ciripelő
+//    utórezgés ül — a levegőben lévő karakter alatt ez indokolatlan és zavaró.
+// Ha valaha visszacserélnéd: a hangerőt ÚJRA KELL SZÁMOLNI a mért csúcsból (lásd az
+// AudioManager hangerő-tábláját). Itt a csere nem járt vele: 0.0811 -> 0.0800, 1.4%.
+import playerFootstepUrl from '../../assets/audio/sfx/stone-chain-run-5.wav';
+import playerJumpUrl from '../../assets/audio/sfx/stone-jump.wav';
+// Enemy halál-hangok: "Monster Growls Attack and Deaths V.1". A csomagban NINCS
+// licencszöveg, csak egy `Authors1.png` szerző-kép (Lazy Spartan Games / Michael Edwards) —
+// nyitott jogi tétel, publikálás előtt tisztázandó (lásd CLAUDE.md). Az eredeti fájlnevek
+// megtartva (`necroHurt` / `necroDeath (2)`): ez a kapocs a forráscsomaghoz.
+// (A `*SfxUrl` utótag KELL: a `gravecallerDeathUrl` nevet már a Necromancer DEATH SPRITE
+// sheet importja foglalja lentebb.)
+import harvesterDeathSfxUrl from '../../assets/audio/sfx/necro-hurt.wav';
+import gravecallerDeathSfxUrl from '../../assets/audio/sfx/necro-death-2.wav';
+// Player halál. SZÁRMAZTATOTT asset: a forrás `2D helper/sounds/17. Death Groan (Male).wav`
+// KÉT külön felvételt tartalmaz egy fájlban (50-330ms és 575-950ms, közte csend). Egyetlen
+// halálhoz egy nyögés kell, ezért az ELSŐ szakasz van kivágva (0-360ms) + 30ms fade-out a
+// vágás kattanása ellen. Így a hang a 1200ms-os respawn ELŐTT véget ér. A fájl csomag és
+// licenc nélkül érkezett — nyitott jogi tétel (lásd CLAUDE.md).
+import playerDeathUrl from '../../assets/audio/sfx/death-groan-17.wav';
 // Player sprite sheetek (2D_SL_Knight_v1.0, lásd assets/sprites/knight/license.txt).
 // Mind 128x64-es blokkokra van vágva.
 import knightIdleUrl from '../../assets/sprites/knight/Idle.png';
@@ -217,6 +247,11 @@ const SFX_SOUNDS: Array<{ key: string; url: string }> = [
   { key: SFX_KEYS.BOSS_PROJECTILE, url: bossProjectileUrl },
   { key: SFX_KEYS.BOSS_SPELL_IMPACT, url: bossSpellImpactUrl },
   { key: SFX_KEYS.GRAVECALLER_CAST, url: gravecallerCastUrl },
+  { key: SFX_KEYS.PLAYER_FOOTSTEP, url: playerFootstepUrl },
+  { key: SFX_KEYS.PLAYER_JUMP, url: playerJumpUrl },
+  { key: SFX_KEYS.PLAYER_DEATH, url: playerDeathUrl },
+  { key: SFX_KEYS.HARVESTER_DEATH, url: harvesterDeathSfxUrl },
+  { key: SFX_KEYS.GRAVECALLER_DEATH, url: gravecallerDeathSfxUrl },
 ];
 
 // Gravecaller (Enemy 2): öt külön sheet, mind 96x96-os frame-ekkel — a knight

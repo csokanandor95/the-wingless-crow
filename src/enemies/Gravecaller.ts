@@ -403,6 +403,11 @@ export default class Gravecaller extends Phaser.Physics.Arcade.Sprite implements
     this.hpText.setVisible(false);
     (this.body as Phaser.Physics.Arcade.Body).enable = false;
 
+    // Lásd a CrowHarvester.die() kommentjét: ez az emit KIZÁRÓLAG ide kerülhet, a
+    // destroy()-ba soha — különben a resetEnemies() minden respawnnál egyszerre szólaltatná
+    // meg az összes lény haláltusáját.
+    this.emit('gravecaller-death');
+
     this.isReacting = false;
     this.currentAnimKey = null;
     this.updateAnimation();

@@ -283,6 +283,31 @@ konstans + két hívás.
   `4. Cursed Citadel (After Intro & Loop)`-jával, tehát a Level 2 sávja UGYANONNAN jön, és
   nem nyit új tételt. Részletek a nyitott jogi tételeknél.
 
+**Phase 8 — 13. iteráció: PLAYER- ÉS ENEMY-HANGOK kész.** Öt új SFX, a bevett
+esemény→scene minta szerint: **player lépés / ugrás / halál** + a **CrowHarvester és a
+Gravecaller haláltusája**. Új modul nem kellett, de három érdemi tanulság született:
+- **A lépés a projekt első ISMÉTLŐDŐ hangja** — minden addigi SFX diszkrét eseményre szólt.
+  A kadencia levezetett (`FOOTSTEP_INTERVAL_MS = RUN_ANIM_MS / 2 = 285 ms`), és a
+  `lastFootstepAt = null` állapot teszi a futás első lépését azonnalivá. Részletek az
+  Audio szakaszban.
+- **A hangerő hangonként MÉRT**, nem közös: a forrásfájlok csúcsértéke 0.081 és 0.708
+  között szór. Lásd a képletet az Audio szakaszban.
+- **A halál-eventek a `die()`-ba kerültek, nem a `destroy()`-ba** — utóbbi minden
+  respawnnál haláltusa-kórust adna (24. technikai tanulság, unit teszttel őrizve).
+
+**A `Stone` vs. `Stone Chain` kérdésre NEM ugyanaz a válasz a lépésnél és az ugrásnál.**
+A csomag minden lépéshangot két változatban ad; a Chain ugyanaz az alapfelvétel, rárétegezett
+láncing-csörgéssel (mért HF-arány: lépés 0.121 → 0.165, ugrás 0.267 → 0.501).
+- **Lépés: a `Chain` nyert.** A csörgés egy 285 ms-os kadenciában a páncélos lovag
+  járásaként olvas.
+- **Ugrás: a SIMA változat nyert** — user-visszajelzés kézi tesztről („a hang végén van egy
+  csörgő/ciripelő rész, ami zavaró"), amit a mérés meg is nevez: a `Stone Chain Jump`
+  borítékja ~300 ms-nál VISSZAEMELKEDIK a csúcs **81 %**-ára, míg a simáé csak **45 %**-ra.
+  A hang végén tehát külön csörgő utórezgés ül, ami a levegőben lévő karakter alatt
+  indokolatlan. A csúcs gyakorlatilag azonos (0.0811 → 0.0800, 1.4 %), tehát a
+  hangerő-kalibráció **nem változott** — de a szabály szerint ilyenkor mindig újra kell
+  számolni, és ez az eset épp azért jó példa, mert kijött belőle, hogy nem kell módosítani.
+
 **DÖNTÉSI PONT — ELDŐLT (2026-08-26).** A Phase 8 utáni döntési ponton (lásd lentebb és a
 `Project_plan.md` 21. pontjában) a user a **„Többi Enemy típus, Level2 és 2. Boss létrehozása"**
 irányt választotta, a Lore/QA helyett. A sorrend: **Enemy 2 (Caster) → Level 2 → Boss 2**.
@@ -355,7 +380,7 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**16 fájl, 452 teszt** — ebből 6 az animáció-/háttér-/VFX-vezérlést, 2 a **pálya-geometriát** (Level 1 + Level 2), 1 a **mozgó platformot**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**16 fájl, 469 teszt** — ebből 6 az animáció-/háttér-/VFX-vezérlést, 2 a **pálya-geometriát** (Level 1 + Level 2), 1 a **mozgó platformot**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -392,7 +417,17 @@ the-wingless-crow/
 │   │       ├── fireball-1.wav          # Gravecaller lövedék (Spells/)
 │   │       ├── fireball-2.wav          # player tűzgolyó   (Spells/)
 │   │       ├── fireball-3.wav          # boss lövedék      (Spells/)
-│   │       └── firebuff-2.wav          # boss Shadow Spell becsapódás (Spells/)
+│   │       ├── firebuff-2.wav          # boss Shadow Spell becsapódás (Spells/)
+│   │       ├── stone-chain-run-5.wav   # player lépés — a "Chain" (láncing-csörgős) változat
+│   │       ├── stone-jump.wav          # player ugrás — a SIMA változat, SZÁNDÉKOSAN nem a
+│   │                                   # Chain: annak a végén külön csörgő utórezgés ül
+│   │       ├── necro-hurt.wav          # CrowHarvester halál \ Monster Growls Attack and
+│   │       ├── necro-death-2.wav       # Gravecaller halál   / Deaths V.1 — licenc TISZTÁZANDÓ
+│   │       └── death-groan-17.wav      # player halál. SZÁRMAZTATOTT: a forrás
+│   │                                   # `17. Death Groan (Male).wav` KÉT külön felvételt
+│   │                                   # tartalmaz (50-330ms és 575-950ms, közte csend);
+│   │                                   # ebből az ELSŐ van kivágva (0-360ms) + 30ms
+│   │                                   # fade-out. Licenc nélküli fájl — TISZTÁZANDÓ
 │   ├── backgrounds/
 │   │   ├── ruined-city/          # Level 1 parallax rétegek, mind 426x384
 │   │   │   ├── 01-sky.png        # RGB, átlátszatlan ég (#673838 -> #724141)
@@ -1214,6 +1249,40 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   | `BOSS_PROJECTILE` | `fireball-3` | a `'boss-projectile'`-nél; más hang, mint a playeré |
   | `BOSS_SPELL_IMPACT` | `firebuff-2` | `SPELL_IMPACT_MS`-nél, amikor az oszlop FÖLDET ÉR |
   | `GRAVECALLER_CAST` | `fireball-1` | a `'gravecaller-projectile'`-nél; HARMADIK tűzgolyó-hang |
+  | `PLAYER_FOOTSTEP` | `stone-chain-run-5` | futás közben, `FOOTSTEP_INTERVAL_MS`-enként |
+  | `PLAYER_JUMP` | `stone-jump` | a `jump()` grounded-guardja mögül |
+  | `PLAYER_DEATH` | `death-groan-17` | a `die()`-ból (a zuhanás-halált is beleértve) |
+  | `HARVESTER_DEATH` | `necro-hurt` | a CrowHarvester `die()`-jából |
+  | `GRAVECALLER_DEATH` | `necro-death-2` | a Gravecaller `die()`-jából |
+- **A PLAYER LÉPÉSE A PROJEKT EGYETLEN ISMÉTLŐDŐ SFX-e.** Minden más hang diszkrét eseményre
+  szól; ez a `Player.updateFootsteps()` kadenciájára ismétlődik, amíg a player fut.
+  - A kadencia **LEVEZETETT**: `FOOTSTEP_INTERVAL_MS = RUN_ANIM_MS / RUN_FOOTFALLS`
+    (570 / 2 = **285 ms**) a `PlayerAnimations.ts`-ben — egy 8 frame-es futóciklus két
+    talajfogást tartalmaz. Ha a `RUN_ANIM_MS` változik, a lépések vele mozdulnak; a
+    `RUN_FOOTFALLS` az egyetlen hangolópont.
+  - A `lastFootstepAt = null` állapot **kettős szerepű**: azt is jelenti, hogy a player nem
+    fut, és azt is, hogy a következő lépés AZONNAL esedékes. Enélkül a futás indulása egy
+    teljes intervallumig néma lenne — pont a legsúlyosabb pillanat. A `die()` és a
+    `respawn()` is nullázza.
+  - Külön guard a CLIMB / ATTACK / CAST / HURT / JUMP / FALL state-ekre **nem kell**:
+    egyikük sem `RUN`, tehát mind a `null`-ágon némul el.
+- **A PER-HANG HANGERŐ MÉRT, NEM HANGOLT.** A forráscsomagok nincsenek egymáshoz
+  normalizálva: a hullámformák csúcsértéke **0.081 és 0.708** között szór (majdnem 19 dB),
+  tehát közös `DEFAULT_SFX_VOLUME` mellett a lépés hallhatatlan lenne, a halál-nyögés pedig
+  kiabálna. Referencia a bevált kardsuhintás (`sword-attack-2` csúcs 0.287 × 0.5 = **0.1435
+  effektív**), a képlet pedig `volume = (cél-arány × 0.1435) / a forrás mért csúcsa`.
+  A levezetett értékek az `AudioManager.ts`-ben állnak, kommentált táblázattal.
+  **Asset-cserénél a hangerőt ÚJRA KELL SZÁMOLNI** — a régi szám az adott fájl csúcsához
+  tartozott, nem a szerephez. Unit teszt őrzi, hogy a lépés a kard alatt, a player halála
+  pedig fölötte maradjon.
+- **A halál-hangok `DEATH_SFX_DETUNE_RANGE = 0`-t kapnak.** A detune-szórás ISMÉTLŐDŐ hangok
+  gépiessége ellen való (kard, lépés); egy halál egyszeri, drámai esemény, amit egy véletlen
+  elhangolás csak olcsóvá tenne.
+- **A player saját hangjait a `bindPlayerSfx(player, audio)` helper köti be**, nem
+  scene-enként kézzel. A projekt egyébként vállalja a scene-duplikációt, de ez a blokk
+  („mechanikus és alacsony kockázatú") HÁROM scene-ben szó szerint azonos — és egy negyedik
+  (`Boss2Scene`) bekötésekor pont ezt lenne a legkönnyebb elfelejteni. A paramétere
+  `Phaser.Events.EventEmitter`, nem `Player`: így az `AudioManager` nem függ a `Player`-től.
 - **`scene.sound.play(key, config)`, NEM `sound.add()`** — a SoundManager `play()`-e olyan
   one-shot hangot hoz létre, ami a lejátszás végén magától felszabadul. Ezért az SFX-hez
   nincs `this.music`-szerű élettartam-kezelés, **nem exkluzív** (több csapás hangja
@@ -1425,6 +1494,24 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
     fel, és hogy a házak talpa 2 px-rel a felszín ALÁ kerül. Egyik sem volt kitalálható —
     és a `ground-corner`/`ground-wall` csempéket enélkül simán szakadék-peremnek néztem
     volna, holott azok a preview kézzel épített kőházának az alapzata.
+24. **Halál-eventet a `die()`-ba emitts, SOHA a `destroy()`-ba.** A `CrowHarvester` és a
+    `Gravecaller` `destroy()` override-ja a state-et KÖZVETLENÜL `DEAD`-re állítja, `die()`
+    hívása NÉLKÜL (lásd a 18. tanulságot) — a scene-ek `resetEnemies()`-e pedig a player
+    MINDEN halálakor az összes lényt megsemmisíti. A `destroy()`-ból emittálva tehát minden
+    egyes respawn egy 9 (Level 1), illetve 14 (Level 2) hangos haláltusa-kórussal indulna.
+    Ez kézi teszten alattomos: könnyű a „sok enemy van a pályán" számlájára írni. Mindkét
+    enemy-tesztben van rá explicit regressziós eset.
+25. **Egy hangfájl formátumát MÉRD, ne feltételezd — a WAV `fmt ` chunk mezősorrendje
+    könnyen elcsúszik.** A csatornaszám a chunk adat-kezdetétől **+2 bájtra** van
+    (`audioFormat` (2) → `numChannels` (2) → `sampleRate` (4)); a `+0`-t olvasva az
+    `audioFormat` értéke (PCM esetén `1`) mono-nak látszik. Ez a projektben konkrét hibát
+    okozott: a sztereó fájlok hosszát **kétszeresnek** mértem, ami miatt a `17. Death Groan`
+    4,5 s-nak, a `necroDeath (2)` pedig 1,8 s-nak látszott (valójában 2,3 s és 0,9 s), és a
+    hangerő-kalibráció referenciacsúcsa is elcsúszott (0.49 vs. a valós 0.287). **Ellenőrző
+    fogás:** a `byteRate` legyen `sampleRate × numChannels × bits/8`, a `blockAlign` pedig
+    `numChannels × bits/8` — ha nem jön ki, rossz offszetről olvasol. A csomagok ráadásul
+    KEVERTEK: a TomMusic SFX-ek sztereók (és `JUNK` chunkkal kezdődnek, tehát a `fmt ` nem
+    a 12. bájton van), a `necroHurt` viszont 16 kHz mono.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
@@ -1493,6 +1580,19 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   loop-fordulónál újrajátszaná az intrót. A csomag `2. Shadowforge Convergence (Intro).mp3`
   + `(Loop).mp3` párja egy intro→loop láncolással jobb lenne, de ahhoz az `AudioManager`
   zene-ágát bővíteni kellene (jelenleg egyetlen, exkluzív sávot kezel) — külön iteráció.
+- **NYITOTT JOGI TÉTEL (ÚJ):** az enemy halál-hangok forráscsomagja (*Monster Growls Attack
+  and Deaths V.1*, `2D helper/sounds/…`) **nem tartalmaz licencszöveget** — egyetlen
+  `Authors1.png` szerző-kép van benne: **Lazy Spartan Games — Michael Edwards, Sole
+  Proprietorship Productions**. A csomag a `Credits.txt`-ben **sem szerepel**, tehát oda
+  felveendő. A feltételeket a letöltési oldalról kell visszakeresni **a repo nyilvánossá
+  tétele / GitHub Pages deploy ELŐTT.** Ezért maradt meg a fájlnevekben a csomagbeli név
+  (`necro-hurt` = `necroHurt`, `necro-death-2` = `necroDeath (2)`) — ez a kapocs a forráshoz.
+- **NYITOTT JOGI TÉTEL (ÚJ):** a player halál-nyögése (`death-groan-17.wav`) a
+  `2D helper/sounds/` **gyökerében** álló, csomag és licenc nélküli fájlból származik
+  (`17. Death Groan (Male).wav`) — ugyanaz a kategória, mint a `Bossbackground_1.png`.
+  A fájlnévben megtartott sorszám az egyetlen kapocs. *(Megjegyzés: ugyanott van egy
+  `01. Death Groan (Male).wav` is — a sorszámozás arra utal, hogy egy nagyobb, azonosítatlan
+  hangkészletből származnak.)*
 - **A boss aréna hátterének (`assets/backgrounds/cathedral/boss-arena.png`) licence
   szintén nincs tisztázva** — a forrás a `2D helper/level/Bossbackground_1.png`, ami
   önálló fájlként, licenc nélkül érkezett. A user gyűjtésébe ez is bekerül; publikálás
@@ -1598,11 +1698,13 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
 **Phase 8 – Atmosphere folyamatban.** Az 1. iteráció (boss music) kész; ami még hátravan:
 - **A maradék sound effectek** (Project_plan.md 18. pont listája). A **teljes harci hangkép
   KÉSZ** (7–8. iteráció): kardsuhintás + becsapódás, mindkét tűzgolyó, a Shadow Spell és az
-  enemy/boss közelharc. Ami még hiányzik: a **tűzgolyók becsapódása**, az **enemy→player
-  sebzés** (hurt), a **charge**, valamint az ugrás / halál / checkpoint / léptek. Mindegyik
+  enemy/boss közelharc. A **13. iteráció** hozzátette a **player léptek / ugrás / halál**
+  hangját és **mindkét enemy haláltusáját**. Ami még hiányzik: a **tűzgolyók becsapódása**,
+  az **enemy→player sebzés** (hurt), a **charge**, a **landolás** (a TomMusic csomagban ott
+  a `Stone Chain Land.wav`, közvetlenül a lépés mellett) és a **checkpoint**. Mindegyik
   ugyanaz a három lépés: asset + `SFX_KEYS` bejegyzés + egy `playSfx()` hívás (a nem-scene
   helyeken egy event a bevett minta szerint). A TomMusic csomagban van hozzájuk
-  `Footsteps/`, `Spell Impact`, `Doors Gates and Chests` (checkpoint) és `Torch` is.
+  `Spell Impact`, `Doors Gates and Chests` (checkpoint) és `Torch` is.
 - **Environment sprite-ok** — a player (2. it.), a CrowHarvester (3. it.), a Level 1 háttere
   (4. it.), a boss aréna háttere (5. it.), a boss (6. it.), a Level 1 terrainje (10. it.) és
   a TELJES Level 2 látvány kész; **már csak a hazardok** (tüske, reaper, checkpoint-jelölő),

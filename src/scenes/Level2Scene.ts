@@ -11,6 +11,10 @@ import Gravecaller, {
 import CheckpointSystem from '../systems/CheckpointSystem';
 import LevelCheckpoint from '../systems/LevelCheckpoint';
 import AudioManager, {
+  bindPlayerSfx,
+  DEATH_SFX_DETUNE_RANGE,
+  GRAVECALLER_DEATH_VOLUME,
+  HARVESTER_DEATH_VOLUME,
   LEVEL2_MUSIC_FADE_IN_MS,
   LEVEL_MUSIC_VOLUME,
   MUSIC_KEYS,
@@ -268,7 +272,8 @@ export default class Level2Scene extends Phaser.Scene {
       this.audio.playSfx(SFX_KEYS.FIREBALL_CAST);
     });
 
-    this.player.on('sword-swing', () => this.audio.playSfx(SFX_KEYS.SWORD_SWING));
+    // Suhintás + lépés + ugrás + halál, egy helyről (mindhárom scene ugyanezt köti be).
+    bindPlayerSfx(this.player, this.audio);
 
     this.physics.add.overlap(
       this.enemyProjectiles,
@@ -416,12 +421,27 @@ export default class Level2Scene extends Phaser.Scene {
           this.audio.playSfx(SFX_KEYS.GRAVECALLER_CAST);
         });
 
+        // A haláltusa a `die()`-ból jön, NEM a `destroy()`-ból — így az alábbi
+        // resetEnemies() (ami minden respawnnál mind a 14 lényt megsemmisíti) néma marad.
+        caster.on('gravecaller-death', () =>
+          this.audio.playSfx(SFX_KEYS.GRAVECALLER_DEATH, {
+            volume: GRAVECALLER_DEATH_VOLUME,
+            detuneRange: DEATH_SFX_DETUNE_RANGE,
+          })
+        );
+
         this.gravecallers.push(caster);
         continue;
       }
 
       const enemy = new CrowHarvester(this, def.x, spawnY, bounds);
       enemy.on('harvester-attack', () => this.audio.playSfx(SFX_KEYS.ENEMY_SWING));
+      enemy.on('harvester-death', () =>
+        this.audio.playSfx(SFX_KEYS.HARVESTER_DEATH, {
+          volume: HARVESTER_DEATH_VOLUME,
+          detuneRange: DEATH_SFX_DETUNE_RANGE,
+        })
+      );
       this.enemies.push(enemy);
     }
   }

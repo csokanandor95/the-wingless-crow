@@ -9,6 +9,7 @@ import {
   BODY_OFFSET_Y,
   BODY_WIDTH,
   CAST_ANIM_MS,
+  FOOTSTEP_INTERVAL_MS,
   HURT_ANIM_MS,
   ORIGIN_Y,
   PLAYER_TEXTURES,
@@ -66,6 +67,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
 
   /** Az épp lejátszott animáció kulcsa — lásd playAnim(). */
   private currentAnimKey: string | null = null;
+
+  /**
+   * Az utolsó lépéshang ideje (`scene.time.now`), vagy `null`, ha a player épp NEM fut.
+   * A `null` nem csak "még nem lépett": ez teszi a RUN-ba lépés ELSŐ lépését azonnalivá
+   * — lásd updateFootsteps().
+   */
+  private lastFootstepAt: number | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, PLAYER_TEXTURES.IDLE, 0);
@@ -128,6 +136,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     if (this.isGrounded()) {
       this.setVelocityY(JUMP_VELOCITY);
       this.playerState = PlayerState.JUMP;
+      // A hangot a SCENE játssza le (mint a 'sword-swing'-nél). A grounded-guardon BELÜL
+      // van, tehát a levegőben hiába nyomott ugrás néma marad — hangspam nélkül.
+      this.emit('player-jump');
     }
   }
 
@@ -348,6 +359,11 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.playerState = PlayerState.DEAD;
     this.setVelocity(0, 0);
     this.disableHitbox();
+    this.lastFootstepAt = null;
+    // Egyetlen halál = egyetlen nyögés. A takeDamage() DEAD-guardja miatt a die() nem
+    // futhat le kétszer, és ez az ág fedi a zuhanás-halált is (az takeDamage(getHP())-en
+    // keresztül jön be) — nem kell külön esemény a szakadéknak.
+    this.emit('player-death');
     // A korábbi szürke tint elmaradt: a Death animáció (a lovag összerogy, majd
     // fekve marad az utolsó frame-en) önmagában közli a halált.
     (this.body as Phaser.Physics.Arcade.Body).enable = false;
@@ -377,6 +393,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.ladder = null;
     this.hitTargetsThisAttack.clear();
     this.disableHitbox();
+    // Nullázni KELL: enélkül a halál előtti utolsó lépés ideje maradna érvényben, és a
+    // respawn utáni első lépés a kadencia szerint késne (vagy azonnal duplázna).
+    this.lastFootstepAt = null;
 
     this.playerState = PlayerState.IDLE;
     // Nullázni KELL: a playAnim() guardja miatt egy „ugyanaz a kulcs” egyébként átugorná
@@ -416,6 +435,36 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     // MINDIG lefut, az applyAirborneState() korai return-jeitől függetlenül — különben
     // pont a lockolt state-ek (ATTACK, HURT, DEAD) és a mászás maradnának animáció nélkül.
     this.updateAnimation();
+    this.updateFootsteps();
+  }
+
+  /**
+   * A lépéshangok kadenciája — a projekt EGYETLEN ismétlődő SFX-e. Minden más hang diszkrét
+   * eseményre szól (csapás, cast, halál); ez viszont addig ismétlődik, amíg a player fut,
+   * ezért kell hozzá saját időzítés.
+   *
+   * A `lastFootstepAt = null` állapot kettős szerepű: azt is jelenti, hogy a player NEM fut,
+   * és azt is, hogy a következő lépés AZONNAL esedékes. Enélkül a RUN-ba lépés után egy
+   * teljes intervallumnyi néma futás lenne, ami pont az indulást tenné súlytalanná.
+   *
+   * Külön guard a CLIMB / ATTACK / CAST / HURT / JUMP / FALL / DEAD state-ekre NEM kell:
+   * egyikük sem RUN, tehát mind a `null`-ágon némul el. A `isGrounded()` a redundancia
+   * kedvéért van ott — a RUN state-et ma csak grounded ágon lehet felvenni, de egy jövőbeli
+   * levegő-mozgás nem tehet láthatatlanul lépkedő playert.
+   */
+  private updateFootsteps(): void {
+    if (this.playerState !== PlayerState.RUN || !this.isGrounded()) {
+      this.lastFootstepAt = null;
+      return;
+    }
+
+    const now = this.scene.time.now;
+    if (this.lastFootstepAt !== null && now - this.lastFootstepAt < FOOTSTEP_INTERVAL_MS) {
+      return;
+    }
+
+    this.lastFootstepAt = now;
+    this.emit('footstep');
   }
 
   private applyAirborneState(): void {

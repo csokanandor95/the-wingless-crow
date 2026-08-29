@@ -20,6 +20,7 @@ import Player, {
   CLIMB_SPEED,
   type LadderContact,
 } from '../../src/player/Player';
+import { FOOTSTEP_INTERVAL_MS } from '../../src/player/PlayerAnimations';
 import {
   createMockScene,
   getBody,
@@ -248,6 +249,138 @@ describe('Player', () => {
       expect(getBody(player).velocity.x).toBe(0);
       expect(getBody(player).velocity.y).toBe(0);
       expect(player.playerState).toBe(PlayerState.DEAD);
+    });
+  });
+
+  // A hangokat a SCENE játssza le, a Player csak eseményt bocsát ki — így az entitás nem
+  // függ az AudioManagertől, a kibocsátás pedig itt megfigyelhető. Ezek a tesztek a
+  // KIBOCSÁTÁS FELTÉTELEIT őrzik, nem a hangot.
+  describe('hang-események', () => {
+    function listen(event: string): ReturnType<typeof vi.fn> {
+      const spy = vi.fn();
+      player.on(event, spy);
+      return spy;
+    }
+
+    describe('ugrás', () => {
+      it('földről ugorva emittál', () => {
+        const spy = listen('player-jump');
+        setGrounded(player, true);
+        player.jump();
+
+        expect(spy).toHaveBeenCalledTimes(1);
+      });
+
+      // A guard MÖGÖTT van: a levegőben hiába nyomott ugrás ne adjon hangot.
+      it('levegőben NEM emittál', () => {
+        const spy = listen('player-jump');
+        setGrounded(player, false);
+        player.jump();
+
+        expect(spy).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('halál', () => {
+      it('a halálos sebzés PONTOSAN egyszer emittál', () => {
+        const spy = listen('player-death');
+        player.takeDamage(MAX_HP);
+        flushAllDelayedCalls(scene);
+
+        expect(spy).toHaveBeenCalledTimes(1);
+      });
+
+      // A zuhanás-halál a scene-ben `takeDamage(getHP())`-ként jön be, tehát ugyanezen az
+      // ágon fut le — nem kell hozzá külön esemény.
+      // A DEAD-guard a takeDamage() ELSŐ sorában van, tehát egy már halott playeren a
+      // hívás semmit nem ütemez — így a die() (és vele a nyögés) nem futhat kétszer.
+      // Azt mérjük, hogy nem keletkezik ÚJ delayedCall; a spy újra-flusholása félrevezető
+      // lenne, mert a teszt-helper mindig a 0. indextől játssza vissza a callbackeket.
+      it('a már halott playert újra sebezve nem indul új halál-lánc', () => {
+        const spy = listen('player-death');
+        player.takeDamage(MAX_HP);
+        flushAllDelayedCalls(scene);
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        const scheduledBefore = scene.time.delayedCall.mock.calls.length;
+        player.takeDamage(10);
+
+        expect(scene.time.delayedCall.mock.calls.length).toBe(scheduledBefore);
+      });
+    });
+
+    // A projekt EGYETLEN ismétlődő SFX-e: nem diszkrét eseményre szól, hanem kadenciára.
+    describe('lépés-kadencia', () => {
+      function startRunning(): ReturnType<typeof vi.fn> {
+        const spy = listen('footstep');
+        setGrounded(player, true);
+        player.moveRight();
+        return spy;
+      }
+
+      // Enélkül a futás indulása egy teljes intervallumig néma lenne — pont az a pillanat,
+      // aminek a legtöbb súlya van.
+      it('a RUN-ba lépés ELSŐ lépése azonnal szól', () => {
+        const spy = startRunning();
+        player.updateState();
+
+        expect(spy).toHaveBeenCalledTimes(1);
+      });
+
+      it('az intervallumon belül nem lép újra, utána igen', () => {
+        const spy = startRunning();
+        player.updateState();
+
+        scene.time.now = FOOTSTEP_INTERVAL_MS - 1;
+        player.updateState();
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        scene.time.now = FOOTSTEP_INTERVAL_MS;
+        player.updateState();
+        expect(spy).toHaveBeenCalledTimes(2);
+      });
+
+      it('állva (IDLE) nem lép', () => {
+        const spy = listen('footstep');
+        setGrounded(player, true);
+        player.stopMoving();
+        player.updateState();
+
+        expect(spy).not.toHaveBeenCalled();
+      });
+
+      it('levegőben nem lép, még RUN state-ből érkezve sem', () => {
+        const spy = startRunning();
+        setGrounded(player, false);
+        player.updateState();
+
+        expect(spy).not.toHaveBeenCalled();
+      });
+
+      it('létrán mászva nem lép', () => {
+        const spy = listen('footstep');
+        player.setLadderContact({ centerX: 100, topY: 100, bottomY: 300 });
+        player.climb(-1);
+        player.updateState();
+
+        expect(spy).not.toHaveBeenCalled();
+      });
+
+      // A megállás nullázza a kadenciát, tehát az ÚJRAINDULÁS is azonnal szól — nem a
+      // korábbi ritmus maradék idejét kell kivárni.
+      it('megállás után az újrainduló futás azonnal lép', () => {
+        const spy = startRunning();
+        player.updateState();
+
+        player.stopMoving();
+        player.updateState();
+
+        scene.time.now = 10; // jóval az intervallumon belül
+        player.moveRight();
+        player.updateState();
+
+        expect(spy).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

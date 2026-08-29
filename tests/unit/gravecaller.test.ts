@@ -131,6 +131,24 @@ describe('Gravecaller', () => {
       caster.update(player);
       expect(getBody(caster).velocity).toEqual(before);
     });
+
+    it('a haláltusa hangját a die() emittálja', () => {
+      const spy = vi.fn();
+      caster.on('gravecaller-death', spy);
+      caster.takeDamage(MAX_HP);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    // Lásd a crowHarvester.test.ts azonos tesztjének kommentjét: a destroy() die() nélkül
+    // állít DEAD-re, és a resetEnemies() minden respawnnál MINDET megsemmisíti.
+    it('a destroy() NEM emittál haláltusát (respawn-kórus elleni védelem)', () => {
+      const spy = vi.fn();
+      caster.on('gravecaller-death', spy);
+      caster.destroy();
+
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 
   describe('DETECT PLAYER (PATROL -> MAINTAIN_DISTANCE)', () => {

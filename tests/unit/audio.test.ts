@@ -17,6 +17,9 @@ import AudioManager, {
   LEVEL_MUSIC_VOLUME,
   LEVEL_MUSIC_FADE_IN_MS,
   LEVEL2_MUSIC_FADE_IN_MS,
+  FOOTSTEP_VOLUME,
+  PLAYER_DEATH_VOLUME,
+  DEATH_SFX_DETUNE_RANGE,
 } from '../../src/systems/AudioManager';
 import {
   createMockScene,
@@ -89,6 +92,33 @@ describe('AudioManager', () => {
     // billentyűleütést. Egy "egységesítsük a két konstanst" refaktor ezt csendben elvenné.
     it('a Level 2 belépője hosszabban fadel be, mint a Level 1-é', () => {
       expect(LEVEL2_MUSIC_FADE_IN_MS).toBeGreaterThan(LEVEL_MUSIC_FADE_IN_MS);
+    });
+
+    // A per-hang hangerők a forrásfájlok MÉRT csúcsértékéből vannak levezetve (lásd az
+    // AudioManager kommentjét), mert a csomagok nincsenek egymáshoz normalizálva: a csúcsok
+    // 0.081 és 0.708 között szórnak. Az "effektív hangosság" = csúcs * volume, és a
+    // referencia a bevált kardsuhintás. Ezek az állítások azt őrzik, hogy egy későbbi
+    // "csak felveszem egy kicsit" hangolás ne fordítsa meg a SZEREPEK sorrendjét.
+    const PEAK = {
+      SWORD_SWING: 0.287,
+      FOOTSTEP: 0.214,
+      PLAYER_DEATH: 0.699,
+    } as const;
+    const swordLoudness = PEAK.SWORD_SWING * DEFAULT_SFX_VOLUME;
+
+    it('a lépés érezhetően halkabb a kardsuhintásnál', () => {
+      // A player fut a pálya nagy részén: ha a lépés eléri a harc szintjét, elnyomja azt.
+      expect(PEAK.FOOTSTEP * FOOTSTEP_VOLUME).toBeLessThan(swordLoudness * 0.6);
+    });
+
+    it('a player halála a kardsuhintásnál hangsúlyosabb', () => {
+      expect(PEAK.PLAYER_DEATH * PLAYER_DEATH_VOLUME).toBeGreaterThan(swordLoudness);
+    });
+
+    // A detune-szórás ISMÉTLŐDŐ hangok gépiessége ellen való; egy halál egyszeri, drámai
+    // esemény, amit egy véletlen elhangolás csak olcsóvá tenne.
+    it('a halál-hangok pontos magasságon szólnak', () => {
+      expect(DEATH_SFX_DETUNE_RANGE).toBe(0);
     });
   });
 

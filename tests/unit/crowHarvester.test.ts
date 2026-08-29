@@ -104,6 +104,27 @@ describe('CrowHarvester', () => {
       expect(() => crowHarvester.update(player)).not.toThrow();
       expect(crowHarvester.crowHarvesterState).toBe(CrowHarvesterState.DEAD);
     });
+
+    it('a haláltusa hangját a die() emittálja', () => {
+      const spy = vi.fn();
+      crowHarvester.on('harvester-death', spy);
+      crowHarvester.takeDamage(MAX_HP);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    // A LEGFONTOSABB állítás a hang körül. A destroy() a state-et közvetlenül DEAD-re
+    // állítja, die() hívása NÉLKÜL — és a scene-ek resetEnemies()-e a player minden
+    // halálakor az ÖSSZES lényt megsemmisíti. Ha az emit valaha a destroy()-ba kerülne,
+    // minden respawn egy 9 (Level 1) illetve 14 (Level 2) hangos haláltusa-kórussal
+    // indulna, amit kézi teszten könnyű a "sok enemy" számlájára írni.
+    it('a destroy() NEM emittál haláltusát (respawn-kórus elleni védelem)', () => {
+      const spy = vi.fn();
+      crowHarvester.on('harvester-death', spy);
+      crowHarvester.destroy();
+
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 
   // A Level1Scene a player halálakor megsemmisíti és újraspawnolja az összes enemyt

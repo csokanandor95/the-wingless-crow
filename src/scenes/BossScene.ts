@@ -17,7 +17,7 @@ import {
   WING_BREAKER_ANIMS,
 } from '../bosses/GraftedWingBreakerAnimations';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
-import AudioManager, { MUSIC_KEYS, SFX_KEYS } from '../systems/AudioManager';
+import AudioManager, { bindPlayerSfx, MUSIC_KEYS, SFX_KEYS } from '../systems/AudioManager';
 import AfterImageTrail from '../systems/AfterImageTrail';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 
@@ -167,7 +167,9 @@ export default class BossScene extends Phaser.Scene {
       this.audio.playSfx(SFX_KEYS.FIREBALL_CAST);
     });
 
-    this.player.on('sword-swing', () => this.audio.playSfx(SFX_KEYS.SWORD_SWING));
+    // Suhintás + lépés + ugrás + halál. Az arénában ugyanaz a lovag mozog, mint a pályákon,
+    // tehát ugyanazt kell hallani — enélkül a boss-harc alatt némán futna és halna meg.
+    bindPlayerSfx(this.player, this.audio);
 
     this.physics.add.overlap(this.fireballs, this.boss, this.handleFireballHitBoss, undefined, this);
     this.physics.add.overlap(

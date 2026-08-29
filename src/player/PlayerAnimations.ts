@@ -61,6 +61,21 @@ export const HURT_ANIM_MS = 150;
 
 const IDLE_ANIM_MS = 1000;
 const RUN_ANIM_MS = 570;
+
+/**
+ * Egy 8 frame-es futóciklus KÉT talajfogást tartalmaz (bal láb + jobb láb) — ez a
+ * futóciklus-animáció bevett felépítése, és a `Run.png` nyolc frame-je is ezt követi
+ * (a 0. és a 4. frame az ellentétes lábbal álló kontakt-póz).
+ */
+const RUN_FOOTFALLS = 2;
+
+/**
+ * Két lépéshang között eltelt idő. LEVEZETETT érték, nem hangolt: ha a `RUN_ANIM_MS`
+ * valaha változik, a lépések együtt mozdulnak vele, tehát a hang és a láb nem csúszhat el
+ * — ugyanaz az elv, amiért a támadás-hitbox és a cast-lock is az animációból származik.
+ * A `RUN_FOOTFALLS` az EGYETLEN hangolópont, ha a kadencia rossznak hallatszik.
+ */
+export const FOOTSTEP_INTERVAL_MS = RUN_ANIM_MS / RUN_FOOTFALLS;
 const JUMP_ANIM_MS = 330;
 const FALL_ANIM_MS = 250;
 const CLIMB_ANIM_MS = 600;

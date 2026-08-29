@@ -291,6 +291,12 @@ export default class CrowHarvester extends Phaser.Physics.Arcade.Sprite implemen
     this.hpText.setVisible(false);
     (this.body as Phaser.Physics.Arcade.Body).enable = false;
 
+    // A haláltusa hangja — a scene játssza le (mint a 'harvester-attack'-ot). KIZÁRÓLAG
+    // ide kerülhet, a destroy()-ba SOHA: a destroy() a state-et közvetlenül DEAD-re állítja
+    // die() nélkül, a scene resetEnemies()-e pedig a player minden halálakor az ÖSSZES
+    // lényt megsemmisíti — onnan emittálva minden respawn egy haláltusa-kórussal indulna.
+    this.emit('harvester-death');
+
     this.isReacting = false;
     this.currentAnimKey = null;
     this.updateAnimation();
