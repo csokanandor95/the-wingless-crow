@@ -179,10 +179,10 @@ export default class Level1Scene extends Phaser.Scene {
 
     this.createDecor();
 
-    // A Level 1 valódi csempéket használ; a skin-váltó a `LevelTerrain`-ben van, hogy a
-    // Level 2 ugyanezt a kódot placeholder látvánnyal hívhassa.
-    const ground = createGroundSegments(this, GROUND_SEGMENTS, 'tiles');
-    const platforms = createPlatforms(this, PLATFORMS, 'tiles');
+    // A skin-váltó a `LevelTerrain`-ben van, hogy a két pálya ugyanazt a kódot hívhassa a
+    // saját csempekészletével (`'cathedral'` itt, `'gothic-town'` a Level 2-n).
+    const ground = createGroundSegments(this, GROUND_SEGMENTS, 'cathedral');
+    const platforms = createPlatforms(this, PLATFORMS, 'cathedral');
     this.spikes = new SpikeField(this, SPIKE_FIELDS);
     for (const def of REAPERS) {
       this.reapers.push(new SwingingReaper(this, def));
@@ -272,7 +272,7 @@ export default class Level1Scene extends Phaser.Scene {
 
     this.interactKey = this.input.keyboard!.addKey('E');
     const doorPrompt = this.registry.get('bossDefeated')
-      ? 'E: Tovább — The Crowless Forest'
+      ? 'E: Tovább — The Crowless Quarter'
       : 'E: Checkpoint';
     this.checkpointPromptText = this.add
       .text(400, 400, doorPrompt, {

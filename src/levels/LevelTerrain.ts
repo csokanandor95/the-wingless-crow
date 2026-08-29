@@ -2,10 +2,12 @@ import type Phaser from 'phaser';
 import {
   GROUND_CENTER_Y,
   GROUND_TOP,
+  platformHasLegs,
   platformLeft,
   platformRight,
   platformTop,
   type GroundSegmentDef,
+  type LevelGeometry,
   type PlatformDef,
 } from './LevelGeometry';
 import {
@@ -17,29 +19,41 @@ import {
   TERRAIN_DEPTH,
   TILE_TEXTURES,
 } from './LevelTileset';
+import {
+  TOWN_CAP_SIZE,
+  TOWN_DECK_HEIGHT,
+  TOWN_GROUND_TILE_HEIGHT,
+  TOWN_LEG_TILE_WIDTH,
+  TOWN_TERRAIN_TOP_Y,
+  TOWN_TILE_TEXTURES,
+} from './GothicTownTileset';
 
 /**
  * A talaj-szegmensek és a lebegő platformok felépítése — a `Level1Scene`-ből kiemelve, hogy a
  * Level 2 ugyanezt használhassa.
  *
- * ## A két skin
+ * ## A három skin
  *
- * - **`'tiles'`** — a Level 1 mai viselkedése. A FIZIKA és a LÁTVÁNY külön objektum: a static
- *   spriteot vízszintesen skálázzuk (ami egy valódi csempe textúráját MEGNYÚJTANÁ), ezért az
+ * - **`'cathedral'`** — a Level 1. A FIZIKA és a LÁTVÁNY külön objektum: a static spriteot
+ *   vízszintesen skálázzuk (ami egy valódi csempe textúráját MEGNYÚJTANÁ), ezért az
  *   LÁTHATATLAN marad, és a látványt egy tileSprite + a két végzáró kép adja.
- * - **`'placeholder'`** — a Level 2 jelenlegi állapota, amíg nincs erdő-tileset. A fizikai
- *   sprite egyszerűen LÁTHATÓ marad, és nincs mellette külön látvány-objektum. Ez itt nem
- *   hanyagság: a placeholder textúra egyszínű téglalap, amit a vízszintes skálázás nem tud
- *   torzítani — tehát pont az a probléma nincs meg, ami miatt a szétválasztás létezik.
+ * - **`'gothic-town'`** — a Level 2. Ugyanaz a szétválasztás, de más csempegeometriával, és
+ *   a platformoknak KÉT változatuk van (állvány / konzol) — lásd `createTownPlatformVisual`.
+ * - **`'placeholder'`** — tileset nélküli fallback. A fizikai sprite egyszerűen LÁTHATÓ
+ *   marad, és nincs mellette külön látvány-objektum. Ez nem hanyagság: a placeholder textúra
+ *   egyszínű téglalap, amit a vízszintes skálázás nem tud torzítani — tehát pont az a
+ *   probléma nincs meg, ami miatt a szétválasztás létezik.
  *
- * Az erdő-tileset megérkezésekor a Level 2 `'tiles'`-ra vált, és ez a modul nem változik.
+ * *(A `'cathedral'` korábban `'tiles'` volt. A név akkor vált félrevezetővé, amikor a Level 2
+ * megkapta a saját, szintén valódi csempekészletét.)*
  */
-export type TerrainSkin = 'tiles' | 'placeholder';
+export type TerrainSkin = 'cathedral' | 'gothic-town' | 'placeholder';
 
 /**
  * A LÁTHATATLAN fizikai testek csempemérete (`ground-placeholder` 64x32,
- * `platform-placeholder` 64x16) — a static bodyk ehhez skálázódnak. A LÁTVÁNY a
- * `'tiles'` skinnél külön tileSprite, a `LevelTileset` méreteivel; a kettőt ne keverd össze.
+ * `platform-placeholder` 64x16) — a static bodyk ehhez skálázódnak. A LÁTVÁNY a valódi
+ * skineknél külön tileSprite, a `LevelTileset` / `GothicTownTileset` méreteivel; a kettőt ne
+ * keverd össze.
  */
 const PHYSICS_TILE_WIDTH = 64;
 
@@ -67,6 +81,11 @@ export function createGroundSegments(
 
     sprite.setVisible(false);
 
+    if (skin === 'gothic-town') {
+      createTownGroundVisual(scene, segment, width);
+      continue;
+    }
+
     scene.add
       .tileSprite(segment.startX, GROUND_TOP, width, GROUND_TILE_HEIGHT, TILE_TEXTURES.GROUND_FLOOR)
       .setOrigin(0, 0)
@@ -88,10 +107,38 @@ export function createGroundSegments(
   return ground;
 }
 
+/**
+ * A gothic-town talaj. **Végzáró NINCS, és ez nem hiányosság:** a GothicVania Town csomagban
+ * nem létezik szakadék-perem csempe (a saját preview-jának talaja végig folyamatos), a
+ * csempe peremE ALATTI teste viszont sima sötét föld — a nyers függőleges vágás tehát tiszta
+ * földfalként olvas. A Level 1-nél azért kellettek végzárók, mert ANNAK a csempéjének
+ * díszített, világos oldala van.
+ *
+ * A rajz `TOWN_GROUND_SURFACE_OFFSET_Y`-nal a `GROUND_TOP` FÖLÉ kerül, hogy a csempe
+ * törmelék-pereme pontosan a fizikai felszínre essen.
+ */
+function createTownGroundVisual(
+  scene: Phaser.Scene,
+  segment: GroundSegmentDef,
+  width: number
+): void {
+  scene.add
+    .tileSprite(
+      segment.startX,
+      TOWN_TERRAIN_TOP_Y,
+      width,
+      TOWN_GROUND_TILE_HEIGHT,
+      TOWN_TILE_TEXTURES.GROUND
+    )
+    .setOrigin(0, 0)
+    .setDepth(TERRAIN_DEPTH);
+}
+
 export function createPlatforms(
   scene: Phaser.Scene,
   defs: PlatformDef[],
-  skin: TerrainSkin
+  skin: TerrainSkin,
+  level?: LevelGeometry
 ): Phaser.Physics.Arcade.StaticGroup {
   const platforms = scene.physics.add.staticGroup();
 
@@ -111,6 +158,14 @@ export function createPlatforms(
     if (skin === 'placeholder') continue;
 
     sprite.setVisible(false);
+
+    if (skin === 'gothic-town') {
+      // A `level` csak itt kell: az állvány/konzol döntés a pálya TELJES geometriájából
+      // származik (van-e alatta talaj, van-e alatta másik lap), nem a lap saját adatából.
+      createTownPlatformVisual(scene, def, level ? platformHasLegs(def, level) : false);
+      continue;
+    }
+
     createPlatformVisual(scene, def);
   }
 
@@ -140,6 +195,71 @@ function createPlatformVisual(scene: Phaser.Scene, def: PlatformDef): void {
   for (const [x, texture] of [
     [left, TILE_TEXTURES.PLATFORM_EDGE_LEFT],
     [platformRight(def) - PLATFORM_EDGE_WIDTH, TILE_TEXTURES.PLATFORM_EDGE_RIGHT],
+  ] as const) {
+    scene.add.image(x, top, texture).setOrigin(0, 0).setDepth(TERRAIN_DEPTH);
+  }
+}
+
+/**
+ * A gothic-town fa-platform, a csomag saját preview-jának felépítése szerint:
+ *
+ *     top-left-wood(32) + N×top-wood(16) + top-right-wood(32)     <- pallólap
+ *             │                                    │
+ *        wood-legs(32×16, ismételve)          wood-legs            <- CSAK állványnál
+ *             │                                    │
+ *      ground-wood-legs(32×16)              ground-wood-legs       <- talpazat a talajon
+ *
+ * A `hasLegs` a KÉT változatot választja szét:
+ *  - **állvány** — a lábak a talajig futnak (a preview esete);
+ *  - **konzol** — csak a lap és a végzárók lelógó 19 px-e. Szakadék fölött ez az egyetlen
+ *    lehetséges, és pontosan a Level 1 `platform-edge-*`-ának a szerepe.
+ *
+ * Sorrend a `createPlatformVisual`-lal AZONOS okból: a végzáró RÁ rajzolódik a lapra.
+ * A lábak viszont a végzárók ELŐTT mennek ki, hogy a végzáró átlós merevítője takarja az
+ * illesztést, ne fordítva.
+ */
+function createTownPlatformVisual(
+  scene: Phaser.Scene,
+  def: PlatformDef,
+  hasLegs: boolean
+): void {
+  const left = platformLeft(def);
+  const right = platformRight(def);
+  const top = platformTop(def);
+
+  scene.add
+    .tileSprite(left, top, right - left, TOWN_DECK_HEIGHT, TOWN_TILE_TEXTURES.PLATFORM_DECK)
+    .setOrigin(0, 0)
+    .setDepth(TERRAIN_DEPTH);
+
+  const legColumnX = [left, right - TOWN_LEG_TILE_WIDTH];
+
+  if (hasLegs) {
+    // A láb a végzáró ALJÁTÓL indul (a végzáró maga is 32 magas), és a talpazat felső éléig
+    // tart. A `wood-legs` mind a 16 sora azonos, ezért a nem-16-többszörös magasság sem
+    // csonkolja láthatóan a mintát.
+    const legTop = top + TOWN_CAP_SIZE;
+    const legHeight = TOWN_TERRAIN_TOP_Y - legTop;
+
+    for (const x of legColumnX) {
+      if (legHeight > 0) {
+        scene.add
+          .tileSprite(x, legTop, TOWN_LEG_TILE_WIDTH, legHeight, TOWN_TILE_TEXTURES.PLATFORM_LEGS)
+          .setOrigin(0, 0)
+          .setDepth(TERRAIN_DEPTH);
+      }
+      // A talpazat a talaj-csempével AZONOS felső élről indul: az alsó 7 sora bitre ugyanaz
+      // a törmelék-perem, tehát folytonosan illeszkedik a talajba.
+      scene.add
+        .image(x, TOWN_TERRAIN_TOP_Y, TOWN_TILE_TEXTURES.PLATFORM_FOOT)
+        .setOrigin(0, 0)
+        .setDepth(TERRAIN_DEPTH);
+    }
+  }
+
+  for (const [x, texture] of [
+    [legColumnX[0], TOWN_TILE_TEXTURES.PLATFORM_CAP_LEFT],
+    [legColumnX[1], TOWN_TILE_TEXTURES.PLATFORM_CAP_RIGHT],
   ] as const) {
     scene.add.image(x, top, texture).setOrigin(0, 0).setDepth(TERRAIN_DEPTH);
   }

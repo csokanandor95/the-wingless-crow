@@ -89,6 +89,18 @@ import bgRuinsUrl from '../../assets/backgrounds/ruined-city/03-ruins.png';
 // (bal-felső sarok: 103, 0) lett 800x450-re kicsinyítve. A kivágás nem esztétikai döntés:
 // ez teszi a rajzolt padlóélt PONTOSAN a BossScene GROUND_TOP-jára (418). Lásd CLAUDE.md.
 import bossArenaUrl from '../../assets/backgrounds/cathedral/boss-arena.png';
+// Level 2 parallax háttér-rétegek. Forrás: GothicVania Town (Luis Zuno / @ansimuz) —
+// public domain, UGYANAZ a csomag, amiből a hangulati propok jönnek.
+// MINDKETTŐ SZÁRMAZTATOTT, és a származtatás VESZTESÉGMENTES:
+//   01-sky.png (384x450) = `layers/background.png` (384x288) + 162 sor tömör `#71405A`.
+//     A forrás 186-287. sora BITRE AZONOS ezzel a színnel, tehát a toldás pixelre pontos —
+//     így NEM kell függőlegesen nyújtani (a felhőkön és a hegygerincen az látszana).
+//   02-town.png (768x450) = [`layers/middleground.png` | ugyanaz vízszintesen TÜKRÖZVE],
+//     + 162 sor tömör `#392D55` (a forrás 236-287. sora). A tükrözés teszi vízszintesen
+//     varratmentessé: a nyers réteg bal és jobb éle érdemben eltér (sziluett-tető 55-100
+//     vs. 117), tükrözve viszont mindkét átmenet duplázott oszlopra esik.
+import bgTownSkyUrl from '../../assets/backgrounds/gothic-town/01-sky.png';
+import bgTownUrl from '../../assets/backgrounds/gothic-town/02-town.png';
 // Level 1 terrain-csempék. Forrás: UGYANAZ a PixelPlatformerSet1 v1.1 csomag (Szadi art,
 // public domain), amiből a fenti parallax háttér is jön — ezért illeszkedik a paletta
 // korrekció nélkül. Származtatott assetek: kivágások a csomag `main_lev_build.png` és
@@ -102,6 +114,17 @@ import platformEdgeLeftUrl from '../../assets/tiles/cathedral/platform-edge-left
 import platformEdgeRightUrl from '../../assets/tiles/cathedral/platform-edge-right.png';
 import doorGateUrl from '../../assets/tiles/cathedral/door-gate.png';
 import ladderUrl from '../../assets/tiles/cathedral/ladder.png';
+// Level 2 terrain-csempék, a GothicVania Town `PNG/environment/layers/sliced-tileset/`
+// mappájából. Öt VÁLTOZATLAN másolat, eredeti fájlnéven; a `ground-strip.png` az egyetlen
+// származtatott: `[ground-b.png | ground.png]` egymás mellé, mert a csomag saját preview-ja
+// 32 px-es periódusban váltogatja a két talaj-variánst, egy tileSprite viszont csak egyet
+// tud ismételni. A geometria a `src/levels/GothicTownTileset.ts` fejlécében van.
+import townGroundUrl from '../../assets/tiles/gothic-town/ground-strip.png';
+import townDeckUrl from '../../assets/tiles/gothic-town/top-wood.png';
+import townCapLeftUrl from '../../assets/tiles/gothic-town/top-left-wood.png';
+import townCapRightUrl from '../../assets/tiles/gothic-town/top-right-wood.png';
+import townLegsUrl from '../../assets/tiles/gothic-town/wood-legs.png';
+import townFootUrl from '../../assets/tiles/gothic-town/ground-wood-legs.png';
 // Hangulati propok. Forrás: GothicVania Town (Luis Zuno / @ansimuz) — "License for Everyone.
 // Public domain and free to use on whatever you want, personal or commercial." A csomag
 // `PNG/environment/props-sliced/` mappájából VÁLTOZATLANUL másolva, eredeti fájlnéven (ez a
@@ -111,9 +134,22 @@ import wagonUrl from '../../assets/props/gothic-town/wagon.png';
 import wellUrl from '../../assets/props/gothic-town/well.png';
 import crateUrl from '../../assets/props/gothic-town/crate.png';
 import crateStackUrl from '../../assets/props/gothic-town/crate-stack.png';
+// A Level 2-vel bejött két további prop és a három háttér-ház — UGYANABBÓL a csomagból,
+// szintén változatlan másolatok, eredeti fájlnéven.
+import barrelUrl from '../../assets/props/gothic-town/barrel.png';
+import signUrl from '../../assets/props/gothic-town/sign.png';
+import houseAUrl from '../../assets/props/gothic-town/house-a.png';
+import houseBUrl from '../../assets/props/gothic-town/house-b.png';
+import houseCUrl from '../../assets/props/gothic-town/house-c.png';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
-import { PROP_TEXTURES, SPIKE_HEIGHT, SPIKE_TILE_WIDTH } from '../levels/LevelGeometry';
+import {
+  BUILDING_TEXTURES,
+  PROP_TEXTURES,
+  SPIKE_HEIGHT,
+  SPIKE_TILE_WIDTH,
+} from '../levels/LevelGeometry';
 import { DOOR_APERTURE, TILE_TEXTURES } from '../levels/LevelTileset';
+import { TOWN_TILE_TEXTURES } from '../levels/GothicTownTileset';
 
 const LOADING_BAR_WIDTH = 320;
 const LOADING_BAR_HEIGHT = 14;
@@ -126,7 +162,7 @@ const LOADING_BAR_HEIGHT = 14;
  * fejlesztés közben ez a leggyorsabb út az új szakaszokhoz. **Commit előtt mindig állítsd
  * vissza `'Level1Scene'`-re.**
  */
-const START_SCENE = 'Level2Scene';
+const START_SCENE = 'Level1Scene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a
@@ -191,6 +227,8 @@ const BACKGROUND_IMAGES: Array<{ key: string; url: string }> = [
   { key: BACKGROUND_TEXTURES.MOUNTAINS, url: bgMountainsUrl },
   { key: BACKGROUND_TEXTURES.RUINS, url: bgRuinsUrl },
   { key: BACKGROUND_TEXTURES.BOSS_ARENA, url: bossArenaUrl },
+  { key: BACKGROUND_TEXTURES.TOWN_SKY, url: bgTownSkyUrl },
+  { key: BACKGROUND_TEXTURES.TOWN, url: bgTownUrl },
 ];
 
 // Level 1 terrain. A `GROUND_FLOOR`, a `PLATFORM_MID` és a `LADDER` tileSprite-ként
@@ -206,13 +244,35 @@ const TILE_IMAGES: Array<{ key: string; url: string }> = [
   { key: TILE_TEXTURES.LADDER, url: ladderUrl },
 ];
 
-// Level 1 hangulati propok — nem ütköző háttér-dekoráció (lásd src/levels/LevelDecor.ts).
+// Level 2 terrain. A `GROUND`, a `PLATFORM_DECK` és a `PLATFORM_LEGS` tileSprite-ként
+// ismétlődik (az első kettő vízszintesen, a lábak függőlegesen); a többi egyszeri kép.
+const TOWN_TILE_IMAGES: Array<{ key: string; url: string }> = [
+  { key: TOWN_TILE_TEXTURES.GROUND, url: townGroundUrl },
+  { key: TOWN_TILE_TEXTURES.PLATFORM_DECK, url: townDeckUrl },
+  { key: TOWN_TILE_TEXTURES.PLATFORM_CAP_LEFT, url: townCapLeftUrl },
+  { key: TOWN_TILE_TEXTURES.PLATFORM_CAP_RIGHT, url: townCapRightUrl },
+  { key: TOWN_TILE_TEXTURES.PLATFORM_LEGS, url: townLegsUrl },
+  { key: TOWN_TILE_TEXTURES.PLATFORM_FOOT, url: townFootUrl },
+];
+
+// Level 2 háttér-épületek — világ-koordinátás díszlet (lásd src/levels/LevelDecor.ts).
+const BUILDING_IMAGES: Array<{ key: string; url: string }> = [
+  { key: BUILDING_TEXTURES.HOUSE_A, url: houseAUrl },
+  { key: BUILDING_TEXTURES.HOUSE_B, url: houseBUrl },
+  { key: BUILDING_TEXTURES.HOUSE_C, url: houseCUrl },
+];
+
+// Hangulati propok — nem ütköző háttér-dekoráció (lásd src/levels/LevelDecor.ts). Az első
+// öt a Level 1-en debütált, a `barrel`/`sign` a Level 2-vel jött; MINDET mindkét pálya
+// használhatja, csak más tinttel (a Level 2 nyersen, lásd PROP_TINT_NONE).
 const PROP_IMAGES: Array<{ key: string; url: string }> = [
   { key: PROP_TEXTURES.STREET_LAMP, url: streetLampUrl },
   { key: PROP_TEXTURES.WAGON, url: wagonUrl },
   { key: PROP_TEXTURES.WELL, url: wellUrl },
   { key: PROP_TEXTURES.CRATE, url: crateUrl },
   { key: PROP_TEXTURES.CRATE_STACK, url: crateStackUrl },
+  { key: PROP_TEXTURES.BARREL, url: barrelUrl },
+  { key: PROP_TEXTURES.SIGN, url: signUrl },
 ];
 
 export default class BootScene extends Phaser.Scene {
@@ -261,7 +321,13 @@ export default class BootScene extends Phaser.Scene {
       });
     }
 
-    for (const image of [...BACKGROUND_IMAGES, ...TILE_IMAGES, ...PROP_IMAGES]) {
+    for (const image of [
+      ...BACKGROUND_IMAGES,
+      ...TILE_IMAGES,
+      ...TOWN_TILE_IMAGES,
+      ...PROP_IMAGES,
+      ...BUILDING_IMAGES,
+    ]) {
       this.load.image(image.key, image.url);
     }
   }
@@ -333,11 +399,11 @@ export default class BootScene extends Phaser.Scene {
     // A `pillar-placeholder` TÖRÖLVE (a Level 1 létrája a lebegő platformnak van támasztva,
     // a mélység-illúziót pedig a parallax rétegek adják).
     //
-    // A `ladder-placeholder` és a `door-placeholder` VISSZAKERÜLT a Level 2 miatt: az a pálya
-    // egyelőre placeholder skinnel renderel (nincs erdő-tileset), és a cathedral `door-gate`
-    // csempéje se nem illik oda, se nem érvényes — annak a geometriája (DOOR_APERTURE,
-    // DOOR_THRESHOLD_PX) ehhez a konkrét PNG-hez van mérve. A Level 1 továbbra is a valódi
-    // csempéket használja.
+    // A `ladder-placeholder` és a `door-placeholder` VISSZAKERÜLT a Level 2 miatt, és a
+    // gothic-town tileset megérkezése után is KELL: a GothicVania Town csomagban NINCS
+    // létra, a cathedral `door-gate` csempéje pedig se nem illik oda, se nem érvényes —
+    // annak a geometriája (DOOR_APERTURE, DOOR_THRESHOLD_PX) ehhez a konkrét PNG-hez van
+    // mérve. A Level 2 terrainje egyébként már valódi csempékből áll (TOWN_TILE_IMAGES).
 
     // Létra: FÜGGŐLEGESEN varratmentes csempe (két oldalléc + egy fok), hogy a tileSprite a
     // létra teljes hosszában ismételhesse — ugyanaz a szerep, mint a `tile-ladder`-é.

@@ -8,10 +8,13 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   BACKGROUND_TEXTURES,
   LEVEL1_BACKGROUND_LAYERS,
+  LEVEL2_BACKGROUND_LAYERS,
   SOURCE_HEIGHT,
+  TOWN_TOP,
   tilePositionForScroll,
   VIEWPORT_HEIGHT,
 } from '../../src/systems/ParallaxBackground';
+import { GROUND_TOP } from '../../src/levels/LevelGeometry';
 
 vi.mock('phaser', async () => {
   const { createFakePhaserModule } = await import('./helpers/fakePhaser');
@@ -88,5 +91,74 @@ describe('LEVEL1_BACKGROUND_LAYERS', () => {
       expect(layer.stretch).toBe(false);
       expect(layer.height).toBe(SOURCE_HEIGHT);
     }
+  });
+});
+
+describe('LEVEL2_BACKGROUND_LAYERS', () => {
+  it('a két tervezett réteget tartalmazza, hátulról előre', () => {
+    expect(LEVEL2_BACKGROUND_LAYERS.map((l) => l.texture)).toEqual([
+      BACKGROUND_TEXTURES.TOWN_SKY,
+      BACKGROUND_TEXTURES.TOWN,
+    ]);
+  });
+
+  it('a scrollFactor és a depth EGYÜTT nő', () => {
+    for (let i = 1; i < LEVEL2_BACKGROUND_LAYERS.length; i++) {
+      const prev = LEVEL2_BACKGROUND_LAYERS[i - 1];
+      const curr = LEVEL2_BACKGROUND_LAYERS[i];
+      expect(curr.scrollFactor).toBeGreaterThan(prev.scrollFactor);
+      expect(curr.depth).toBeGreaterThan(prev.depth);
+    }
+  });
+
+  it('mindkét réteg a háttér-épületek MÖGÖTT van', () => {
+    // A világ-koordinátás házak a BUILDING_DEPTH-en (-15) állnak; a parallax rétegeknek
+    // ez alatt kell maradniuk, különben a távoli sziluett a házak ELÉ kerülne.
+    for (const layer of LEVEL2_BACKGROUND_LAYERS) {
+      expect(layer.depth).toBeLessThan(-15);
+    }
+  });
+
+  it('egyik réteg alsó éle sem csúszik a viewport alja fölé', () => {
+    for (const layer of LEVEL2_BACKGROUND_LAYERS) {
+      expect(layer.top + layer.height).toBeGreaterThanOrEqual(VIEWPORT_HEIGHT);
+    }
+  });
+
+  it('EGYIK réteg sem nyúlik függőlegesen', () => {
+    // A Level 1 ege sima színátmenet, azon a nyújtás nem látszik. Ezek a rétegek viszont
+    // felhőket és hegygerincet tartalmaznak — ott egy 288 -> 450-es (1.5625x) nyújtás
+    // láthatóan torzítana. Helyette a KÉT PNG már származtatva 450 magas, a forrás
+    // egyszínű alsó sávjának veszteségmentes meghosszabbításával.
+    for (const layer of LEVEL2_BACKGROUND_LAYERS) {
+      expect(layer.stretch).toBe(false);
+    }
+  });
+
+  it('az ég a teljes viewportot lefedi', () => {
+    const sky = LEVEL2_BACKGROUND_LAYERS[0];
+    expect(sky.top).toBe(0);
+    expect(sky.height).toBe(VIEWPORT_HEIGHT);
+  });
+
+  it('a város-sziluett tömör alapja a talaj FÖLÖTT, de a képernyő alsó felében kezdődik', () => {
+    // Ez a TOWN_TOP levezetésének regressziós védelme (a Level 1 SILHOUETTE_BOTTOM_Y-jának
+    // megfelelője). A tömör alapsáv a sziluett 176. forrás-sorától indul; ennek a talaj
+    // fölött kell kezdődnie (különben a sziluett a játékteret takarná el), de nem túl
+    // magasan (különben a horizont a képernyő közepére ugrana).
+    const TOWN_SOLID_ROW = 176;
+    const solidTop = TOWN_TOP + TOWN_SOLID_ROW;
+
+    expect(solidTop).toBeLessThan(GROUND_TOP);
+    expect(GROUND_TOP - solidTop).toBeGreaterThanOrEqual(60);
+    expect(GROUND_TOP - solidTop).toBeLessThanOrEqual(160);
+  });
+
+  it('a sziluett-réteg a viewport tetejét szándékosan SZABADON hagyja', () => {
+    // A `TOWN_TOP` pozitív: fölötte csak az ég-réteg felhői látszanak. Nulla vagy negatív
+    // értéknél a sziluett a képernyő tetejéig érne, és elnyelné a felhőket.
+    const town = LEVEL2_BACKGROUND_LAYERS[1];
+    expect(town.top).toBe(TOWN_TOP);
+    expect(TOWN_TOP).toBeGreaterThan(0);
   });
 });

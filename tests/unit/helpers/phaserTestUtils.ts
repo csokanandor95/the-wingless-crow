@@ -261,9 +261,12 @@ export interface MockStaticSprite {
   texture: string;
   scaleX: number;
   tint: number | null;
+  /** Valódi csempekészletnél a fizikai sprite LÁTHATATLAN — a látvány külön objektum. */
+  visible: boolean;
   refreshCount: number;
   setScale(sx: number, sy: number): MockStaticSprite;
   setTint(v: number): MockStaticSprite;
+  setVisible(v: boolean): MockStaticSprite;
   setPosition(x: number, y: number): MockStaticSprite;
   refreshBody(): MockStaticSprite;
 }
@@ -280,6 +283,7 @@ export function createMockStaticGroup() {
         texture,
         scaleX: 1,
         tint: null,
+        visible: true,
         refreshCount: 0,
         setScale(sx) {
           sprite.scaleX = sx;
@@ -287,6 +291,10 @@ export function createMockStaticGroup() {
         },
         setTint(v) {
           sprite.tint = v;
+          return sprite;
+        },
+        setVisible(v) {
+          sprite.visible = v;
           return sprite;
         },
         setPosition(nx, ny) {
@@ -314,16 +322,13 @@ export function createMockScene() {
       zone: vi.fn((x?: number, y?: number, width?: number, height?: number) =>
         createMockZone(x, y, width, height)
       ),
-      // A SpikeField ezzel csempézi a tüske-grafikát a mező hosszában (a létra mintájára).
+      // A SpikeField ezzel csempézi a tüske-grafikát a mező hosszában (a létra mintájára),
+      // a terrain- és a mozgó platform-látvány pedig a padlót/pallót. Ugyanaz a chainable
+      // felület, mint a MockImage-é, plusz a méret — a hívók `setOrigin`/`setTint`/
+      // `setDepth`/`setPosition`-t is láncolnak rá.
       tileSprite: vi.fn(
-        (x: number, y: number, width: number, height: number, texture: string) => {
-          const sprite = { x, y, width, height, texture, depth: 0, setDepth: vi.fn() };
-          sprite.setDepth.mockImplementation((v: number) => {
-            sprite.depth = v;
-            return sprite;
-          });
-          return sprite;
-        }
+        (x: number, y: number, width: number, height: number, texture: string) =>
+          Object.assign(createMockImage(x, y, texture, 0), { width, height })
       ),
       text: vi.fn(() => createMockText()),
       image: vi.fn((x: number, y: number, texture: string, frame: string | number) =>

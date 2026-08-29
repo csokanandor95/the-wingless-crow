@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { GROUND_TOP } from '../levels/LevelGeometry';
 
 // --- Forrás-geometria -------------------------------------------------------
 // Mindhárom réteg ugyanabból a csomagból jön (PixelPlatformerSet1 v1.1 / Szadi art),
@@ -26,6 +27,9 @@ export const BACKGROUND_TEXTURES = {
    * kulcsoknak egyetlen forrása legyen, amit a BootScene betölthet.
    */
   BOSS_ARENA: 'bg-boss-arena',
+  /** Level 2 (GothicVania Town) — lásd `LEVEL2_BACKGROUND_LAYERS`. */
+  TOWN_SKY: 'bg-town-sky',
+  TOWN: 'bg-town',
 } as const;
 
 // --- Réteg-definíció --------------------------------------------------------
@@ -87,6 +91,60 @@ export const LEVEL1_BACKGROUND_LAYERS: ParallaxLayerDef[] = [
     depth: -20,
     top: SILHOUETTE_TOP,
     height: SOURCE_HEIGHT,
+    stretch: false,
+  },
+];
+
+// --- Level 2 réteg-terv -----------------------------------------------------
+//
+// A Level 1-től eltérően EGYIK réteg sem nyúlik függőlegesen. A forráscsomag
+// (GothicVania Town) rétegei 384x288-asok, és felhőket + hegygerincet tartalmaznak, amiken
+// egy 288 -> 450-es (1.5625x) nyújtás láthatóan torzítana. Helyette a KÉT PNG már
+// származtatva 450 magas: a forrás alsó sávja mindkettőn BITRE AZONOS sorokból áll
+// (`background.png` 186-287 = `#71405A`, `middleground.png` 236-287 = `#392D55`), tehát a
+// lefelé toldás pixelre pontos, és a pixelsűrűség 1:1 marad a karakterekével.
+//
+// A város-sziluett textúrája 768 széles: [forrás | vízszintesen tükrözött forrás]. A nyers
+// 384-es réteg NEM varratmentes (a bal él sziluett-teteje 55-100, a jobbé 117), a tükrözés
+// viszont mindkét átmenetet duplázott oszlopra viszi -> láthatatlan. Az ára egy
+// tükör-szimmetria, ami egy 0.3-as scrollFactorú, távoli sziluetten nem tűnik fel.
+
+/** MÉRT: a város-sziluett első TELJESEN átlátszatlan sora a forrásban. */
+const TOWN_SOLID_ROW = 176;
+
+/**
+ * A sziluett TÖMÖR alapja ennyivel a talaj fölött kezdődik.
+ *
+ * **Ez a Level 2 EGYETLEN hangolópontja a horizontra** — a Level 1 `SILHOUETTE_BOTTOM_Y`-jának
+ * megfelelője. Az érték a Level 1 arányaiból jön (ott a városrom sziluettje ~99 px-szel a
+ * talaj fölött válik tömörré), és ebből adódik a képernyő-kompozíció:
+ *
+ *     0-135    felhők
+ *     136-175  hegygerinc
+ *     175-318  város-sziluett a világos égsáv előtt
+ *     318-418  tömör sötét alapsáv   <- ezt töltik ki a világ-koordinátás házak
+ *     418-450  talaj
+ */
+const TOWN_SOLID_BAND_PX = 100;
+
+/** LEVEZETETT: a sziluett-réteg felső éle a viewportban. */
+export const TOWN_TOP = GROUND_TOP - TOWN_SOLID_BAND_PX - TOWN_SOLID_ROW;
+
+export const LEVEL2_BACKGROUND_LAYERS: ParallaxLayerDef[] = [
+  {
+    texture: BACKGROUND_TEXTURES.TOWN_SKY,
+    scrollFactor: 0.1,
+    depth: -30,
+    top: 0,
+    height: VIEWPORT_HEIGHT,
+    stretch: false,
+  },
+  {
+    texture: BACKGROUND_TEXTURES.TOWN,
+    scrollFactor: 0.3,
+    depth: -25,
+    top: TOWN_TOP,
+    height: VIEWPORT_HEIGHT - TOWN_TOP,
     stretch: false,
   },
 ];

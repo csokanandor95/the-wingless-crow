@@ -15,10 +15,14 @@ import MovingPlatform, { isRiding } from '../platforms/MovingPlatform';
 import HazardDamageGate from '../hazards/HazardDamage';
 import SpikeField, { SPIKE_DAMAGE, SPIKE_KNOCKBACK_Y } from '../hazards/SpikeField';
 import SwingingReaper, { REAPER_DAMAGE } from '../hazards/SwingingReaper';
+import ParallaxBackground, { LEVEL2_BACKGROUND_LAYERS } from '../systems/ParallaxBackground';
 import { createGroundSegments, createPlatforms } from '../levels/LevelTerrain';
+import createDecorProps, { createBackdropBuildings } from '../levels/LevelDecor';
 import {
+  BACKDROP_BUILDINGS,
   CHECKPOINTS,
   CHECKPOINT_ZONE,
+  DECOR_PROPS,
   DOOR,
   DOOR_CHECKPOINT,
   ENEMY_SPAWNS,
@@ -26,6 +30,7 @@ import {
   FALL_DEPTH,
   GROUND_SEGMENTS,
   LADDERS,
+  LEVEL2_GEOMETRY,
   MOVING_PLATFORMS,
   PLATFORMS,
   PLAYER_HALF_HEIGHT,
@@ -47,7 +52,7 @@ import { LADDER_TILE_WIDTH } from '../levels/LevelTileset';
 import type { Damageable, PhysicsOverlapObject } from '../combat/DamageSystem';
 
 /**
- * Level 2 – The Crowless Forest.
+ * Level 2 – The Crowless Quarter (korábban „The Crowless Forest", lásd `Level2Layout.ts`).
  *
  * A geometria a `levels/Level2Layout.ts`-ben él (Phaser-mentes adatmodul), a terrain-építés a
  * `levels/LevelTerrain.ts`-ben, a mozgó platform mechanikája a `platforms/MovingPlatform.ts`-ben
@@ -60,8 +65,10 @@ import type { Damageable, PhysicsOverlapObject } from '../combat/DamageSystem';
  *
  * ## Amiben ELTÉR a Level 1-től
  *
- *  - **Nincs parallax háttér és nincs tileset** — a látvány külön, későbbi iteráció (user-döntés).
- *    Addig egyszínű háttér + `'placeholder'` terrain-skin.
+ *  - **Saját látvány-készlet**: GothicVania Town — kétrétegű parallax
+ *    (`LEVEL2_BACKGROUND_LAYERS`), `'gothic-town'` terrain-skin, világ-koordinátás
+ *    háttér-épületek. A paletta SZÁNDÉKOSAN világosabb a Level 1-nél (alkonyi városnegyed
+ *    az éjszakai romok után), ezért a propok itt tint NÉLKÜL mennek ki.
  *  - **Mozgó platformok** (4 db), a rajtuk álló player kézi szállításával.
  *  - **Két létra** (a Level 1-nek egy van) -> tömb + a fedésben lévő kiválasztása frame-enként.
  *  - **Három köztes checkpoint** (a Level 1-nek egy) -> `LevelCheckpoint` példányok.
@@ -81,8 +88,12 @@ const RESPAWN_DELAY_MS = 1200;
 /** Az ajtó-átmenet hossza. */
 const TRANSITION_FADE_MS = 500;
 
-/** Sötét, hideg erdő-tónus. PLACEHOLDER — a valódi parallax háttér külön iteráció. */
-const BACKGROUND_COLOR = '#0d1410';
+/**
+ * = a `bg-town-sky` legfelső képsorának színe. A parallax réteg amúgy is kitakarja, de így
+ * sem egy letterbox, sem a `create()` előtti pillanat nem villant oda nem illő színt —
+ * ugyanaz az indok, mint a Level 1 `#673838`-ánál.
+ */
+const BACKGROUND_COLOR = '#854a62';
 
 /**
  * Mennyivel a cél-felület FÖLÉ nyúlik a mászási zóna. Enélkül a létra tetején álló player
@@ -109,6 +120,7 @@ export default class Level2Scene extends Phaser.Scene {
   private playerHpText!: Phaser.GameObjects.Text;
   private audio!: AudioManager;
 
+  private background!: ParallaxBackground;
   private ladders: LadderInstance[] = [];
   private movingPlatforms: MovingPlatform[] = [];
 
@@ -162,6 +174,10 @@ export default class Level2Scene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(BACKGROUND_COLOR);
     this.cameras.main.fadeIn(400);
 
+    // A legelső dolog, ami a display listára kerül — a rétegek `setScrollFactor(0)`-val a
+    // kamerához vannak rögzítve, a mozgást az `update()` adja a `tilePositionX`-en át.
+    this.background = new ParallaxBackground(this, LEVEL2_BACKGROUND_LAYERS);
+
     // A FIZIKAI világ mélyebb, mint a canvas: a szakadékba lépő player kizuhan a képből, és
     // a FALL_DEATH_Y-t átlépve hal meg. A KAMERA bounds-a a canvas magassága marad, tehát
     // nincs függőleges görgetés — a pálya egy vízszintes sáv.
@@ -172,14 +188,22 @@ export default class Level2Scene extends Phaser.Scene {
     // SFX-ekhez kell. Kézi takarítás nincs: maga iratkozik fel a scene shutdownjára.
     this.audio = new AudioManager(this);
 
-    // Placeholder skin: nincs Level 2 tileset, tehát a fizikai sprite MAGA a látvány.
-    const ground = createGroundSegments(this, GROUND_SEGMENTS, 'placeholder');
-    const platforms = createPlatforms(this, PLATFORMS, 'placeholder');
+    // A háttér-épületek a terrain ELŐTT jönnek létre, hogy a display listán is mögötte
+    // legyenek — a `BUILDING_DEPTH` (-15) ezt amúgy is garantálja, de így a sorrend olvasható.
+    createBackdropBuildings(this, BACKDROP_BUILDINGS, LEVEL2_GEOMETRY);
+
+    // A `LEVEL2_GEOMETRY` a platformoknak kell: az állvány/konzol változat a pálya TELJES
+    // geometriájából származik (van-e alatta talaj, van-e alatta másik lap), nem a lap
+    // saját adatából — lásd `platformHasLegs()`.
+    const ground = createGroundSegments(this, GROUND_SEGMENTS, 'gothic-town');
+    const platforms = createPlatforms(this, PLATFORMS, 'gothic-town', LEVEL2_GEOMETRY);
+
+    createDecorProps(this, DECOR_PROPS, LEVEL2_GEOMETRY);
 
     // A mozgó lapok UGYANABBA a static groupba kerülnek, mint a fix platformok: így egyetlen
     // collider-regisztráció fedi mindkettőt, és a lövedékek is becsapódnak beléjük.
     for (const def of MOVING_PLATFORMS) {
-      this.movingPlatforms.push(new MovingPlatform(def, platforms));
+      this.movingPlatforms.push(new MovingPlatform(def, platforms, this, 'gothic-town'));
     }
 
     this.spikes = new SpikeField(this, SPIKE_FIELDS);
@@ -408,6 +432,8 @@ export default class Level2Scene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    this.background.update(this.cameras.main.scrollX);
+
     this.updateMovingPlatforms(delta);
 
     // Szinkron overlap-teszt (mint a Level 1-en): azonnal ad eredményt, szemben a

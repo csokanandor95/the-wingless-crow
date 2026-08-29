@@ -94,7 +94,7 @@ A pálya 3200 → 6000 px, a talaj szegmensekre bomlott, és szakadékok került
 **Phase 7 (Boss) KÉSZ:** valódi boss (`bosses/GraftedWingBreaker.ts` — *The Grafted
 Wing-Breaker*, a Project_plan.md 12. pontja szerinti névvel), fix 800×450-es boss aréna,
 boss entrance, HP-bar, két fázis, boss victory. A győzelem után egy adatvezérelt szöveges
-átvezető (`NarrationScene`) következik, onnan a (placeholder) `Level2Scene`.
+átvezető (`NarrationScene`) következik, onnan a `Level2Scene`.
 **A teljes lánc végigjátszható:** `Level1 → ajtó (E) → BossScene → NarrationScene → Level2Scene`.
 
 **Phase 8 (Atmosphere) ELINDULT — 1. iteráció: boss music kész.** `systems/AudioManager.ts`
@@ -274,6 +274,36 @@ pontjának *„Archer / Caster"*-e: távolsági ellenfél, egyetlen támadással
 jogi tétel.** A Level 1 `E2` platformján álló `E-platform-1` CrowHarvester **le lett
 cserélve** erre. Részletek lentebb, az „Enemy 2 — Gravecaller" szakaszban.
 
+**LEVEL 2 — LÁTVÁNY KÉSZ (2026-08-29).** A pálya geometriája (7200 px, 9 szakasz, mozgó
+platformok, hazardok, 14 enemy) korábbi iterációkban elkészült; ez a kör adta meg a
+látványát. Forrás: **GothicVania Town** (Luis Zuno / @ansimuz) — **public domain**, UGYANAZ
+a csomag, amiből a Level 1 hangulati propjai jönnek, tehát **nem nyílt új jogi tétel**.
+Új modulok: `levels/GothicTownTileset.ts`; bővült: `LevelTerrain`, `LevelDecor`,
+`LevelGeometry`, `ParallaxBackground`, `MovingPlatform`.
+
+- **ÁTNEVEZÉS: `The Crowless Forest` → `The Crowless Quarter`** (user-döntés). A csomag egy
+  alkonyi gótikus VÁROS, nem erdő, és a látvány nyert a `Project_plan.md` 14. pontjával
+  szemben — a dokumentum frissítve. A scene-kulcs változatlanul `Level2Scene`, tehát a
+  néven semmilyen kód nem függ.
+- **A paletta NYERSEN megy be, tint nélkül** (user-döntés). A csomag érezhetően VILÁGOSABB
+  a Level 1-nél (égbolt-csúcsfényesség `(190,106,107)` vs. `(103,56,56)`) — ez tudatos
+  kontraszt az éjszakai romokhoz képest, nem hiba. A talaj `(42,27,40)` és a fa-palló
+  `(58,38,56)` fényessége viszont majdnem pontosan a Level 1-é (`(42,33,33)` / `(63,51,50)`),
+  tehát a gameplay-elemek olvashatósága nem változott.
+- **KÉT parallax réteg**, mindkettő SZÁRMAZTATOTT, de veszteségmentesen (lásd a 21.
+  tanulságot és a `ParallaxBackground.ts` Level 2 blokkját). **Egyik sem nyúlik
+  függőlegesen** — szemben a Level 1 egével, ami sima színátmenet.
+- **A terrain HÁROM skinre bomlott**: `'cathedral'` (volt `'tiles'`), `'gothic-town'`,
+  `'placeholder'`. A Level 1 hívása mechanikusan `'cathedral'`-ra változott.
+- **A fa-platformnak KÉT változata van** — állvány (lábak a talajig) és konzol —, és a
+  választás **LEVEZETETT**: `platformHasLegs()`. Részletek lentebb, a „Level 2 terrain"
+  szakaszban.
+- **HAT háttér-ház** világ-koordinátásan (`BACKDROP_BUILDINGS`, `BUILDING_DEPTH = -15`) és
+  **17 hangulati prop** (`DECOR_PROPS`, tint nélkül), mind unit-tesztelt elhelyezéssel.
+- Ami a Level 2-n MÉG placeholder: a **létra** és a **boss-ajtó** (a csomagban nincs létra,
+  a cathedral `door-gate` geometriája pedig ehhez a PNG-hez van mérve), a hazardok és a
+  lövedékek. Zene és SFX szintén hátravan.
+
 **LEVEL 1 REDESIGN — 1. iteráció KÉSZ (a Phase 8 közé beszúrt, 3 iterációs blokk).**
 Az eredeti Level 1 (3200 px, folyamatos talaj, hazard nélkül) pillanatok alatt átugrálható
 volt. A user layout-specje (`2D helper/level1-layout.md`) alapján a pálya **6000 px**-re nőtt,
@@ -341,8 +371,15 @@ the-wingless-crow/
 │   │   │   ├── 01-sky.png        # RGB, átlátszatlan ég (#673838 -> #724141)
 │   │   │   ├── 02-mountains.png  # RGBA sziluett, teteje a forrás y=163..201-nél
 │   │   │   └── 03-ruins.png      # RGBA sziluett, teteje a forrás y=193..227-nél
-│   │   └── cathedral/
-│   │       └── boss-arena.png    # 800x450, ÁTMÉRETEZETT/KIVÁGOTT — lásd BossScene alább
+│   │   ├── cathedral/
+│   │   │   └── boss-arena.png    # 800x450, ÁTMÉRETEZETT/KIVÁGOTT — lásd BossScene alább
+│   │   └── gothic-town/          # Level 2 parallax. GothicVania Town (Luis Zuno) — PUBLIC DOMAIN.
+│   │       │                     # MINDKETTŐ SZÁRMAZTATOTT, de VESZTESÉGMENTESEN: a forrás alsó
+│   │       │                     # sávja bitre azonos sorokból áll, tehát lefelé toldható.
+│   │       ├── 01-sky.png        # 384x450 = background.png (384x288) + 162 sor `#71405A`
+│   │       └── 02-town.png       # 768x450 = [middleground.png | TÜKRÖZVE] + 162 sor `#392D55`
+│   │                             # A tükrözés teszi vízszintesen varratmentessé (a nyers
+│   │                             # 384-es réteg bal és jobb éle érdemben eltér).
 │   ├── tiles/
 │   │   └── cathedral/            # Level 1 terrain. PixelPlatformerSet1 v1.1 (Szadi art) —
 │   │       │                     # PUBLIC DOMAIN. Kivágások, ÁTMÉRETEZÉS NÉLKÜL; a
@@ -353,16 +390,32 @@ the-wingless-crow/
 │   │       ├── platform-mid.png        # 32x16, vízszintesen VARRATMENTES
 │   │       ├── platform-edge-left.png  # 48x32 \ felső 16 = lap, alsó 16 = lelógó szikla
 │   │       ├── platform-edge-right.png # 48x32 /
-│   │       ├── door-gate.png           # 64x128, boltív; nyílás x=14..51, y=48..108
-│   │       └── ladder.png              # 32x16, függőlegesen VARRATMENTES (16px fok-osztás)
+│   │   │   ├── door-gate.png           # 64x128, boltív; nyílás x=14..51, y=48..108
+│   │   │   └── ladder.png              # 32x16, függőlegesen VARRATMENTES (16px fok-osztás)
+│   │   └── gothic-town/          # Level 2 terrain. GothicVania Town — PUBLIC DOMAIN.
+│   │       │                     # Öt VÁLTOZATLAN másolat + egy származtatott.
+│   │       ├── ground-strip.png        # 32x48 SZÁRMAZTATOTT: [ground-b.png | ground.png].
+│   │       │                           # A felső 9 sor ÁTLÁTSZÓ, a 9-15. a járható perem.
+│   │       ├── top-wood.png            # 16x16 pallólap (13 px rajzolt), vízszintesen VARRATMENTES
+│   │       ├── top-left-wood.png       # 32x32 \ végzáró: felső 13 lap, alsó 19 láb + merevítő
+│   │       ├── top-right-wood.png      # 32x32 /
+│   │       ├── wood-legs.png           # 32x16, MIND A 16 SORA AZONOS -> tetszőleges magasság
+│   │       └── ground-wood-legs.png    # 32x16 talpazat: alsó 7 sora = a talaj pereme
 │   ├── props/
-│   │   └── gothic-town/          # Level 1 hangulati propok. GothicVania Town (Luis Zuno) —
-│   │       │                     # PUBLIC DOMAIN. VÁLTOZATLAN másolatok, eredeti fájlnéven.
-│   │       ├── street-lamp.png   # 35x108 \ kő/vas: PROP_TINT_COOL_SOURCE
+│   │   └── gothic-town/          # Hangulati propok + háttér-házak. GothicVania Town (Luis
+│   │       │                     # Zuno) — PUBLIC DOMAIN. VÁLTOZATLAN másolatok, eredeti
+│   │       │                     # fájlnéven. A tint PLACEMENT-szintű: a Level 1 korrigál,
+│   │       │                     # a Level 2 PROP_TINT_NONE-t ad (ott ez a hazai paletta).
+│   │       ├── street-lamp.png   # 35x108 \ kő/vas: PROP_TINT_COOL_SOURCE (a Level 1-en)
 │   │       ├── well.png          # 65x65  /
 │   │       ├── wagon.png         # 93x75  \
-│   │       ├── crate.png         # 39x35   > fa: PROP_TINT_WARM_SOURCE
-│   │       └── crate-stack.png   # 73x68  /
+│   │       ├── crate.png         # 39x35   > fa: PROP_TINT_WARM_SOURCE (a Level 1-en)
+│   │       ├── crate-stack.png   # 73x68  /
+│   │       ├── barrel.png        # 24x30  \ a Level 2-vel jöttek, egyelőre csak ott
+│   │       ├── sign.png          # 37x45  /
+│   │       ├── house-a.png       # 168x183 \ HÁTTÉR-ÉPÜLETEK (BUILDING_TEXTURES): lapos talpúak,
+│   │       ├── house-b.png       # 210x244  > BUILDING_DEPTH (-15), tint NÉLKÜL, és a talpuk
+│   │       └── house-c.png       # 221x183 /  BUILDING_SINK_PX-szel a felszín ALÁ kerül
 │   └── sprites/
 │       ├── knight/               # player sprite sheetek, mind 128x64-es blokkokra vágva
 │       │   ├── Idle.png Run.png Jump.png Attacks.png
@@ -392,13 +445,16 @@ the-wingless-crow/
 │       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, slash/projectile/spell/charge, death)
 │       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown, SFX)
 │       ├── level1Layout.test.ts # a Level 1 geometria invariánsai (elérhetőség-BFS, gapek, enemy-bounds, spike-ok)
+│       ├── level2Layout.test.ts # ugyanaz a Level 2-re + ugrás-plafon, mozgó platform, létrák,
+│       │                        # állvány/konzol (platformHasLegs), házak és propok elhelyezése
+│       ├── movingPlatform.test.ts # a mozgásprofil (pure), a rider-szállítás és a fa-látvány szinkronja
 │       ├── hazards.test.ts      # HazardDamageGate + SpikeField geometria + SwingingReaper lengés
 │       ├── playerAnimations.test.ts       # state->anim leképezés + a Player animáció-vezérlése
 │       ├── crowHarvesterAnimations.test.ts # state->anim + a facing-kompenzáció regressziós tesztje
 │       ├── gravecallerAnimations.test.ts   # state->anim, facing, LEVEZETETT geometria/cast-időzítés
 │       ├── bossAnimations.test.ts         # state->anim, facing-kompenzáció SCALE-lel, levezetett konstansok
 │       ├── afterImageTrail.test.ts        # a dash sebesség-csíkja: throttle + geometria-másolás
-│       ├── parallaxBackground.test.ts     # scroll->tilePositionX + a Level 1 réteg-terv invariánsai
+│       ├── parallaxBackground.test.ts     # scroll->tilePositionX + a Level 1 ÉS Level 2 réteg-terv
 │       └── helpers/
 │           ├── fakePhaser.ts        # a 'phaser' modul önálló fake névtere (createFakePhaserModule)
 │           └── phaserTestUtils.ts   # megosztott mock scene/body/delayedCall-stepper helperek
@@ -408,9 +464,17 @@ the-wingless-crow/
 │   ├── config/
 │   │   └── physics.ts            # GRAVITY_Y — a main.ts ÉS a Level1Layout ugrás-számítása ebből dolgozik
 │   ├── levels/
+│   │   ├── LevelGeometry.ts      # MINDEN pályára érvényes: típusok, ugrás-plafon, pure helperek
+│   │   │                         # (surfaceSpan, groundGaps, enemyChaseBounds, platformHasLegs,
+│   │   │                         #  PROP_/BUILDING_ASSETS). A pályánkénti ADAT a LevelNLayoutban.
 │   │   ├── Level1Layout.ts       # a Level 1 TELJES geometriája, Phaser-mentes adatmodulként
-│   │   ├── LevelTileset.ts       # a terrain-csempék mérete/forrás-rectjei + a depth-rend
-│   │   └── LevelDecor.ts         # a hangulati propok kirakása (origin/depth/tint egy helyen)
+│   │   ├── Level2Layout.ts       # ugyanaz a Level 2-re (7200px, 9 szakasz) + a díszlet-adat
+│   │   ├── LevelTileset.ts       # Level 1 (cathedral) csempe-méretek/forrás-rectek + a depth-rend
+│   │   ├── GothicTownTileset.ts  # Level 2 (gothic-town) csempe-geometria + BUILDING_DEPTH
+│   │   ├── LevelTerrain.ts       # talaj + platform építés, HÁROM skinnel (cathedral/gothic-town/placeholder)
+│   │   └── LevelDecor.ts         # propok (createDecorProps) és háttér-házak (createBackdropBuildings)
+│   ├── platforms/
+│   │   └── MovingPlatform.ts     # Level 2 mozgó lap: pure mozgásprofil + kézi rider-szállítás
 │   ├── hazards/
 │   │   ├── HazardDamage.ts       # HazardDamageGate — KÖZÖS i-frame ablak minden hazardnak
 │   │   ├── SpikeField.ts         # statikus tüskemezők (látvány tileSprite + külön hitbox Zone)
@@ -422,7 +486,7 @@ the-wingless-crow/
 │   │   ├── Level1Scene.ts        # 6000px pálya; a geometria a levels/Level1Layout.ts-ből jön
 │   │   ├── BossScene.ts          # 800x450 fix aréna, boss entrance, HP-bar, victory/defeat ágak
 │   │   ├── NarrationScene.ts     # adatvezérelt szöveges átvezető (typewriter), újrahasználható
-│   │   └── Level2Scene.ts        # placeholder — a Level 2 tervezése még hátravan
+│   │   └── Level2Scene.ts        # 7200px pálya; a geometria a levels/Level2Layout.ts-ből jön
 │   ├── player/
 │   │   ├── Player.ts             # + CLIMB state, LadderContact interface, respawn()
 │   │   ├── PlayerAnimations.ts   # sprite geometria, anim kulcsok/frame-tartományok, animKeyForState()
@@ -437,6 +501,7 @@ the-wingless-crow/
 │   │   └── GraftedWingBreakerAnimations.ts # sheet geometria, anim kulcsok, időzítések forrása
 │   ├── systems/
 │   │   ├── CheckpointSystem.ts   # egyetlen aktív respawn-pont tárolása
+│   │   ├── LevelCheckpoint.ts    # a köztes checkpoint jelölője + zónája (mindkét pályán)
 │   │   ├── AudioManager.ts       # egy zenesáv (loop + fade) + állapot nélküli one-shot SFX
 │   │   ├── SpriteFacing.ts       # off-center sprite fordulás-kompenzáció (CrowHarvester + boss)
 │   │   ├── AfterImageTrail.ts    # afterimage-csík gyors mozgáshoz (a boss dash-éhez)
@@ -1018,6 +1083,82 @@ lényeges különbség, amiből minden más következik.
   az osztály csak a `hitsPlayer(x, y)` sugár-alapú döntést adja (mint a
   `CrowHarvester.resolveAttackHit()` és a boss `CHARGE_HIT_RANGE`-e).
 
+### Level 2 látvány (`levels/GothicTownTileset.ts`, `LevelTerrain.ts`, `LevelDecor.ts`)
+
+> A pálya GEOMETRIÁJA a `levels/Level2Layout.ts`-ben él (Phaser-mentes adatmodul, mint a
+> Level 1-nél); ez a szakasz csak a LÁTVÁNYRÓL szól. Forrás: **GothicVania Town**
+> (`PNG/environment`), public domain.
+
+**Parallax — KÉT réteg** (`LEVEL2_BACKGROUND_LAYERS`), a Level 1 három rétegével szemben:
+
+| réteg | textúra | scrollFactor | depth | top | height |
+|---|---|---|---|---|---|
+| ég + hegyek | `bg-town-sky` (384×450) | 0.10 | −30 | 0 | 450 |
+| város-sziluett | `bg-town` (768×450) | 0.30 | −25 | `TOWN_TOP` (142) | 308 |
+
+- **EGYIK SEM nyúlik függőlegesen** (`stretch: false`). A Level 1 ege sima színátmenet, azon
+  a nyújtás nem látszik; ezek viszont felhőket és hegygerincet tartalmaznak, amiken egy
+  288 → 450-es (1.5625×) nyújtás láthatóan torzítana. Helyette **a PNG-k már 450 magasak**,
+  a forrás egyszínű alsó sávjának veszteségmentes toldásával — lásd a 21. tanulságot.
+- **A `TOWN_TOP` LEVEZETETT**, egyetlen hangolóponttal (`TOWN_SOLID_BAND_PX = 100`, a Level 1
+  `SILHOUETTE_BOTTOM_Y`-jának megfelelője): a sziluett tömör alapja (a forrás 176. sora)
+  ennyivel a talaj fölött kezdődjön. Ebből a kompozíció: felhők 0–135 · hegygerinc 136–175 ·
+  város-sziluett 175–318 · tömör sötét alapsáv 318–418 · talaj 418–450.
+- **A tömör alapsávot a világ-koordinátás HÁZAK töltik ki** (183–244 px magasak a talajról) —
+  ezért nem elég egy távoli, ismétlődő ház-réteg, és ezért állnak a házak világ-térben.
+
+**Talaj.** A csempe felső 9 sora ÁTLÁTSZÓ, a 9–15. a világos törmelék-perem (= a járható
+felszín), a 16–47. sima sötét föld. Ezért van a `TOWN_TERRAIN_TOP_Y = GROUND_TOP − 9`: a
+tileSprite ennyivel a fizikai felszín FÖLÉ kerül.
+- **Szakadék-végzáró NINCS, és nem is hiányzik.** A csomagban nem létezik ilyen csempe (a
+  saját preview-jának talaja végig folyamatos), a perem alatti test viszont sima sötét föld,
+  tehát a nyers függőleges vágás tiszta földfalként olvas. A Level 1-nél azért kellett
+  végzáró, mert ANNAK a csempéjének díszített, világos oldala van.
+
+**Lebegő platform — KÉT változat.** A felépítés a csomag saját preview-jából van visszafejtve:
+`top-left-wood(32) + N×top-wood(16) + top-right-wood(32)`, alatta opcionálisan
+`wood-legs(32×16)` függőlegesen ismételve és `ground-wood-legs` talpazat.
+- **állvány (`legs`)** — a lábak a talajig futnak;
+- **konzol (`bracket`)** — csak a lap és a végzárók lelógó 19 px-e. Szakadék fölött ez az
+  egyetlen lehetséges, és pontosan a Level 1 `platform-edge-*`-ának a szerepe.
+- **A választás LEVEZETETT, nem adat** (`platformHasLegs()`), két feltétel ÉS-e:
+  (1) EGYETLEN talaj-szegmens tartalmazza a teljes lapot; (2) a két láb-oszlopban nincs
+  MÁSIK platform a lap alatt. A jelenlegi layouton **állvány:** `C1`, `C2`, `D-C1`, `G-P1`,
+  `G-P2`, `G-P3`, `H-ledge`; minden más konzol. A `boss-ledge` a (2) miatt konzol — alatta
+  végigfut a `H-ledge`; az `E-ledge` az (1) miatt, mert átlóg a `G3` peremén.
+- **A talpazat és a talaj-csempe TETEJE azonos** (`TOWN_TERRAIN_TOP_Y`): a
+  `ground-wood-legs.png` alsó 7 sora BITRE ugyanaz a perem, mint a `ground.png` 9–15. sora,
+  tehát azonos felső élről indítva folytonosan illeszkedik. Nincs mit kézzel eltolni.
+- **A `wood-legs` mind a 16 sora AZONOS** → a láb tetszőleges (nem 16-többszörös) magasságú
+  tileSprite-tal rajzolható, az utolsó félbevágott ismétlés nem látszik.
+- A lábak a VÉGZÁRÓK ELŐTT mennek ki a display listára, hogy a végzáró átlós merevítője
+  takarja az illesztést, ne fordítva.
+
+**Mozgó platform.** Ugyanaz a három csempe, **láb nélkül** (mind szakadék fölött jár), és a
+látvány külön objektum, amit a `MovingPlatform.syncVisuals()` a bodyval EGYÜTT mozgat minden
+frame-ben. Nem `Container`: a konténer gyerekeinek a depth-je a konténeréhez kötődne, a
+lapnak viszont a többi terrain-elemmel azonos `TERRAIN_DEPTH`-en kell lennie.
+A megkülönböztető tint MEGMARADT (a felismerhetőség gameplay-információ), de fára hangolva:
+`MOVING_PLATFORM_WOOD_TINT = 0xffc890` — MULTIPLY tint csak sötétíteni tud, tehát világosítás
+helyett MELEGÍTÉS `(58,38,56)` → `(58,30,31)`.
+
+**Díszlet.** `BACKDROP_BUILDINGS` (6 ház, `BUILDING_DEPTH = −15`) és `DECOR_PROPS` (17 prop,
+`DECOR_DEPTH = −10`) — a mélységsor tehát: sziluett → ház → prop → terrain → player.
+- **A házak talpa `BUILDING_SINK_PX = 2`-vel a felszín ALÁ kerül.** MÉRT érték a csomag
+  preview-jából (a házak talpa ott 251, a felszín 249): ettől „a földben áll" a ház, nem rá
+  van ragasztva.
+- **A propok tintje PLACEMENT-szintű** (`DecorPropDef.tint`), nem textúra-szintű: ugyanaz a
+  lámpa a Level 1 cathedral-tónusában korrekciót kíván, a Level 2-n viszont hazai pályán van
+  (`PROP_TINT_NONE = 0xffffff`, ami MULTIPLY-ban NO-OP).
+- **A ház-invariánsok 2D-ben vizsgálódnak, nem csak vízszintesen** (`boxesOverlap`). A pálya
+  emeletes: egy talajon álló láda és egy fölötte lévő párkányon álló checkpoint lehet azonos
+  x-en, 160 px függőleges távolsággal — egy pusztán vízszintes tiltás ott hamis riasztást
+  adna, amit a következő karbantartó jogosan gyengítene fel. *(A teszt írása közben pontosan
+  ez történt: az `E-crate-1` bukott a `CP-2`-n.)*
+- **A „ne nőj bele a fölötted lévő platform aljába" szabály CSAK a propokra vonatkozik.** A
+  házak a `BUILDING_DEPTH`-en hátrébb vannak a terrainnél, tehát egy előttük álló állvány
+  takarja őket — pontosan a forrás preview rétegzése.
+
 ### NarrationScene (`src/scenes/NarrationScene.ts`)
 - Adatvezérelt, újrahasználható szöveges átvezető: `scene.start('NarrationScene', { lines, nextScene, title? })`
 - Typewriter reveal; **Space/Enter** = gépelés közben teljes sor, kész sornál a következő sor;
@@ -1219,6 +1360,30 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
     végigjátszáson „működőnek" látszott volna (a lény lő, a player megöli); a hiba abból
     derült ki, hogy a *„túl közeli player → hátrál"* teszt `velocity 0`-t kapott. A javítás
     (`applySpacing()` visszaadja, hogy ÁLL-e, és a cast kapuja ez) egyben jobb gameplay is.
+21. **Mielőtt egy háttérréteget FÜGGŐLEGESEN NYÚJTANÁL, nézd meg, nem toldható-e.** A
+    GothicVania Town rétegei 288 magasak, a viewportunk 450. A `stretch: true` (a Level 1
+    egének útja) itt torzított volna, mert ezeken felhő és hegygerinc van — a Level 1 ege
+    viszont sima színátmenet, azon nem látszik. Mérés helyettesítette a kompromisszumot: a
+    `background.png` **186–287. sora**, illetve a `middleground.png` **236–287. sora** BITRE
+    AZONOS, egyszínű sorokból áll (`#71405A` / `#392D55`). A hiányzó 162 sort tehát egyszerűen
+    hozzá lehetett tenni — a réteg 1:1 marad, a pixelsűrűség változatlan. **Egy nem-egész
+    skálázás (1.5625×) pixel arton mindig rosszabb, mint egy mért toldás.**
+22. **Nem varratmentes háttérréteget TÜKÖR-CSEMPÉZÉSSEL lehet ismételhetővé tenni.** A
+    `middleground.png` bal és jobb éle érdemben eltér (a sziluett teteje 55–100 vs. 117, 90
+    sor tér el >8-cal), tehát sima csempézésnél 384 px-enként függőleges lépcső látszana.
+    A `[forrás | vízszintesen tükrözött forrás]` 768-as textúrában viszont a bal él `mg[0]`,
+    a jobb él szintén `mg[0]`, a belső varrat pedig `mg[383]`↔`mg[383]` — mindkét átmenet
+    duplázott oszlopra esik, tehát láthatatlan. Ára egy tükör-szimmetria, ami egy 0.3-as
+    scrollFactorú, távoli sziluetten nem tűnik fel. **Ellenőrizd MÉRÉSSEL, hogy egy réteg
+    varratmentes-e** (a wrap-seam eltérése ne legyen nagyobb a képen belüli szomszéd-oszlopok
+    eltérésénél) — a `background.png` átment ezen (1.06 vs. 0.85), a `middleground.png` nem.
+23. **Egy asset-csomag SAJÁT preview-képe a leghitelesebb dokumentáció.** A GothicVania Town
+    `environment-preview.png`-jét template-matcheléssel visszafejtve derült ki minden, amit
+    a fájlnevek nem árulnak el: hogy a KÉT talaj-variánst 32 px-es periódusban VÁLTOGATNI
+    kell (`ground-b` @0,64,96…, `ground` @48,80,112…), hogy a fa-állvány pontosan hogyan épül
+    fel, és hogy a házak talpa 2 px-rel a felszín ALÁ kerül. Egyik sem volt kitalálható —
+    és a `ground-corner`/`ground-wall` csempéket enélkül simán szakadék-peremnek néztem
+    volna, holott azok a preview kézzel épített kőházának az alapzata.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
@@ -1309,10 +1474,13 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   lila, Gravecaller zöld. *(A Necromancer csomagban VAN cast-effekt sheet, de a mérés
   szerint az egy szétfoszló BECSAPÓDÁS — 30→4 px —, nem loopolható repülő bolt, ezért
   maradt a placeholder; valódi asset az `assets/effects/` iterációban.)*
-- `Level2Scene` teljes egészében placeholder ("Level 2 — The Crowless Forest / tervezés alatt"), és benne az **R billentyű** visszavisz a `Level1Scene`-re — kizárólag azért, hogy a `Level1 → Boss → átvezető → Level2` lánc manuálisan körbejárható legyen. A valódi Level 2 elkészültekor törlendő
+- A `Level2Scene`-ben az **R billentyű** visszavisz a `Level1Scene`-re — kizárólag azért, hogy a `Level1 → Boss → átvezető → Level2` lánc manuálisan körbejárható legyen, amíg a `Boss2Scene` nem létezik. Annak elkészültekor törlendő
+- A Level 2 **létrája (`ladder-placeholder`) és boss-ajtaja (`door-placeholder`)** még kódból generált: a GothicVania Town csomagban nincs létra, a cathedral `door-gate` geometriája (`DOOR_APERTURE`, `DOOR_THRESHOLD_PX`) pedig ahhoz a konkrét PNG-hez van mérve. Olcsó részleges javítás a Level 1 `tile-ladder`-ének újrahasználata (már be van töltve)
+- A **`BootScene.START_SCENE` jelenleg `'Level2Scene'`** — fejlesztéshez, hogy a Level 2 közvetlenül tesztelhető legyen. **Commit előtt `'Level1Scene'`-re állítandó**
 - A `BOSS_VICTORY_NARRATION` szövege placeholder lore — a végleges a Phase 9 – Lore-ban készül
 - A `BootScene` "Betöltés..." szövege + progress-sávja nyers `add.text` / `Graphics` — a `ui/` modulba költözik, amint több asset (sprite-ok) is betöltendő lesz
-- `main.ts`-ben `arcade.debug: true` — a physics bodyk és a létra zónája ki van rajzolva
+- `main.ts`-ben `arcade.debug` — jelenleg **`false`**. `true`-ra állítva kirajzolja a physics
+  bodykat és a létra zónáját; a layout hangolásához hasznos, a látvány megítéléséhez zavaró
 - A training dummy és a régi 'H' debug billentyű (self-damage teszteléshez) már törölve lett, miután a CrowHarvester valódi sebzésforrássá vált
 
 ## Következő lépés
@@ -1320,13 +1488,14 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 **A DÖNTÉSI PONT ELDŐLT: „Többi Enemy típus, Level2 és 2. Boss".** Ezen belül az
 **Enemy 2 (Gravecaller) KÉSZ** — lásd fentebb. Ami a választott irányból még hátravan:
 
-1. **Level 2 – The Crowless Forest.** Jelenleg placeholder scene. A Project_plan 14. pontja
-   szerint „Archer / sötétebb környezet / több platforming" — a Gravecallerrel az „Archer"
-   szerep már megvan, tehát a Level 2 lehet az első pálya, ahol több példány is szerepel.
-   *(A Level 1 layout-ja `Level1Layout.ts`-ként Phaser-mentes adatmodul + unit-tesztelt
-   invariánsok — ezt a mintát érdemes átvinni.)*
+1. **Level 2 – The Crowless Quarter.** A geometria (`Level2Layout.ts`, 7200 px, 9 szakasz,
+   mozgó platformok, hazardok, 10 CrowHarvester + 4 Gravecaller) és a LÁTVÁNY is KÉSZ.
+   Hátravan: **zene** (jelölt: a *Free Dark Fantasy Music* csomag `Elkmire Keep (LOOP)`-ja),
+   **SFX**, és a hazard-/lövedék-/létra-/ajtó-placeholderek cseréje.
 2. **Boss 2.** Jelölt aréna-háttér már van: `2D helper/level/Bossbackground_2.png`
    (angyal-szobros katedrális, nyitott égbolttal) — külön aréna, nem a Boss 1 variánsa.
+   A `Level2Scene` ajtaja már a `'Boss2Scene'` kulcsot célozza: a scene regisztrálásakor
+   magától élni fog.
 3. **Enemy 3 – Beast** (opcionális, a terv szerint is): gyorsabb, agresszívebb.
    `PATROL → DETECT → CHARGE → ATTACK → COOLDOWN`.
 
@@ -1362,8 +1531,8 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
   végigsöpri), és áthaladásonként 20 sebzés. Ha ez soknak bizonyul, az elsődleges
   nehézség-hangolópont a `periodMs` (2400, lassabb lengés = szélesebb ablak), utána a
   `REAPER_DAMAGE`.
-- **A `main.ts` `arcade.debug: true`** minden hitboxot kirajzol, ami a layout vizuális
-  megítélését érdemben rontja. Egy hangoló körhöz érdemes lehet ideiglenesen kikapcsolni.
+- **A `main.ts` `arcade.debug`** minden hitboxot kirajzol, ami a layout vizuális megítélését
+  érdemben rontja. Jelenleg `false`; egy geometria-hangoló körhöz kapcsold vissza.
 - **Tutorial feliratok hossza** (`HINT_HOLD_MS` = 4000) és pozíciója.
 - **A köztes checkpoint helye** (x=3000, a spike-szakasz után) — a G4/E szakasz és az F
   szakasz így egyetlen, hosszú, checkpoint nélküli blokk.
@@ -1377,18 +1546,20 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
   helyeken egy event a bevett minta szerint). A TomMusic csomagban van hozzájuk
   `Footsteps/`, `Spell Impact`, `Doors Gates and Chests` (checkpoint) és `Torch` is.
 - **Environment sprite-ok** — a player (2. it.), a CrowHarvester (3. it.), a Level 1 háttere
-  (4. it.), a boss aréna háttere (5. it.), a boss (6. it.) és a Level 1 terrainje (10. it.)
-  kész; **már csak a hazardok** (tüske, reaper, checkpoint-jelölő) **és a HÁROM lövedék**
-  placeholder.
+  (4. it.), a boss aréna háttere (5. it.), a boss (6. it.), a Level 1 terrainje (10. it.) és
+  a TELJES Level 2 látvány kész; **már csak a hazardok** (tüske, reaper, checkpoint-jelölő),
+  a **HÁROM lövedék**, valamint a **Level 2 létrája és boss-ajtaja** placeholder.
   A `2D helper/Sprites/` alatt van még Enemy01/02/03/05 és egy "Gino Character" — ha
   bármelyik enemy-jelöltként bejön, számíts rá, hogy szintén off-center lesz; a
   `systems/SpriteFacing.ts` már készen áll rá (lásd a 16. technikai tanulságot).
 - **Hangulati propok a Level 1-re (11. iteráció) — KÉSZ**, lásd fentebb. **A GothicVania Town
   csomag ÚJ a projektben → a user `2D helper/Credits.txt`-jébe felveendő**
-  (`https://opengameart.org/content/gothicvania-town`). A csomagban maradt még használható
-  elem egy jövőbeli körhöz: `barrel.png` (24×30), `sign.png` (37×45), három ház
-  (`house-a/b/c.png`), valamint egy fa állvány-platform készlet
-  (`top-wood` / `wood-legs` / `top-left-wood` / `top-right-wood`).
+  (`https://opengameart.org/content/gothicvania-town`). **A Level 2 látvány-iterációja
+  ugyanennek a csomagnak az `environment` mappáját használja fel** (parallax rétegek, talaj,
+  fa-platformok, házak, `barrel`, `sign`) — egy credit-sor tehát mindkettőt lefedi.
+  A csomagban ezután is maradt kihasználatlan elem: a `stairs*` lépcső-készlet (16×32-es
+  fokok — a projektben nincs átlós járható elem), a `window`/`roof`/`wall` házépítő csempék,
+  és a `Music/rpg_village02_loop` sáv.
 - **Menü / átvezető ambient.** A Level 1 és a boss aréna zenéje KÉSZ (1. és 9. iteráció).
   A `NarrationScene` és a `Level2Scene` még néma. Figyelem: az `AudioManager`
   **scene-hatókörű** (a scene shutdownja elvágja) — ez a pálya-zenéknél előny, de egy
@@ -1400,7 +1571,6 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
   **Mindkét háttér, mind a három karakter és a Level 1 terrainje kész.**
 - `ui/` modul: valódi HUD a debug `add.text`-ek helyett, és a boss HP-bar átköltöztetése
   a `BossScene.drawBossHealthBar()`-ból. Ide kerülhet a `BootScene` betöltésjelzője is.
-- A `main.ts` `arcade.debug: true` kikapcsolása.
 
 **Phase 8 után jön a Döntési pont** (lásd fentebb és a Project_plan.md 21. pontjában):
 többi Enemy típus + Level + Bossok, VAGY tovább a Lore (Phase 9) / QA (Phase 10) irányba.

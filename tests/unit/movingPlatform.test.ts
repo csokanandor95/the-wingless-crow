@@ -33,7 +33,11 @@ import {
   movingPlatformSpan,
   type MovingPlatformDef,
 } from '../../src/levels/LevelGeometry';
-import { createMockStaticGroup } from './helpers/phaserTestUtils';
+import { createMockScene, createMockStaticGroup } from './helpers/phaserTestUtils';
+import {
+  TOWN_CAP_SIZE,
+  TOWN_TILE_TEXTURES,
+} from '../../src/levels/GothicTownTileset';
 
 /** Vízszintes: 200 px út 100 px/s-mal = 2000 ms, 500 ms megállással -> 5000 ms ciklus. */
 const HORIZONTAL: MovingPlatformDef = {
@@ -334,5 +338,86 @@ describe('MovingPlatform', () => {
     const delta = lift.getDelta();
     lift.carry(sinking);
     expect(sinking.y, 'süllyedéskor át KELL vinni az y-t').toBeCloseTo(200 + delta.y, 6);
+  });
+});
+
+// --- A fa-látvány (Level 2 / gothic-town skin) -------------------------------
+//
+// A valódi csempekészletnél a LÁTVÁNY és a FIZIKA külön objektum (a static spriteot
+// vízszintesen skálázzuk, ami egy valódi textúrát megnyújtana). Egy mozgó lapnál ebből egy
+// új hibalehetőség születik, ami a statikus platformoknál nem létezik: a látvány
+// ELCSÚSZHAT a testtől. Ezek a tesztek pontosan ezt zárják ki.
+
+describe('MovingPlatform — gothic-town látvány', () => {
+  function createWooden(def: MovingPlatformDef = HORIZONTAL) {
+    const group = createMockStaticGroup();
+    const scene = createMockScene();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const platform = new MovingPlatform(def, group as any, scene as any, 'gothic-town');
+    return { group, scene, platform };
+  }
+
+  it('a fizikai sprite LÁTHATATLAN, a látványt a három fa-csempe adja', () => {
+    const { group, scene } = createWooden();
+
+    expect(group.created[0].visible).toBe(false);
+    expect(scene.add.tileSprite).toHaveBeenCalledTimes(1); // a pallólap
+    expect(scene.add.image).toHaveBeenCalledTimes(2); // a két végzáró
+
+    const textures = scene.add.image.mock.calls.map((call) => call[2]);
+    expect(textures).toEqual([
+      TOWN_TILE_TEXTURES.PLATFORM_CAP_LEFT,
+      TOWN_TILE_TEXTURES.PLATFORM_CAP_RIGHT,
+    ]);
+  });
+
+  it('LÁBA SOSINCS — a mozgó lapok mind szakadék fölött járnak', () => {
+    const { scene } = createWooden();
+
+    const textures = [
+      ...scene.add.image.mock.calls.map((call) => call[2]),
+      ...scene.add.tileSprite.mock.calls.map((call) => call[4]),
+    ];
+    expect(textures).not.toContain(TOWN_TILE_TEXTURES.PLATFORM_LEGS);
+    expect(textures).not.toContain(TOWN_TILE_TEXTURES.PLATFORM_FOOT);
+  });
+
+  it('a látvány a testtel EGYÜTT mozdul, minden frame-ben', () => {
+    // Ez a valódi kockázat: ha a syncVisuals() kimarad az update()-ből, a deszkalap a
+    // kiindulási végponton ragad, miközben a player egy láthatatlan testen utazik.
+    const { group, scene, platform } = createWooden();
+    const deck = scene.add.tileSprite.mock.results[0].value;
+    const [capLeft, capRight] = scene.add.image.mock.results.map((r) => r.value);
+    const halfWidth = HORIZONTAL.tiles * 32;
+
+    for (const step of [400, 250, 16, 1000]) {
+      platform.update(step);
+
+      const body = group.created[0];
+      expect(deck.x).toBeCloseTo(body.x - halfWidth, 6);
+      expect(capLeft.x).toBeCloseTo(body.x - halfWidth, 6);
+      expect(capRight.x).toBeCloseTo(body.x + halfWidth - TOWN_CAP_SIZE, 6);
+      expect(deck.y).toBeCloseTo(body.y - MOVING_PLATFORM_HEIGHT / 2, 6);
+    }
+  });
+
+  it('a függőleges lift látványa is követi a testet', () => {
+    const { group, scene, platform } = createWooden(VERTICAL);
+    const deck = scene.add.tileSprite.mock.results[0].value;
+
+    platform.update(400);
+    platform.update(1000);
+
+    expect(group.created[0].y).toBeLessThan(VERTICAL.fromY);
+    expect(deck.y).toBeCloseTo(group.created[0].y - MOVING_PLATFORM_HEIGHT / 2, 6);
+  });
+
+  it('skin nélkül a régi viselkedés marad: látható, tintelt fizikai sprite', () => {
+    const group = createMockStaticGroup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    new MovingPlatform(HORIZONTAL, group as any);
+
+    expect(group.created[0].visible).not.toBe(false);
+    expect(group.created[0].tint).not.toBeNull();
   });
 });

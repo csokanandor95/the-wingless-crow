@@ -1,9 +1,17 @@
 import type Phaser from 'phaser';
 import {
+  MOVING_PLATFORM_HEIGHT,
   movingPlatformSpan,
   type MovingPlatformDef,
   type Span,
 } from '../levels/LevelGeometry';
+import type { TerrainSkin } from '../levels/LevelTerrain';
+import { TERRAIN_DEPTH } from '../levels/LevelTileset';
+import {
+  TOWN_CAP_SIZE,
+  TOWN_DECK_HEIGHT,
+  TOWN_TILE_TEXTURES,
+} from '../levels/GothicTownTileset';
 
 /**
  * Mozgó platform (Level 2) — a projekt első ilyen eleme.
@@ -49,6 +57,17 @@ export const RIDE_TOLERANCE_Y = 6;
 
 /** Világosabb, mint a `platform-placeholder` alap szürkéje: a mozgó lap váljon el a fixtől. */
 const MOVING_PLATFORM_TINT = 0x8f9bb3;
+
+/**
+ * Ugyanaz a szándék a fa-skinen: **a mozgó platform felismerhetősége gameplay-információ**,
+ * nem dekoráció — a player a lap ránézésre tudja, hogy az mozogni fog.
+ *
+ * A MULTIPLY tint viszont csak sötétíteni tud (lásd CLAUDE.md 14. tanulság), tehát
+ * világosítás helyett MELEGÍTÉS: a zöld/kék csatornát visszavéve a hideg-lilás palló
+ * `(58,38,56)` -> `(58,30,31)` meleg, vörösesbarna deszkává válik. Más faanyag, azonos
+ * fényesség — a lap nem "villog ki" a pályából, csak elválik a statikusaktól.
+ */
+const MOVING_PLATFORM_WOOD_TINT = 0xffc890;
 
 /** A teljes út hossza az egyik végponttól a másikig. */
 export const platformTravelDistance = (def: MovingPlatformDef): number =>
@@ -113,10 +132,19 @@ export function isRiding(
   );
 }
 
+/** Egy látvány-elem és a lap KÖZÉPPONTJÁHOZ képesti eltolása (bal-felső sarok). */
+interface VisualPart {
+  obj: Phaser.GameObjects.Components.Transform;
+  offsetX: number;
+  offsetY: number;
+}
+
 export default class MovingPlatform {
   readonly def: MovingPlatformDef;
 
   private readonly sprite: Phaser.Physics.Arcade.Sprite;
+  /** Csak a valódi tilesetnél nem üres: a lap külön látvány-objektumai. */
+  private readonly visuals: VisualPart[] = [];
   private elapsedMs = 0;
   private currentX: number;
   private currentY: number;
@@ -128,8 +156,17 @@ export default class MovingPlatform {
    * A lap a scene statikus platform-groupjába kerül (nem sajátba): így ugyanabba a
    * collider-regisztrációba esik, mint a fix lapok — a player és a lövedékek ütközése
    * egyetlen helyen van bekötve, és a mozgó platform nem igényel új sort a scene-ben.
+   *
+   * A `scene` és a `skin` csak a LÁTVÁNYHOZ kell: a `'gothic-town'` skinnél a fizikai sprite
+   * — a statikus lapokhoz hasonlóan — láthatatlanná válik, mert vízszintesen skálázzuk (ami
+   * egy valódi csempét megnyújtana), és a látványt külön tileSprite + két végzáró adja.
    */
-  constructor(def: MovingPlatformDef, group: Phaser.Physics.Arcade.StaticGroup) {
+  constructor(
+    def: MovingPlatformDef,
+    group: Phaser.Physics.Arcade.StaticGroup,
+    scene?: Phaser.Scene,
+    skin: TerrainSkin = 'placeholder'
+  ) {
     this.def = def;
 
     const start = platformPositionAt(0, def);
@@ -142,10 +179,49 @@ export default class MovingPlatform {
       'platform-placeholder'
     ) as Phaser.Physics.Arcade.Sprite;
     this.sprite.setScale(def.tiles, 1).refreshBody();
-    // Egyelőre placeholder skin (nincs Level 2 tileset) — a látvány MAGA a fizikai sprite.
-    // Enyhén világosabb tint különbözteti meg a statikus lapoktól: a mozgó platform
-    // felismerhetősége gameplay-információ, nem dekoráció.
+
+    if (skin === 'gothic-town' && scene) {
+      this.sprite.setVisible(false);
+      this.createWoodVisual(scene);
+      this.syncVisuals();
+      return;
+    }
+
+    // Placeholder skin — a látvány MAGA a fizikai sprite. Enyhén világosabb tint
+    // különbözteti meg a statikus lapoktól: a mozgó platform felismerhetősége
+    // gameplay-információ, nem dekoráció.
     this.sprite.setTint(MOVING_PLATFORM_TINT);
+  }
+
+  /**
+   * A fa-lap ugyanabból a három csempéből áll, mint a statikus (deszkalap + két végzáró),
+   * de **lába SOSINCS**: a mozgó platformok mind szakadék fölött járnak, ahol nincs mibe
+   * kapaszkodnia — és egy vele együtt mozgó "állvány" amúgy is értelmetlen lenne.
+   */
+  private createWoodVisual(scene: Phaser.Scene): void {
+    const halfWidth = this.def.tiles * 32;
+    const top = -MOVING_PLATFORM_HEIGHT / 2;
+
+    const deck = scene.add
+      .tileSprite(0, 0, halfWidth * 2, TOWN_DECK_HEIGHT, TOWN_TILE_TEXTURES.PLATFORM_DECK)
+      .setOrigin(0, 0)
+      .setTint(MOVING_PLATFORM_WOOD_TINT)
+      .setDepth(TERRAIN_DEPTH);
+    this.visuals.push({ obj: deck, offsetX: -halfWidth, offsetY: top });
+
+    // A végzárók a lap UTÁN kerülnek a display listára, tehát RÁ rajzolódnak — ugyanaz a
+    // sorrend-indok, mint a statikus lapoknál.
+    for (const [offsetX, texture] of [
+      [-halfWidth, TOWN_TILE_TEXTURES.PLATFORM_CAP_LEFT],
+      [halfWidth - TOWN_CAP_SIZE, TOWN_TILE_TEXTURES.PLATFORM_CAP_RIGHT],
+    ] as const) {
+      const cap = scene.add
+        .image(0, 0, texture)
+        .setOrigin(0, 0)
+        .setTint(MOVING_PLATFORM_WOOD_TINT)
+        .setDepth(TERRAIN_DEPTH);
+      this.visuals.push({ obj: cap, offsetX, offsetY: top });
+    }
   }
 
   /** A scene minden frame-ben meghívja a frame-idővel. */
@@ -161,6 +237,18 @@ export default class MovingPlatform {
     // Static bodynál a `refreshBody()` KÖTELEZŐ: enélkül a body a régi helyén maradna, és a
     // látvány elcsúszna a fizikától.
     this.sprite.setPosition(next.x, next.y).refreshBody();
+    this.syncVisuals();
+  }
+
+  /**
+   * A látvány-elemek a bodyval EGYÜTT, UGYANABBAN a frame-ben mozdulnak. Külön Container
+   * helyett kézi pozicionálás: a Container gyerekeinek a depth-je a konténeréhez kötődne,
+   * a lapnak viszont a többi terrain-elemmel azonos `TERRAIN_DEPTH`-en kell lennie.
+   */
+  private syncVisuals(): void {
+    for (const part of this.visuals) {
+      part.obj.setPosition(this.currentX + part.offsetX, this.currentY + part.offsetY);
+    }
   }
 
   getSpan(): Span {

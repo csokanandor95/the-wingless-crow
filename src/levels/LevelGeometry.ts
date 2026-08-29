@@ -182,6 +182,64 @@ export const platformRight = (p: PlatformDef): number => p.x + p.tiles * 32;
 export const platformBottom = (p: PlatformDef): number =>
   platformTop(p) + PLATFORM_TILE_HEIGHT;
 
+/**
+ * A platform-végzáró (és vele a lelógó láb) szélessége. A `GothicTownTileset.TOWN_CAP_SIZE`
+ * MÁSOLATA — itt azért kell, hogy a `platformHasLegs()` Phaser-mentes maradjon anélkül, hogy
+ * a tileset-modulra hivatkozna (az viszont IDE importál, `GROUND_TOP`-ért).
+ */
+const LEG_COLUMN_WIDTH = 32;
+
+/**
+ * Állványt (a talajig lefutó lábakat) kap-e a platform, vagy csak konzolt (a végzárók
+ * lelógó 19 px-ét)?
+ *
+ * **LEVEZETETT, nem adat.** Egy `support: 'legs'` mező mellett egy platform elmozdítása
+ * csendben ottfelejtené a rossz értéket; így viszont a geometria dönt — ugyanaz az elv, mint
+ * az `enemyChaseBounds()`-nál, ahol szintén a felület pereme számít, nem egy kézzel írt szám.
+ *
+ * Két feltétel ÉS-e:
+ *  1. **egyetlen** talaj-szegmens tartalmazza a TELJES lapot — szakadék fölé nyilván nem
+ *     lóghat láb, és egy peremen átlógó lapnál (`E-ledge`) az egyik láb a semmiben állna;
+ *  2. a két láb-oszlopban nincs MÁSIK platform a lap alatt — különben a láb átdöfné azt
+ *     (a `boss-ledge` alatt végigfut a `H-ledge`).
+ */
+export function platformHasLegs(def: PlatformDef, level: LevelGeometry): boolean {
+  const left = platformLeft(def);
+  const right = platformRight(def);
+
+  const onGround = level.groundSegments.some((g) => g.startX <= left && right <= g.endX);
+  if (!onGround) return false;
+
+  const legColumns: Array<[number, number]> = [
+    [left, left + LEG_COLUMN_WIDTH],
+    [right - LEG_COLUMN_WIDTH, right],
+  ];
+
+  return !level.platforms.some((other) => {
+    if (other.id === def.id) return false;
+    // Csak az számít, ami a lap ALATT van: ami fölötte, azt a láb nem érinti.
+    if (platformTop(other) <= platformTop(def)) return false;
+
+    const otherLeft = platformLeft(other);
+    const otherRight = platformRight(other);
+    return legColumns.some(([lx, rx]) => otherLeft < rx && lx < otherRight);
+  });
+}
+
+/**
+ * A láb-oszlopok vízszintes sávjai — a layout-tesztek ezzel bizonyítják, hogy egyetlen láb
+ * sem áll tüskemezőben, létra mászási zónájában vagy checkpoint-jelölőn.
+ */
+export function platformLegColumns(def: PlatformDef): Array<{ left: number; right: number }> {
+  const left = platformLeft(def);
+  const right = platformRight(def);
+
+  return [
+    { left, right: left + LEG_COLUMN_WIDTH },
+    { left: right - LEG_COLUMN_WIDTH, right },
+  ];
+}
+
 // --- Egy pálya geometriai magja ---------------------------------------------
 
 /**
@@ -569,6 +627,9 @@ export const PROP_TEXTURES = {
   WELL: 'prop-well',
   CRATE: 'prop-crate',
   CRATE_STACK: 'prop-crate-stack',
+  // A Level 2-vel bejött két további prop UGYANEBBŐL a csomagból (`props-sliced/`).
+  BARREL: 'prop-barrel',
+  SIGN: 'prop-sign',
 } as const;
 
 export type PropTexture = (typeof PROP_TEXTURES)[keyof typeof PROP_TEXTURES];
@@ -594,6 +655,18 @@ export const PROP_TINT_WARM_SOURCE = 0xc0b890;
 export const PROP_TINT_COOL_SOURCE = 0xffdc71;
 
 /**
+ * „Ne korrigálj" — a Level 2 propjai ezt kapják.
+ *
+ * A fenti két tint a cathedral-paletta korrekciója: ezek a propok EREDETILEG a GothicVania
+ * Town csomagból valók, tehát a Level 1-en idegen palettába kellett őket beilleszteni. A
+ * Level 2 MAGA az a csomag, ott tehát a nyers szín a helyes.
+ *
+ * `0xffffff` MULTIPLY módban NO-OP (a fehér a szorzás egységeleme) — lásd CLAUDE.md 14.
+ * tanulság. Ezért nem kell se külön flag, se elágazás a render-oldalon.
+ */
+export const PROP_TINT_NONE = 0xffffff;
+
+/**
  * A PNG-k tényleges mérete + a hozzájuk tartozó tint. Azért itt van, és nem a render-oldalon,
  * mert a LÁBNYOM ebből számítódik: a layout-tesztek ezzel bizonyítják, hogy egyetlen prop sem
  * lóg szakadékba, tüskemezőbe vagy a kasza söprési sávjába — GameObject-mock nélkül.
@@ -611,6 +684,10 @@ export const PROP_ASSETS: Record<
   [PROP_TEXTURES.WAGON]: { width: 93, height: 75, tint: PROP_TINT_WARM_SOURCE },
   [PROP_TEXTURES.CRATE]: { width: 39, height: 35, tint: PROP_TINT_WARM_SOURCE },
   [PROP_TEXTURES.CRATE_STACK]: { width: 73, height: 68, tint: PROP_TINT_WARM_SOURCE },
+  // A két Level 2-es prop a saját csomagja palettájában marad (lásd PROP_TINT_NONE); a
+  // `tint` mező viszont KÖTELEZŐ, tehát itt is ki van írva, nem hallgatólagos default.
+  [PROP_TEXTURES.BARREL]: { width: 24, height: 30, tint: PROP_TINT_NONE },
+  [PROP_TEXTURES.SIGN]: { width: 37, height: 45, tint: PROP_TINT_NONE },
 };
 
 export interface DecorPropDef {
@@ -622,10 +699,69 @@ export interface DecorPropDef {
   surfaceId: string;
   /** Vízszintes tükrözés — ugyanabból a textúrából ad változatosságot. */
   flipX?: boolean;
+  /**
+   * Felülírja a `PROP_ASSETS[texture].tint`-et. Azért PLACEMENT-szintű, mert ugyanaz a
+   * textúra két pályán két palettába kerül: a `street-lamp` a Level 1 cathedral-tónusában
+   * korrekciót kíván, a Level 2-n viszont hazai pályán van (`PROP_TINT_NONE`).
+   */
+  tint?: number;
 }
 
 /** A prop lábnyoma a talajon — a tesztek és az ütközés-vizsgálatok ebből dolgoznak. */
 export function decorPropFootprint(def: DecorPropDef): { left: number; right: number } {
   const half = PROP_ASSETS[def.texture].width / 2;
+  return { left: def.x - half, right: def.x + half };
+}
+
+/** A ténylegesen alkalmazandó tint: a placement felülírja a textúra alapértelmezését. */
+export const decorPropTint = (def: DecorPropDef): number =>
+  def.tint ?? PROP_ASSETS[def.texture].tint;
+
+// --- Háttér-épületek --------------------------------------------------------
+
+/**
+ * A háttérben álló házak (Level 2). SZÁNDÉKOSAN külön típus a `DecorPropDef`-től, nem egy
+ * opcionális mezőkkel felhígított közös: három ponton térnek el (mélység, talp-besüllyesztés,
+ * nulla tint), és a lábnyomuk nagyságrendje is más — egy 221 px-es ház elhelyezési szabályai
+ * nem ugyanazok, mint egy 24 px-es hordóé.
+ *
+ * Forrás: GothicVania Town `props-sliced/`, változatlan másolatok. Mindhárom LAPOS TALPÚ
+ * (az alsó képsoruk átlátszatlan), tehát `origin (0.5, 1)`-gyel pontosan a felszínre állnak.
+ */
+export const BUILDING_TEXTURES = {
+  HOUSE_A: 'building-house-a',
+  HOUSE_B: 'building-house-b',
+  HOUSE_C: 'building-house-c',
+} as const;
+
+export type BuildingTexture = (typeof BUILDING_TEXTURES)[keyof typeof BUILDING_TEXTURES];
+
+export const BUILDING_ASSETS: Record<BuildingTexture, { width: number; height: number }> = {
+  [BUILDING_TEXTURES.HOUSE_A]: { width: 168, height: 183 },
+  [BUILDING_TEXTURES.HOUSE_B]: { width: 210, height: 244 },
+  [BUILDING_TEXTURES.HOUSE_C]: { width: 221, height: 183 },
+};
+
+/**
+ * MÉRT: a csomag saját `environment-preview.png`-jén a házak talpa `y = 251`, a járható
+ * felszín `y = 249`. A ház tehát 2 px-rel BELEÜL a talaj törmelék-peremébe, nem a tetején
+ * lebeg — ez a különbség adja azt, hogy a ház „a földben áll", és nem rá van ragasztva.
+ */
+export const BUILDING_SINK_PX = 2;
+
+export interface BuildingDef {
+  id: string;
+  texture: BuildingTexture;
+  /** A ház VÍZSZINTES középpontja; a talpa a `surfaceId` felszíne alá süllyed `BUILDING_SINK_PX`-szel. */
+  x: number;
+  /** Ground szegmens VAGY platform id — lásd `surfaceSpan()`. */
+  surfaceId: string;
+  /** Vízszintes tükrözés — három textúrából így hatféle sziluett lesz. */
+  flipX?: boolean;
+}
+
+/** A ház lábnyoma — a layout-tesztek ebből dolgoznak, GameObject-mock nélkül. */
+export function buildingFootprint(def: BuildingDef): { left: number; right: number } {
+  const half = BUILDING_ASSETS[def.texture].width / 2;
   return { left: def.x - half, right: def.x + half };
 }

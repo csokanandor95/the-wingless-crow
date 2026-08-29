@@ -19,6 +19,9 @@ import {
   CHECKPOINT_ZONE,
   DOOR,
   DOOR_CHECKPOINT,
+  BACKDROP_BUILDINGS,
+  BUILDING_SINK_PX,
+  DECOR_PROPS,
   ENEMY_SPAWNS,
   GRAVECALLER_SPAWN_OFFSET,
   GROUND_SEGMENTS,
@@ -37,11 +40,14 @@ import {
   PLAYER_BODY_WIDTH,
   PLAYER_HALF_HEIGHT,
   REAPERS,
+  REAPER_DECOR_CLEARANCE,
   REAPER_ENEMY_CLEARANCE,
   SPIKE_FIELDS,
   SPIKE_TILE_WIDTH,
   START_X,
   WORLD_WIDTH,
+  buildingFootprint,
+  decorPropFootprint,
   enemyChaseBounds,
   enemyHalfBodyWidth,
   enemyType,
@@ -51,7 +57,9 @@ import {
   movingPlatformPathBounds,
   platformBottom,
   platformById,
+  platformHasLegs,
   platformLeft,
+  platformLegColumns,
   platformRight,
   platformTop,
   reaperMinDistanceTo,
@@ -70,6 +78,11 @@ import {
   VERTICAL_DETECTION_RANGE as GRAVECALLER_VERTICAL_RANGE,
 } from '../../src/enemies/Gravecaller';
 import { LADDER_TILE_WIDTH, PLATFORM_TILE_HEIGHT } from '../../src/levels/LevelTileset';
+import {
+  TOWN_DECK_TILE_WIDTH,
+  TOWN_PLATFORM_MIN_WIDTH_FOR_CAPS,
+} from '../../src/levels/GothicTownTileset';
+import { BUILDING_ASSETS, PROP_ASSETS, PROP_TINT_NONE } from '../../src/levels/LevelGeometry';
 
 vi.mock('phaser', async () => {
   const { createFakePhaserModule } = await import('./helpers/fakePhaser');
@@ -115,6 +128,17 @@ function allSurfaces(): Map<string, Span> {
   }
 
   return surfaces;
+}
+
+/** Átfed-e két vízszintes sáv? (Érintkezés — közös perem — még NEM átfedés.) */
+function overlaps(a: { left: number; right: number }, b: { left: number; right: number }): boolean {
+  return a.left < b.right && b.left < a.right;
+}
+
+function groundSegmentSpan(id: string): { left: number; right: number } {
+  const segment = GROUND_SEGMENTS.find((g) => g.id === id);
+  if (!segment) throw new Error(`Nincs ilyen talaj-szegmens: ${id}`);
+  return { left: segment.startX, right: segment.endX };
 }
 
 function groundSegmentIdAt(x: number): string {
@@ -1364,5 +1388,326 @@ describe('a layout és a csempe-geometria összhangja', () => {
     for (const p of PLATFORMS) {
       expect(platformBottom(p) - platformTop(p)).toBe(PLATFORM_TILE_HEIGHT);
     }
+  });
+
+  it('minden platform szélessége befogadja a két végzárót, és 16 többszöröse', () => {
+    // A fa-lap `top-left-wood(32) + N*top-wood(16) + top-right-wood(32)`-ként épül fel;
+    // ez a két feltétel garantálja, hogy a lap SOSEM lóg túl és sosem marad hézag.
+    for (const p of PLATFORMS) {
+      const width = platformRight(p) - platformLeft(p);
+      expect(width).toBeGreaterThanOrEqual(TOWN_PLATFORM_MIN_WIDTH_FOR_CAPS);
+      expect(width % TOWN_DECK_TILE_WIDTH).toBe(0);
+    }
+  });
+
+  it('a mozgó platformok szélessége is befogadja a két végzárót', () => {
+    for (const m of MOVING_PLATFORMS) {
+      const width = m.tiles * 64;
+      expect(width).toBeGreaterThanOrEqual(TOWN_PLATFORM_MIN_WIDTH_FOR_CAPS);
+      expect(width % TOWN_DECK_TILE_WIDTH).toBe(0);
+    }
+  });
+});
+
+// --- Állvány vagy konzol? (a fa-platform két változata) ----------------------
+//
+// A `platformHasLegs()` LEVEZETETT, nem adat: a geometria dönt. Ezek a tesztek egyrészt a
+// levezetés eredményét rögzítik (hogy egy platform elmozdítása látható legyen), másrészt
+// azokat a feltételeket, amiket a függvény maga NEM tud ellenőrizni — hogy a láb ne álljon
+// tüskében, létrában vagy checkpointon.
+
+describe('platformHasLegs (fa-állvány vs. konzol)', () => {
+  const LEGGED = ['C1', 'C2', 'D-C1', 'G-P1', 'G-P2', 'G-P3', 'H-ledge'];
+
+  it('csak a talaj FÖLÖTT álló lapok kapnak lábat', () => {
+    const legged = PLATFORMS.filter(platformHasLegs).map((p) => p.id);
+    expect(legged.sort()).toEqual([...LEGGED].sort());
+  });
+
+  it('a szakadék fölötti lapok konzolosak — oda nem lehet lábat tenni', () => {
+    for (const id of ['B-pillar', 'D1', 'D2', 'D3', 'F1', 'F2', 'F3']) {
+      expect(platformHasLegs(platformById(id))).toBe(false);
+    }
+  });
+
+  it('az E-ledge konzolos, mert ÁTLÓG a szakadék fölé', () => {
+    // A jobb széle (4696) túlnyúlik a G3 peremén (4600): a jobb láb a semmiben állna.
+    const ledge = platformById('E-ledge');
+    expect(platformRight(ledge)).toBeGreaterThan(groundSegmentSpan('G3').right);
+    expect(platformHasLegs(ledge)).toBe(false);
+  });
+
+  it('a boss-ledge konzolos, mert ALATTA végigfut a H-ledge', () => {
+    // Talaj VAN alatta (G4), tehát az 1. feltétel teljesül — a 2. zárja ki: a bal
+    // láb-oszlopa átdöfné a H-ledge lapját.
+    const bossLedge = platformById('boss-ledge');
+    const hLedge = platformById('H-ledge');
+    expect(platformTop(hLedge)).toBeGreaterThan(platformTop(bossLedge));
+    expect(platformLegColumns(bossLedge)[0].left).toBeGreaterThanOrEqual(platformLeft(hLedge));
+    expect(platformHasLegs(bossLedge)).toBe(false);
+  });
+
+  it('minden láb-oszlop teljes egészében egyetlen talaj-szegmensen áll', () => {
+    for (const p of PLATFORMS.filter(platformHasLegs)) {
+      for (const column of platformLegColumns(p)) {
+        const onGround = GROUND_SEGMENTS.some(
+          (g) => g.startX <= column.left && column.right <= g.endX
+        );
+        expect(onGround, `${p.id} láb-oszlopa ${column.left}..${column.right}`).toBe(true);
+      }
+    }
+  });
+
+  it('egyetlen láb sem áll tüskemezőben', () => {
+    for (const p of PLATFORMS.filter(platformHasLegs)) {
+      for (const column of platformLegColumns(p)) {
+        for (const field of SPIKE_FIELDS) {
+          expect(
+            overlaps(column, { left: field.startX, right: field.endX }),
+            `${p.id} lába a(z) ${field.id} mezőbe ér`
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('egyetlen láb sem takarja a létrát vagy a köztes checkpointot', () => {
+    const zones = [
+      ...LADDERS.map((l) => ({
+        id: l.id,
+        left: l.x - l.width / 2,
+        right: l.x + l.width / 2,
+      })),
+      ...CHECKPOINTS.map((c) => ({
+        id: c.id,
+        left: c.x - CHECKPOINT_ZONE.width / 2,
+        right: c.x + CHECKPOINT_ZONE.width / 2,
+      })),
+    ];
+
+    for (const p of PLATFORMS.filter(platformHasLegs)) {
+      for (const column of platformLegColumns(p)) {
+        for (const zone of zones) {
+          expect(overlaps(column, zone), `${p.id} lába a(z) ${zone.id} zónába ér`).toBe(false);
+        }
+      }
+    }
+  });
+});
+
+// --- Díszlet: háttér-épületek és hangulati propok ---------------------------
+//
+// A díszlet a gameplay-re nulla hatással van (nincs physics body), a LÁTHATÓSÁGRA viszont
+// igen: egy tüskemezőt vagy egy létrát eltakaró prop olvashatatlanná tesz egy gameplay-elemet.
+// Ezek a tesztek pontosan ezt zárják ki — ugyanaz a szerep, mint a Level 1 `DECOR_PROPS`-jánál.
+
+interface Box {
+  id: string;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/** Átfed-e két TÉGLALAP? */
+function boxesOverlap(a: Omit<Box, 'id'>, b: Omit<Box, 'id'>): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+/**
+ * Az interakciós zónák, amiket semmilyen díszlet nem takarhat el.
+ *
+ * **A vizsgálat 2D, nem csak vízszintes**, és ez nem finomkodás: a pálya emeletes, tehát két
+ * elem simán lehet azonos x-en, 160 px-nyi függőleges távolsággal — egy talajon álló láda
+ * nem takarja el a fölötte lévő párkányon álló checkpointot. Egy pusztán vízszintes tiltás
+ * ilyenkor hamis riasztást adna, amit a következő karbantartó jogosan gyengítene fel.
+ */
+const INTERACTION_ZONES: Box[] = [
+  // A létra zónája a KÉT felület között feszül — ezt a `Level2Scene.createLadders()` is így
+  // számolja, tehát a teszt ugyanabból a forrásból dolgozik, mint a futó kód.
+  ...LADDERS.map((l) => ({
+    id: l.id,
+    left: l.x - l.width / 2,
+    right: l.x + l.width / 2,
+    top: surfaceSpan(l.toSurfaceId).top,
+    bottom: surfaceSpan(l.fromSurfaceId).top,
+  })),
+  ...CHECKPOINTS.map((c) => ({
+    id: c.id,
+    left: c.x - CHECKPOINT_ZONE.width / 2,
+    right: c.x + CHECKPOINT_ZONE.width / 2,
+    top: surfaceSpan(c.surfaceId).top - CHECKPOINT_ZONE.height,
+    bottom: surfaceSpan(c.surfaceId).top,
+  })),
+  {
+    id: 'door',
+    left: DOOR.x - DOOR.width / 2,
+    right: DOOR.x + DOOR.width / 2,
+    top: platformTop(platformById('boss-ledge')) - DOOR.height,
+    bottom: platformTop(platformById('boss-ledge')),
+  },
+];
+
+/** A kaszák söprési sávja, díszlet-ráhagyással. */
+const REAPER_DECOR_ZONES = REAPERS.map((def) => {
+  const sweep = reaperSweep(def);
+  return {
+    id: def.id,
+    left: sweep.left - REAPER_DECOR_CLEARANCE,
+    right: sweep.right + REAPER_DECOR_CLEARANCE,
+  };
+});
+
+describe('BACKDROP_BUILDINGS', () => {
+  it('minden id egyedi', () => {
+    const ids = BACKDROP_BUILDINGS.map((b) => b.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('minden ház EGYETLEN talaj-szegmensen belül áll', () => {
+    for (const building of BACKDROP_BUILDINGS) {
+      const footprint = buildingFootprint(building);
+      const segment = GROUND_SEGMENTS.find((g) => g.id === building.surfaceId);
+      expect(segment, `${building.id} nem talaj-szegmensen áll`).toBeDefined();
+      expect(footprint.left, building.id).toBeGreaterThanOrEqual(segment!.startX);
+      expect(footprint.right, building.id).toBeLessThanOrEqual(segment!.endX);
+    }
+  });
+
+  it('egyetlen ház sem takar tüskemezőt', () => {
+    for (const building of BACKDROP_BUILDINGS) {
+      const footprint = buildingFootprint(building);
+      for (const field of SPIKE_FIELDS) {
+        expect(
+          overlaps(footprint, { left: field.startX, right: field.endX }),
+          `${building.id} takarja a(z) ${field.id} mezőt`
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('egyetlen ház sem ér a kaszák söprési sávjába', () => {
+    for (const building of BACKDROP_BUILDINGS) {
+      const footprint = buildingFootprint(building);
+      for (const zone of REAPER_DECOR_ZONES) {
+        expect(overlaps(footprint, zone), `${building.id} / ${zone.id}`).toBe(false);
+      }
+    }
+  });
+
+  it('egyetlen ház sem takarja a létrát, a checkpointot vagy az ajtót', () => {
+    for (const building of BACKDROP_BUILDINGS) {
+      const footprint = buildingFootprint(building);
+      const bottom = surfaceSpan(building.surfaceId).top + BUILDING_SINK_PX;
+      const box = {
+        ...footprint,
+        bottom,
+        top: bottom - BUILDING_ASSETS[building.texture].height,
+      };
+
+      for (const zone of INTERACTION_ZONES) {
+        expect(boxesOverlap(box, zone), `${building.id} / ${zone.id}`).toBe(false);
+      }
+    }
+  });
+
+  it('a talp a felszín ALÁ kerül, nem fölé', () => {
+    // A `BUILDING_SINK_PX` MÉRT érték a csomag preview-jából: ettől "a földben áll" a ház.
+    // Negatív vagy nulla értéknél a ház a talaj peremén lebegne.
+    expect(BUILDING_SINK_PX).toBeGreaterThan(0);
+    expect(BUILDING_SINK_PX).toBeLessThan(PLATFORM_TILE_HEIGHT);
+  });
+});
+
+describe('DECOR_PROPS', () => {
+  it('minden id egyedi', () => {
+    const ids = DECOR_PROPS.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('minden prop a SAJÁT felületén belül áll', () => {
+    for (const prop of DECOR_PROPS) {
+      const footprint = decorPropFootprint(prop);
+      const surface = surfaceSpan(prop.surfaceId);
+      expect(footprint.left, prop.id).toBeGreaterThanOrEqual(surface.left);
+      expect(footprint.right, prop.id).toBeLessThanOrEqual(surface.right);
+    }
+  });
+
+  it('minden prop tint NÉLKÜL megy ki — a Level 2 a saját csomagjuk palettája', () => {
+    for (const prop of DECOR_PROPS) {
+      expect(prop.tint, prop.id).toBe(PROP_TINT_NONE);
+    }
+  });
+
+  it('egyetlen prop sem takar tüskemezőt', () => {
+    for (const prop of DECOR_PROPS) {
+      const footprint = decorPropFootprint(prop);
+      for (const field of SPIKE_FIELDS) {
+        expect(
+          overlaps(footprint, { left: field.startX, right: field.endX }),
+          `${prop.id} takarja a(z) ${field.id} mezőt`
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('egyetlen prop sem ér a kaszák söprési sávjába', () => {
+    for (const prop of DECOR_PROPS) {
+      const footprint = decorPropFootprint(prop);
+      for (const zone of REAPER_DECOR_ZONES) {
+        expect(overlaps(footprint, zone), `${prop.id} / ${zone.id}`).toBe(false);
+      }
+    }
+  });
+
+  it('egyetlen prop sem takarja a létrát, a checkpointot vagy az ajtót', () => {
+    for (const prop of DECOR_PROPS) {
+      const bottom = surfaceSpan(prop.surfaceId).top;
+      const box = {
+        ...decorPropFootprint(prop),
+        bottom,
+        top: bottom - PROP_ASSETS[prop.texture].height,
+      };
+
+      for (const zone of INTERACTION_ZONES) {
+        expect(boxesOverlap(box, zone), `${prop.id} / ${zone.id}`).toBe(false);
+      }
+    }
+  });
+
+  it('egyetlen prop sem nő bele a fölötte lévő platform aljába', () => {
+    // Egy 108 px-es utcai lámpa feje egy +110-es lap alatt átdöfné a deszkát. A HÁZAKRA ez
+    // SZÁNDÉKOSAN nem vonatkozik: azok a BUILDING_DEPTH-en (-15) hátrébb vannak a terrainnél,
+    // tehát egy előttük álló állvány takarja őket — pontosan a forrás preview rétegzése.
+    for (const prop of DECOR_PROPS) {
+      const footprint = decorPropFootprint(prop);
+      const surfaceTop = surfaceSpan(prop.surfaceId).top;
+      const propTop = surfaceTop - PROP_ASSETS[prop.texture].height;
+
+      for (const platform of PLATFORMS) {
+        const bottom = platformBottom(platform);
+        // Csak a prop FÖLÖTT lévő lapok számítanak.
+        if (bottom > surfaceTop) continue;
+        if (bottom <= propTop) continue;
+
+        expect(
+          overlaps(footprint, {
+            left: platformLeft(platform),
+            right: platformRight(platform),
+          }),
+          `${prop.id} belenő a(z) ${platform.id} aljába`
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('a G1 szakadék-pereme előtt tábla figyelmeztet', () => {
+    // Nem esztétika: ez az első hely, ahol a pálya zuhanással tud ölni, és a `G1` peremén
+    // (900) semmi más nem jelzi. A tábla a peremtől egy testszélességen belül van.
+    const sign = DECOR_PROPS.find((p) => p.id === 'A-sign-1');
+    expect(sign).toBeDefined();
+    const edge = groundSegmentSpan('G1').right;
+    expect(edge - decorPropFootprint(sign!).right).toBeLessThan(PLAYER_BODY_WIDTH);
   });
 });

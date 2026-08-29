@@ -792,20 +792,38 @@ Főbb elemek:
 >
 > A Level 1-en így **7 CrowHarvester + 2 Gravecaller** van, és **14 platform**.
 
-### Level 2 – The Crowless Forest
+### Level 2 – The Crowless Quarter
 
-Elátkozott erdő.
+Elhagyott gótikus városnegyed alkonyatkor. *(Korábban „The Crowless Forest / elátkozott
+erdő" — lásd az átnevezésről szóló megjegyzést lentebb.)*
 
 Új elem:
 
 - Archer
-- sötétebb környezet
 - több platforming
+- mozgó platformok
 
 > **Megjegyzés (2026-08-26):** az „Archer" szerepét a **Gravecaller** (Enemy 2, 11. pont)
 > tölti be, ami már létezik és a Level 1-en bemutatkozik. A Level 2 lehet az első pálya,
 > ahol több példány is szerepel belőle, illetve ahol a magasságkülönbségekre épített
 > ranged-fenyegetés a fő tervezési motívum.
+
+> **ÁTNEVEZÉS ÉS TÉMAVÁLTÁS (2026-08-29, user-döntés).** A látvány-iterációban a
+> **GothicVania Town** csomag mellett döntöttünk (Luis Zuno / @ansimuz, public domain — ez
+> UGYANAZ a csomag, amiből a Level 1 hangulati propjai jönnek). A pálya így nem erdő, hanem
+> **alkonyi gótikus városnegyed**, és a név a látványt követte: `The Crowless Quarter`.
+> Ez lore-ban is jobban ül: a Level 3 az őrült király romos kastélya, tehát a közte lévő
+> pálya logikusan a király városa.
+>
+> **Ezzel a „sötétebb környezet" pont is kikerült a listából.** A csomag palettája
+> érezhetően VILÁGOSABB a Level 1-nél (az égbolt csúcsfényessége `(190,106,107)` a Level 1
+> `(103,56,56)`-jával szemben), és a user döntése szerint **tint nélkül, nyersen** megy be:
+> az alkonyi városnegyed tudatos vizuális kontraszt a Level 1 éjszakai romjaihoz képest.
+> A talaj és a fa-platformok fényessége viszont majdnem pontosan egyezik a Level 1-ével,
+> tehát a gameplay-elemek olvashatósága nem változik.
+>
+> A **kódfüggés a néven nulla** (a scene-kulcs változatlanul `Level2Scene`), tehát egy
+> későbbi névváltás egy keresés-csere.
 
 ### Level 3 – The Throne of the Damned
 
@@ -1381,7 +1399,9 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 >
 > 1. **Enemy 2 – Caster (`Gravecaller`) — KÉSZ.** Lásd a 11. pontot. A Level 1 `E2`
 >    platformján áll, a korábbi CrowHarvester helyén (14. pont).
-> 2. **Level 2 – The Crowless Forest** — hátravan (jelenleg placeholder scene).
+> 2. **Level 2 – The Crowless Quarter** — a geometria (`Level2Layout.ts`) és a látvány
+>    (GothicVania Town: parallax háttér, terrain, fa-platformok, háttér-házak, propok) KÉSZ.
+>    Hátravan: zene, SFX, és a hazard-/lövedék-placeholderek cseréje.
 > 3. **Boss 2** — hátravan. Jelölt aréna-háttér: `2D helper/level/Bossbackground_2.png`
 >    (angyal-szobros katedrália, nyitott égbolttal) — külön aréna, nem a Boss 1 variánsa.
 > 4. **Enemy 3 – Beast** — opcionális, a 11. pont szerint is.

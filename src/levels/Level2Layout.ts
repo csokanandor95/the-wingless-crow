@@ -1,11 +1,17 @@
 import {
+  BUILDING_TEXTURES,
   GROUND_TOP,
   PLAYER_HALF_HEIGHT,
+  PROP_TEXTURES,
+  PROP_TINT_NONE,
   enemyChaseBounds as enemyChaseBoundsIn,
   groundGaps as groundGapsIn,
   groundSegmentById as groundSegmentByIdIn,
   platformById as platformByIdIn,
+  platformHasLegs as platformHasLegsIn,
   surfaceSpan as surfaceSpanIn,
+  type BuildingDef,
+  type DecorPropDef,
   type EnemySpawnDef,
   type GapDef,
   type GroundSegmentDef,
@@ -19,7 +25,12 @@ import {
 } from './LevelGeometry';
 
 /**
- * Level 2 – The Crowless Forest: a pálya TELJES geometriája, egyetlen forrásból.
+ * Level 2 – The Crowless Quarter: a pálya TELJES geometriája, egyetlen forrásból.
+ *
+ * *(A pálya korábban „The Crowless Forest" volt. A látvány-iterációban a GothicVania Town
+ * csomag mellett döntöttünk — alkonyi gótikus városnegyed, nem erdő —, és a név a látványt
+ * követte; a `Project_plan.md` 14. pontja ennek megfelelően frissült. A scene-kulcs
+ * változatlanul `'Level2Scene'`, tehát a néven semmilyen kód nem függ.)*
  *
  * Ugyanaz a minta, mint a `Level1Layout.ts`-nél: Phaser-mentes adatmodul, hogy az invariánsok
  * (elérhetőség, ugrás-plafon, hazard-folyosók) GameObject-mockolás nélkül unit-tesztelhetők
@@ -51,6 +62,7 @@ import {
 // --- Megosztott geometria (re-export, hogy a scene egy helyről importálhasson) ---
 
 export {
+  BUILDING_SINK_PX,
   EDGE_INSET,
   FALL_DEATH_Y,
   FALL_DEPTH,
@@ -72,6 +84,8 @@ export {
   REAPER_ENEMY_CLEARANCE,
   SPIKE_TILE_WIDTH,
   WORLD_HEIGHT,
+  buildingFootprint,
+  decorPropFootprint,
   enemyHalfBodyWidth,
   enemySpawnOffset,
   enemyType,
@@ -81,6 +95,7 @@ export {
   movingPlatformSpan,
   platformBottom,
   platformLeft,
+  platformLegColumns,
   platformRight,
   platformTop,
   reaperMinDistanceTo,
@@ -88,6 +103,8 @@ export {
 } from './LevelGeometry';
 
 export type {
+  BuildingDef,
+  DecorPropDef,
   EnemySpawnDef,
   GapDef,
   GroundSegmentDef,
@@ -380,6 +397,8 @@ export const groundSegmentById = (id: string): GroundSegmentDef =>
   groundSegmentByIdIn(LEVEL2_GEOMETRY, id);
 export const enemyChaseBounds = (def: EnemySpawnDef): { min: number; max: number } =>
   enemyChaseBoundsIn(def, LEVEL2_GEOMETRY);
+export const platformHasLegs = (def: PlatformDef): boolean =>
+  platformHasLegsIn(def, LEVEL2_GEOMETRY);
 
 // --- Létrák -----------------------------------------------------------------
 
@@ -622,3 +641,98 @@ export const LADDER_EXIT_CLEARANCE = 80;
 
 /** A talaj-szint referenciája a scene-nek (a tüskék és a jelölők ide ülnek). */
 export const LEVEL2_GROUND_TOP = GROUND_TOP;
+
+// --- Háttér-épületek --------------------------------------------------------
+
+/**
+ * HAT ház a 7200 px-en. A sűrűség SZÁNDÉKOSAN nem egyenletes: **város a két végén,
+ * pusztaság középen.** A pálya így egy elhagyott negyeden át vezet — az `A` szakasz még
+ * lakott utca, a `C`–`E` hazard-blokkban egyetlen magányos rom áll, a `G` záró aréna pedig
+ * megint sűrűbb, ahogy a boss-kapuhoz érünk.
+ *
+ * A pozíciókat négy invariáns fogja közre, mind unit-tesztelve:
+ *   1. a lábnyom EGYETLEN talaj-szegmensen belül van (nem lóg szakadék fölé);
+ *   2. nem metsz tüskemezőt — a hazard olvashatósága fontosabb a díszletnél (Level 1 szabály);
+ *   3. nem ér a kaszák söprési sávjába;
+ *   4. nem takarja a létrát, a köztes checkpointot vagy a boss-ajtót.
+ *
+ * A `flipX` három textúrából hatféle sziluettet ad — egy 7200 px-es pályán ez érezhető.
+ */
+export const BACKDROP_BUILDINGS: BuildingDef[] = [
+  // --- A: lakott utca. A kezdőképernyőn két ház fogja közre a startot. ---
+  { id: 'A-house-1', texture: BUILDING_TEXTURES.HOUSE_A, x: 210, surfaceId: 'G1' },
+  { id: 'A-house-2', texture: BUILDING_TEXTURES.HOUSE_C, x: 700, surfaceId: 'G1', flipX: true },
+
+  // --- C: EGYETLEN ház, a tüskeritmus első biztonságos szigetén (1796–2096). ---
+  // A `C1` lépőkő (1989–2053) előtte van, tehát az állvány a ház homlokzata ELŐTT áll —
+  // pontosan a forráscsomag preview-jának rétegzése.
+  { id: 'C-house-1', texture: BUILDING_TEXTURES.HOUSE_A, x: 1940, surfaceId: 'G2' },
+
+  // --- E: a kasza UTÁNI parton, a söprési sávon (3961–4167) kívül. ---
+  { id: 'E-house-1', texture: BUILDING_TEXTURES.HOUSE_C, x: 4420, surfaceId: 'G3' },
+
+  // --- G: a záró aréna bejárata és a létra előtti tér. ---
+  // A `G-house-1` a csomag legmagasabb háza (244 px): a teteje 176-on van, tehát a
+  // város-sziluett tömör alapsávjába (318 fölé) is belenyúl — ez köti össze a világ-térben
+  // álló házakat a háttérrel.
+  { id: 'G-house-1', texture: BUILDING_TEXTURES.HOUSE_B, x: 5700, surfaceId: 'G4' },
+  { id: 'G-house-2', texture: BUILDING_TEXTURES.HOUSE_C, x: 6600, surfaceId: 'G4', flipX: true },
+];
+
+// --- Hangulati propok -------------------------------------------------------
+
+/**
+ * 17 nem ütköző díszlet. Ugyanaz a szerződés, mint a Level 1-en (nincs body, nincs osztály),
+ * két eltéréssel:
+ *
+ *  - **`tint: PROP_TINT_NONE`** — ezek a propok EREDETILEG ebből a csomagból valók, tehát a
+ *    Level 2 a hazai palettájuk. A Level 1 `PROP_TINT_WARM/COOL_SOURCE`-a ott azért kell,
+ *    mert oda idegen (cathedral) tónusba kellett őket beilleszteni.
+ *  - **KÉT új textúra** ugyanabból a csomagból: `barrel` és `sign`.
+ *
+ * A tüskemezők és a kaszák környéke SZÁNDÉKOSAN ÜRES (Level 1-en bevált szabály).
+ *
+ * Két tudatos motívum:
+ *  - **`A-sign-1` (862) a pálya első szakadéka ELŐTT** — néma figyelmeztetés ott, ahol a
+ *    `G1` peremén (900) a mozgó platformos szakasz kezdődik;
+ *  - **`H-lamp-1` (6830) a létra kijárata mellett** — a Level 1 `H` szakaszának visszhangja,
+ *    ahol két lámpa fogja közre a létra lábát. Itt csak EGY fér el: a másik oldalon a
+ *    `H-ledge` bal állványlába áll (6724–6756).
+ */
+export const DECOR_PROPS: DecorPropDef[] = [
+  // --- A: bemelegítés (0–900) ---
+  { id: 'A-lamp-1', texture: PROP_TEXTURES.STREET_LAMP, x: 160, surfaceId: 'G1', tint: PROP_TINT_NONE },
+  { id: 'A-crates-1', texture: PROP_TEXTURES.CRATE_STACK, x: 340, surfaceId: 'G1', tint: PROP_TINT_NONE },
+  { id: 'A-wagon-1', texture: PROP_TEXTURES.WAGON, x: 480, surfaceId: 'G1', tint: PROP_TINT_NONE },
+  { id: 'A-barrel-1', texture: PROP_TEXTURES.BARREL, x: 600, surfaceId: 'G1', tint: PROP_TINT_NONE },
+  { id: 'A-sign-1', texture: PROP_TEXTURES.SIGN, x: 862, surfaceId: 'G1', tint: PROP_TINT_NONE },
+
+  // --- C: tüskeritmus (1700–2900) — csak a biztonságos szigeteken ---
+  { id: 'C-crate-1', texture: PROP_TEXTURES.CRATE, x: 1870, surfaceId: 'G2', tint: PROP_TINT_NONE },
+  { id: 'C-barrel-1', texture: PROP_TEXTURES.BARREL, x: 2250, surfaceId: 'G2', tint: PROP_TINT_NONE },
+  { id: 'C-crates-2', texture: PROP_TEXTURES.CRATE_STACK, x: 2800, surfaceId: 'G2', tint: PROP_TINT_NONE },
+
+  // --- E: talajszintű harc (3700–4600) — a kasza sávján kívül ---
+  { id: 'E-well-1', texture: PROP_TEXTURES.WELL, x: 3790, surfaceId: 'G3', tint: PROP_TINT_NONE },
+  { id: 'E-lamp-1', texture: PROP_TEXTURES.STREET_LAMP, x: 4250, surfaceId: 'G3', tint: PROP_TINT_NONE },
+  { id: 'E-crate-1', texture: PROP_TEXTURES.CRATE, x: 4560, surfaceId: 'G3', tint: PROP_TINT_NONE },
+
+  // --- G/H: záró aréna + a létra (5560–7200) ---
+  { id: 'G-crates-1', texture: PROP_TEXTURES.CRATE_STACK, x: 5640, surfaceId: 'G4', tint: PROP_TINT_NONE },
+  // A lámpa a `G-house-1` homlokzata ELŐTT áll (depth -10 vs. -15). A `G-P1` állvány két
+  // lába közé NEM tehető: a 108 px magas lámpa feje pont a lap aljába érne.
+  { id: 'G-lamp-1', texture: PROP_TEXTURES.STREET_LAMP, x: 5760, surfaceId: 'G4', tint: PROP_TINT_NONE },
+  { id: 'G-barrel-1', texture: PROP_TEXTURES.BARREL, x: 6160, surfaceId: 'G4', tint: PROP_TINT_NONE },
+  { id: 'G-wagon-1', texture: PROP_TEXTURES.WAGON, x: 6560, surfaceId: 'G4', tint: PROP_TINT_NONE },
+  { id: 'H-lamp-1', texture: PROP_TEXTURES.STREET_LAMP, x: 6830, surfaceId: 'G4', tint: PROP_TINT_NONE },
+
+  // --- I: boss-előtér. Az EGYETLEN prop, ami nem talajon, hanem platformon áll. ---
+  { id: 'I-sign-1', texture: PROP_TEXTURES.SIGN, x: 7020, surfaceId: 'boss-ledge', tint: PROP_TINT_NONE },
+];
+
+/**
+ * A díszlet-invariánsokhoz: a propok/házak nem érhetnek egy kasza söprési sávjának ekkora
+ * környezetébe. Szűkebb, mint a `REAPER_ENEMY_CLEARANCE` (80), mert itt nem mozgásról van
+ * szó — elég, hogy a penge ne söpörjön át a grafikán.
+ */
+export const REAPER_DECOR_CLEARANCE = 20;
