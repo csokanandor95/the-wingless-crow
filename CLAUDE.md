@@ -263,6 +263,26 @@ láda ×2, ládahalom ×3. Forrás: **GothicVania Town** (Luis Zuno / @ansimuz) 
 A Phase 8 többi része (a maradék environment sprite-ok, a maradék SFX, particles,
 `ui/` modul) még hátravan.
 
+**Phase 8 — 12. iteráció: LEVEL 2 HÁTTÉRZENE kész.** A `Level2Scene` megkapta a saját sávját
+(`assets/audio/shadowforge-convergence.mp3` — AlkaKrab, `2. Shadowforge Convergence (Loop)`).
+Új infrastruktúra NEM kellett: a scene-nek már volt `AudioManager` példánya (SFX-hez), a
+zene-ág pedig pontosan ezt tudja. A változás egy asset + egy `MUSIC_KEYS` bejegyzés + egy
+konstans + két hívás.
+- **A LOOP-változat kell, nem a csomag `Tracks mp3/` teljes száma**: a `playMusic()`
+  `loop: true`-val játszik, tehát a Tracks-verzió intrója minden fordulónál újraszólna.
+  Ugyanez az elv, amiért a `boss-theme.mp3` is az `(After Intro & Loop)` változat.
+- **A fade-in 4000 ms, kétszerese a Level 1-ének** (`LEVEL2_MUSIC_FADE_IN_MS`), és ennek
+  levezetése van: a Level 1-nél az audio context zárolt, tehát a sáv úgyis csak az első
+  billentyűleütésnél indul; a Level 2-be viszont már feloldott contexttel érkezünk, ott a
+  zene tényleg a `create()` pillanatában szólal meg. User-kérés volt, hogy ne üssön be
+  intenzíven. Unit teszt őrzi, hogy a Level 2 fade-inje hosszabb marad.
+- **A hangerő NEM változott** (`LEVEL_MUSIC_VOLUME`, 0.35), hogy az „ambient < boss theme <
+  SFX" keverési sorrend érvényben maradjon.
+- **Mellékeredmény: lezárult egy nyitott jogi tétel.** A `boss-theme.mp3` forrása eddig
+  „külön tisztázandó" volt — méréssel kiderült, hogy bitre azonos az AlkaKrab csomag
+  `4. Cursed Citadel (After Intro & Loop)`-jával, tehát a Level 2 sávja UGYANONNAN jön, és
+  nem nyit új tételt. Részletek a nyitott jogi tételeknél.
+
 **DÖNTÉSI PONT — ELDŐLT (2026-08-26).** A Phase 8 utáni döntési ponton (lásd lentebb és a
 `Project_plan.md` 21. pontjában) a user a **„Többi Enemy típus, Level2 és 2. Boss létrehozása"**
 irányt választotta, a Lore/QA helyett. A sorrend: **Enemy 2 (Caster) → Level 2 → Boss 2**.
@@ -302,7 +322,7 @@ a csomag, amiből a Level 1 hangulati propjai jönnek, tehát **nem nyílt új j
   **17 hangulati prop** (`DECOR_PROPS`, tint nélkül), mind unit-tesztelt elhelyezéssel.
 - Ami a Level 2-n MÉG placeholder: a **létra** és a **boss-ajtó** (a csomagban nincs létra,
   a cathedral `door-gate` geometriája pedig ehhez a PNG-hez van mérve), a hazardok és a
-  lövedékek. Zene és SFX szintén hátravan.
+  lövedékek. **A zene azóta KÉSZ** (lásd lentebb); az SFX hátravan.
 
 **LEVEL 1 REDESIGN — 1. iteráció KÉSZ (a Phase 8 közé beszúrt, 3 iterációs blokk).**
 Az eredeti Level 1 (3200 px, folyamatos talaj, hazard nélkül) pillanatok alatt átugrálható
@@ -335,7 +355,7 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**14 fájl, 317 teszt** — ebből 6 az animáció-/háttér-/VFX-vezérlést, 1 a **Level 1 pálya-geometriát**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**16 fájl, 452 teszt** — ebből 6 az animáció-/háttér-/VFX-vezérlést, 2 a **pálya-geometriát** (Level 1 + Level 2), 1 a **mozgó platformot**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -356,7 +376,14 @@ the-wingless-crow/
 │   └── Project_plan.md
 ├── assets/
 │   ├── audio/
-│   │   ├── boss-theme.mp3        # Vite-importtal jön be (nem public/), lásd lentebb
+│   │   ├── boss-theme.mp3        # Vite-importtal jön be (nem public/), lásd lentebb.
+│   │   │                         # = AlkaKrab `4. Cursed Citadel (After Intro & Loop)` — BITRE
+│   │   │                         # azonos másolat (md5 29fac9c2..., 2 044 105 bájt)
+│   │   ├── shadowforge-convergence.mp3
+│   │   │                         # Level 2 ambient. UGYANAZ az AlkaKrab csomag:
+│   │   │                         # `2. Shadowforge Convergence (Loop)`. A LOOP-változat kell,
+│   │   │                         # nem a `Tracks mp3/` teljes szám (annak intrója minden
+│   │   │                         # loop-fordulónál újraszólna)
 │   │   ├── library-of-veles.mp3  # Level 1 ambient (Free Dark Fantasy Music) — licenc TISZTÁZANDÓ
 │   │   └── sfx/                  # Free Fantasy SFX Pack (TomMusic), WAV — licenc TISZTÁZANDÓ
 │   │       ├── sword-attack-2.wav      # player kardsuhintás (a sorszám a kapocs a csomaghoz)
@@ -1231,11 +1258,19 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   szól, ezért marad háttérben; a boss theme érezhetően felerősödik hozzá képest; az SFX
   mindkettő fölött átvág. Egy „csak feljebb veszem egy kicsit" hangolás nem fordíthatja
   meg észrevétlenül a sorrendet
-- **Két sáv van** (`MUSIC_KEYS`): `BOSS_THEME` (a `BossScene` belépőjétől) és
-  `LEVEL1_THEME` (a `Level1Scene` teljes hosszán). Egyszerre sosem szól kettő: a
-  `playMusic()` hard-stoppolja az előzőt, a `Level1Scene` már az ajtó-fade alatt
-  felszabadítja a sávját, és a Phaser a régi scene SHUTDOWN-ját a következő scene
-  `create()`-je ELŐTT futtatja
+- **Három sáv van** (`MUSIC_KEYS`): `BOSS_THEME` (a `BossScene` belépőjétől),
+  `LEVEL1_THEME` (a `Level1Scene` teljes hosszán) és `LEVEL2_THEME` (a `Level2Scene` teljes
+  hosszán). Egyszerre sosem szól kettő: a `playMusic()` hard-stoppolja az előzőt, mindkét
+  pálya már az ajtó-fade alatt felszabadítja a sávját, és a Phaser a régi scene SHUTDOWN-ját
+  a következő scene `create()`-je ELŐTT futtatja
+- **A KÉT pálya-sáv fade-inje SZÁNDÉKOSAN eltér**, és ez nem ízlés, hanem a két belépés
+  különbsége (unit teszt őrzi a sorrendet):
+  - `LEVEL_MUSIC_FADE_IN_MS` (2000) — a Level 1 közvetlenül az oldalbetöltés után indul,
+    tehát az audio context ZÁROLT, és a sáv úgyis csak az első billentyűleütésnél szólal meg;
+  - `LEVEL2_MUSIC_FADE_IN_MS` (4000) — a Level 2-be a `NarrationScene` felől érkezünk, MÁR
+    FELOLDOTT contexttel, tehát a zene tényleg a `create()` pillanatában indul. Itt a
+    fade-in az EGYETLEN dolog, ami tompítja a belépést (user-kérés: „ne ilyen intenzíven
+    üssön be a zene a kezdéskor")
 - **AUTOPLAY: a `sound.locked` ág a Level 1-nél a FŐ út, nem élhelyzet.** A `Level1Scene`
   közvetlenül az oldalbetöltés után indul, bármilyen user-interakció előtt — ott az audio
   context GARANTÁLTAN zárolt, tehát a `playMusic()` az `UNLOCKED` eseményre halasztja a
@@ -1268,6 +1303,12 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   (500) **ugyanaz a konstans, amiből a kamera-fade dolgozik** — a kép és a hang együtt
   halkul el. Halál/respawn nem szakítja meg (a scene nem indul újra); boss-vereség után
   visszatérve viszont a `create()` újrafut, tehát a sáv az elejéről indul
+- Bekötés a `Level2Scene`-ben: UGYANEZ a minta, `MUSIC_KEYS.LEVEL2_THEME`-mel és
+  `LEVEL2_MUSIC_FADE_IN_MS`-szel; a `stopMusic(TRANSITION_FADE_MS)` a `checkDoor()`-ban van.
+  **A hívás sorrendje ott számít:** a `bossSceneExists()` korai `return`-ág UTÁN kell állnia
+  (amikor a Boss 2 aréna még nem létezik, csak checkpoint mentődik és a pálya megy tovább —
+  ott a zenének szólnia kell). A debug `R` billentyű azonnal vált, tehát ott a shutdown-hook
+  vágja el fade nélkül; debug úton ez rendben van
 
 ## Fontos technikai tanulságok (ne ismételd meg ezeket a hibákat!)
 
@@ -1433,8 +1474,25 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   nyilvánossá tétele / GitHub Pages deploy ELŐTT.** Ezért maradt meg a forrás-cím a
   fájlnévben (`library-of-veles.mp3` = `Library of Veles (LOOP)`) — ez a kapocs a
   forráshoz. **Megjegyzés:** a csomag másik sávja (`Elkmire Keep (LOOP).mp3`) jó jelölt
-  egy jövőbeli Level 2 / menü zenének. A `boss-theme.mp3` NEM ebből a csomagból való
-  (egyik sáv mérete sem egyezik vele) — annak a forrása külön tisztázandó.
+  egy jövőbeli menü- vagy átvezető-zenének (a Level 2 már megkapta a sávját, lásd lentebb).
+- **A `boss-theme.mp3` és a `shadowforge-convergence.mp3` forrása AZONOSÍTVA** — ez a
+  korábbi „a boss theme forrása külön tisztázandó" tétel LEZÁRÁSA. Mindkettő az **AlkaKrab**
+  csomagból való (`2D helper/music/Loops mp3/`):
+  - `boss-theme.mp3` = `4. Cursed Citadel (After Intro & Loop).mp3` — **bitre azonos**
+    másolat (md5 `29fac9c22b67191a2cfaccff4e6be568`, 2 044 105 bájt, méréssel igazolva);
+  - `shadowforge-convergence.mp3` = `2. Shadowforge Convergence (Loop).mp3`.
+  A `2D helper/Credits.txt` az AlkaKrabot a boss theme miatt **már kreditálja**; a
+  `02. Shadowforge Convergence (level 2 music)` sorral kiegészítendő (a user gyűjtése).
+  **NEM teljesen lezárt tétel viszont a licenc SZÖVEGE:** a csomaghoz — a TomMusic /
+  Free Dark Fantasy esetével ellentétben — **van** dokumentum (`2D helper/music/Loops mp3/
+  AlkaKrab Music License Info.pdf`), de a tartalma **nincs átolvasva** (a PDF beágyazott
+  szövege tömörített, és nincs `pdftoppm` a gépen). A konkrét feltételeket a repo
+  nyilvánossá tétele / GitHub Pages deploy ELŐTT el kell olvasni.
+  **A LOOP-változat használata nem esztétikai döntés:** az `AudioManager.playMusic()`
+  `loop: true`-val játszik, tehát a csomag `Tracks mp3/` (teljes szám) verziója minden
+  loop-fordulónál újrajátszaná az intrót. A csomag `2. Shadowforge Convergence (Intro).mp3`
+  + `(Loop).mp3` párja egy intro→loop láncolással jobb lenne, de ahhoz az `AudioManager`
+  zene-ágát bővíteni kellene (jelenleg egyetlen, exkluzív sávot kezel) — külön iteráció.
 - **A boss aréna hátterének (`assets/backgrounds/cathedral/boss-arena.png`) licence
   szintén nincs tisztázva** — a forrás a `2D helper/level/Bossbackground_1.png`, ami
   önálló fájlként, licenc nélkül érkezett. A user gyűjtésébe ez is bekerül; publikálás
@@ -1490,8 +1548,8 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 
 1. **Level 2 – The Crowless Quarter.** A geometria (`Level2Layout.ts`, 7200 px, 9 szakasz,
    mozgó platformok, hazardok, 10 CrowHarvester + 4 Gravecaller) és a LÁTVÁNY is KÉSZ.
-   Hátravan: **zene** (jelölt: a *Free Dark Fantasy Music* csomag `Elkmire Keep (LOOP)`-ja),
-   **SFX**, és a hazard-/lövedék-/létra-/ajtó-placeholderek cseréje.
+   A **zene is KÉSZ** (`Shadowforge Convergence`, AlkaKrab — lásd az Audio szakaszt).
+   Hátravan: **SFX**, és a hazard-/lövedék-/létra-/ajtó-placeholderek cseréje.
 2. **Boss 2.** Jelölt aréna-háttér már van: `2D helper/level/Bossbackground_2.png`
    (angyal-szobros katedrális, nyitott égbolttal) — külön aréna, nem a Boss 1 variánsa.
    A `Level2Scene` ajtaja már a `'Boss2Scene'` kulcsot célozza: a scene regisztrálásakor
@@ -1560,8 +1618,8 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
   A csomagban ezután is maradt kihasználatlan elem: a `stairs*` lépcső-készlet (16×32-es
   fokok — a projektben nincs átlós járható elem), a `window`/`roof`/`wall` házépítő csempék,
   és a `Music/rpg_village02_loop` sáv.
-- **Menü / átvezető ambient.** A Level 1 és a boss aréna zenéje KÉSZ (1. és 9. iteráció).
-  A `NarrationScene` és a `Level2Scene` még néma. Figyelem: az `AudioManager`
+- **Menü / átvezető ambient.** A Level 1, a Level 2 és a boss aréna zenéje KÉSZ (1., 9. és
+  12. iteráció). Már csak a `NarrationScene` néma. Figyelem: az `AudioManager`
   **scene-hatókörű** (a scene shutdownja elvágja) — ez a pálya-zenéknél előny, de egy
   scene-eken ÁTÍVELŐ sávhoz (pl. menü → pálya megszakítás nélkül) game-szintűvé kell emelni.
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),

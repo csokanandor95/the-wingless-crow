@@ -11,6 +11,7 @@ import Phaser from 'phaser';
 export const MUSIC_KEYS = {
   BOSS_THEME: 'boss-theme',
   LEVEL1_THEME: 'level1-theme',
+  LEVEL2_THEME: 'level2-theme',
 } as const;
 
 export const SFX_KEYS = {
@@ -50,6 +51,16 @@ export const LEVEL_MUSIC_VOLUME = 0.35;
  * berobbanó sáv ott zavaró lenne. Lásd a Level1Scene.create() kommentjét.
  */
 export const LEVEL_MUSIC_FADE_IN_MS = 2000;
+/**
+ * A Level 2 belépője SZÁNDÉKOSAN hosszabb a Level 1-énél, és ez nem ízlés kérdése, hanem a
+ * két belépés különbsége:
+ *  - a Level 1 közvetlenül az oldalbetöltés után indul, tehát az audio context ZÁROLT — a
+ *    sáv ott amúgy is csak az első billentyűlenyomásnál kezd szólni (az UNLOCKED-ág);
+ *  - a Level 2-be a NarrationScene felől érkezünk, MÁR FELOLDOTT contexttel, tehát a zene
+ *    valóban a create() pillanatában indul. Itt a fade-in az EGYETLEN dolog, ami tompítja
+ *    a belépést — a nyers sáv különben teljes intenzitással ütne be a fekete képernyőből.
+ */
+export const LEVEL2_MUSIC_FADE_IN_MS = 4000;
 
 // Szándékosan a zene hangereje FÖLÖTT: a boss theme alatt is át kell vágnia.
 export const DEFAULT_SFX_VOLUME = 0.5;

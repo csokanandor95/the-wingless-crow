@@ -15,6 +15,8 @@ import AudioManager, {
   DEFAULT_SFX_VOLUME,
   DEFAULT_SFX_DETUNE_RANGE,
   LEVEL_MUSIC_VOLUME,
+  LEVEL_MUSIC_FADE_IN_MS,
+  LEVEL2_MUSIC_FADE_IN_MS,
 } from '../../src/systems/AudioManager';
 import {
   createMockScene,
@@ -79,6 +81,14 @@ describe('AudioManager', () => {
     it('level ambient < boss theme < SFX', () => {
       expect(LEVEL_MUSIC_VOLUME).toBeLessThan(DEFAULT_MUSIC_VOLUME);
       expect(DEFAULT_MUSIC_VOLUME).toBeLessThan(DEFAULT_SFX_VOLUME);
+    });
+
+    // A Level 2-be feloldott audio contexttel érkezünk (a NarrationScene felől), tehát ott
+    // a zene tényleg a create() pillanatában indul — a fade-in az EGYETLEN dolog, ami
+    // tompítja a belépést. A Level 1-en ezzel szemben az UNLOCKED-ág úgyis kivárja az első
+    // billentyűleütést. Egy "egységesítsük a két konstanst" refaktor ezt csendben elvenné.
+    it('a Level 2 belépője hosszabban fadel be, mint a Level 1-é', () => {
+      expect(LEVEL2_MUSIC_FADE_IN_MS).toBeGreaterThan(LEVEL_MUSIC_FADE_IN_MS);
     });
   });
 

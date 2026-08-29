@@ -31,6 +31,14 @@ import bossThemeUrl from '../../assets/audio/boss-theme.mp3';
 // EGYÁLTALÁN nincs licenc/readme fájl — publikálás előtt tisztázandó (lásd CLAUDE.md nyitott
 // jogi tételek). A forrás-cím megtartása a fájlnévben az egyetlen kapocs a csomaghoz.
 import level1ThemeUrl from '../../assets/audio/library-of-veles.mp3';
+// Level 2 ambient: AlkaKrab csomag, `2. Shadowforge Convergence (Loop)`. UGYANAZ a csomag,
+// amiből a `boss-theme.mp3` jön (`4. Cursed Citadel (After Intro & Loop)` — bitre azonos
+// másolat, md5 29fac9c2...). A LOOP-ra vágott változat kell, nem a `Tracks mp3/` teljes szám:
+// az AudioManager `loop: true`-val játszik, tehát a Tracks-verzió intrója minden fordulónál
+// újraszólna. A csomaghoz VAN licenc-dokumentum (`2D helper/music/Loops mp3/AlkaKrab Music
+// License Info.pdf`), de a szövege nincs átolvasva — publikálás előtt tisztázandó
+// (lásd CLAUDE.md nyitott jogi tételek). A forrás-cím a fájlnévben a kapocs a csomaghoz.
+import level2ThemeUrl from '../../assets/audio/shadowforge-convergence.mp3';
 // Harci SFX: "Free Fantasy SFX Pack" (TomMusic), a csomag `Attacks/` és `Spells/`
 // almappáiból. A csomag ReadMe.txt-je NEM tartalmaz licencszöveget, csak elérhetőségeket —
 // publikálás előtt tisztázandó (lásd CLAUDE.md nyitott jogi tételek). A fájlnevekben
@@ -162,7 +170,7 @@ const LOADING_BAR_HEIGHT = 14;
  * fejlesztés közben ez a leggyorsabb út az új szakaszokhoz. **Commit előtt mindig állítsd
  * vissza `'Level1Scene'`-re.**
  */
-const START_SCENE = 'Level1Scene';
+const START_SCENE = 'Level2Scene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a
@@ -198,6 +206,7 @@ const PLAYER_SHEETS: Array<{ key: string; url: string }> = [
 const MUSIC_TRACKS: Array<{ key: string; url: string }> = [
   { key: MUSIC_KEYS.BOSS_THEME, url: bossThemeUrl },
   { key: MUSIC_KEYS.LEVEL1_THEME, url: level1ThemeUrl },
+  { key: MUSIC_KEYS.LEVEL2_THEME, url: level2ThemeUrl },
 ];
 
 const SFX_SOUNDS: Array<{ key: string; url: string }> = [

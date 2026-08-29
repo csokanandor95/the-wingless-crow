@@ -10,7 +10,12 @@ import Gravecaller, {
 } from '../enemies/Gravecaller';
 import CheckpointSystem from '../systems/CheckpointSystem';
 import LevelCheckpoint from '../systems/LevelCheckpoint';
-import AudioManager, { SFX_KEYS } from '../systems/AudioManager';
+import AudioManager, {
+  LEVEL2_MUSIC_FADE_IN_MS,
+  LEVEL_MUSIC_VOLUME,
+  MUSIC_KEYS,
+  SFX_KEYS,
+} from '../systems/AudioManager';
 import MovingPlatform, { isRiding } from '../platforms/MovingPlatform';
 import HazardDamageGate from '../hazards/HazardDamage';
 import SpikeField, { SPIKE_DAMAGE, SPIKE_KNOCKBACK_Y } from '../hazards/SpikeField';
@@ -73,7 +78,8 @@ import type { Damageable, PhysicsOverlapObject } from '../combat/DamageSystem';
  *  - **Két létra** (a Level 1-nek egy van) -> tömb + a fedésben lévő kiválasztása frame-enként.
  *  - **Három köztes checkpoint** (a Level 1-nek egy) -> `LevelCheckpoint` példányok.
  *  - **Nincs tutorial-felirat**: a Level 1 megtanította az irányítást.
- *  - **Nincs zene** (a Level 2 sávja későbbi iteráció); az `AudioManager` csak SFX-hez kell.
+ *  - **Saját zenesáv** (`Shadowforge Convergence`), a Level 1-énél HOSSZABB fade-innel —
+ *    ide már feloldott audio contexttel érkezünk, lásd `LEVEL2_MUSIC_FADE_IN_MS`.
  *  - **Saját registry-kulcs a checkpointnak**: a Level 1 `'checkpoint'`-ja MÁS koordinátákra
  *    mutat — közös kulcsnál a Level 2-re belépő player a Level 1 respawn-pontját örökölné.
  */
@@ -184,9 +190,18 @@ export default class Level2Scene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT + FALL_DEPTH);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-    // Zenét NEM indít (a Level 2 sávja későbbi iteráció) — az AudioManager itt csak az
-    // SFX-ekhez kell. Kézi takarítás nincs: maga iratkozik fel a scene shutdownjára.
+    // Zene + SFX. Kézi takarítás nincs: az AudioManager maga iratkozik fel a scene
+    // shutdownjára — és itt ez PONT a kívánt élettartam (a sáv az ajtón átlépve ér véget).
     this.audio = new AudioManager(this);
+
+    // A Level 1-nél HOSSZABB fade-in, mert ide már feloldott audio contexttel érkezünk (a
+    // NarrationScene felől), tehát a zene tényleg ebben a pillanatban indul — lásd a
+    // LEVEL2_MUSIC_FADE_IN_MS kommentjét. A hangerő ugyanaz a level-ambient szint, mint a
+    // Level 1-en: a keverési sorrend (ambient < boss theme < SFX) így marad érvényes.
+    this.audio.playMusic(MUSIC_KEYS.LEVEL2_THEME, {
+      volume: LEVEL_MUSIC_VOLUME,
+      fadeInMs: LEVEL2_MUSIC_FADE_IN_MS,
+    });
 
     // A háttér-épületek a terrain ELŐTT jönnek létre, hogy a display listán is mögötte
     // legyenek — a `BUILDING_DEPTH` (-15) ezt amúgy is garantálja, de így a sorrend olvasható.
@@ -609,6 +624,13 @@ export default class Level2Scene extends Phaser.Scene {
 
     this.isTransitioning = true;
     this.doorPromptText.setText('Checkpoint mentve...').setVisible(true);
+
+    // A zene a KÉPPEL EGYÜTT halkul el, ugyanabból a konstansból, amiből a kamera-fade. A
+    // scene shutdownja önmagában is elvágná (az AudioManager hookja), de fade nélkül —
+    // pont a fekete képernyő pillanatában pattanna le. FONTOS, hogy ez a hívás a fenti
+    // `bossSceneExists()` korai return UTÁN van: ott a pálya megy tovább, a zenének szólnia
+    // kell. (A Level1Scene.activateCheckpointAndTransition() mintája.)
+    this.audio.stopMusic(TRANSITION_FADE_MS);
 
     // FADE_OUT_COMPLETE, nem a fadeOut() callbackje: utóbbi a fade MINDEN frame-jén lefutna,
     // tehát frame-enként újraindítaná a cél scene-t (CLAUDE.md 4. tanulság).
