@@ -17,6 +17,12 @@ import {
   GRAVECALLER_TEXTURES,
 } from '../enemies/GravecallerAnimations';
 import {
+  createMadKingAnimations,
+  FRAME_HEIGHT as KING_FRAME_HEIGHT,
+  FRAME_WIDTH as KING_FRAME_WIDTH,
+  KING_TEXTURES,
+} from '../bosses/MadKingAnimations';
+import {
   createGraftedWingBreakerAnimations,
   CLEAN_TEXTURE_KEY as BOSS_CLEAN_TEXTURE_KEY,
   FRAME_HEIGHT as BOSS_FRAME_HEIGHT,
@@ -76,6 +82,10 @@ import playerJumpUrl from '../../assets/audio/sfx/stone-jump.wav';
 // sheet importja foglalja lentebb.)
 import harvesterDeathSfxUrl from '../../assets/audio/sfx/necro-hurt.wav';
 import gravecallerDeathSfxUrl from '../../assets/audio/sfx/necro-death-2.wav';
+// A Mad King ugró becsapódása: UGYANAZ a TomMusic csomag (`Spells/Rock Wall 1.wav`), tehát
+// nem nyit új jogi tételt. A kardsuhintásnál nehezebb, 2 mp-es dörej — a fight legnagyobb
+// ütése. A fájlnévben megtartott csomagbeli név a kapocs a forráshoz.
+import kingSlamUrl from '../../assets/audio/sfx/rock-wall-1.wav';
 // Player halál. SZÁRMAZTATOTT asset: a forrás `2D helper/sounds/17. Death Groan (Male).wav`
 // KÉT külön felvételt tartalmaz egy fájlban (50-330ms és 575-950ms, közte csend). Egyetlen
 // halálhoz egy nyögés kell, ezért az ELSŐ szakasz van kivágva (0-360ms) + 30ms fade-out a
@@ -115,6 +125,22 @@ import gravecallerDeathUrl from '../../assets/sprites/gravecaller/spr_Necromance
 // Az eredeti fájlnevek megmaradtak: ez köti vissza az assetet a forráscsomaghoz.
 import bossSheetUrl from '../../assets/sprites/grafted-wing-breaker/Bringer-of-Death-SpritSheet.png';
 import bossCleanSheetUrl from '../../assets/sprites/grafted-wing-breaker/Bringer-of-Death-SpritSheet_no-Effect.png';
+// Boss 2 (The Mad King): a "Medieval King Pack 2" csomag — **CC-0**, tehát NEM nyitott jogi
+// tétel (a License.txt be van másolva: assets/sprites/mad-king/license.txt). HÉT külön sheet,
+// mind AZONOS 160x111-es frame-mel, VÁLTOZATLAN másolatként, eredeti fájlnéven. Egyetlen
+// kivétel a `Take Hit.png` -> `Take-Hit.png` átnevezés: a Vite-import szóközös útvonallal
+// törékeny (ugyanaz az ok, amiért a háttér-rétegek is át lettek nevezve).
+//
+// A csomag `Jump.png` / `Fall.png` sheetje SZÁNDÉKOSAN kimarad: az ugró becsapódás levegőben
+// lévő pózát maga az `Attack3.png` f2 frame-je adja. A `Take Hit - white silhouette.png` sem
+// kell — a találat-villanás a bevett setTint + TintModes.FILL úton megy.
+import kingIdleUrl from '../../assets/sprites/mad-king/Idle.png';
+import kingRunUrl from '../../assets/sprites/mad-king/Run.png';
+import kingSlashUrl from '../../assets/sprites/mad-king/Attack1.png';
+import kingLungeUrl from '../../assets/sprites/mad-king/Attack2.png';
+import kingLeapUrl from '../../assets/sprites/mad-king/Attack3.png';
+import kingDeathUrl from '../../assets/sprites/mad-king/Death.png';
+import kingHitUrl from '../../assets/sprites/mad-king/Take-Hit.png';
 // Level 1 parallax háttér-rétegek. Forrás: PixelPlatformerSet1 v1.1 (Szadi art) —
 // "License for Everyone / public domain, personal or commercial". A fájlok át lettek
 // nevezve (`01 background.png` -> `01-sky.png` stb.), mert a Vite-import szóközös
@@ -127,6 +153,13 @@ import bgRuinsUrl from '../../assets/backgrounds/ruined-city/03-ruins.png';
 // (bal-felső sarok: 103, 0) lett 800x450-re kicsinyítve. A kivágás nem esztétikai döntés:
 // ez teszi a rajzolt padlóélt PONTOSAN a BossScene GROUND_TOP-jára (418). Lásd CLAUDE.md.
 import bossArenaUrl from '../../assets/backgrounds/cathedral/boss-arena.png';
+// Boss 2 aréna háttere: romos gótikus trónterem. SZÁRMAZTATOTT asset — a forrás a
+// `2D helper/level/Second boss background.png` (1672x941), amiből egy sima 800x450-es
+// KICSINYÍTÉS lett, KIVÁGÁS NÉLKÜL. A boss 1-nél azért kellett vágni, mert ott a GROUND_TOP
+// (418) már adott volt; itt új scene, tehát a padlóvonalat igazítottuk a képhez
+// (Boss2Scene.GROUND_TOP = 369). A forrás licenc nélkül érkezett — nyitott jogi tétel
+// (lásd CLAUDE.md), mint a Bossbackground_1.png esetében.
+import boss2ArenaUrl from '../../assets/backgrounds/throne-room/boss2-arena.png';
 // Level 2 parallax háttér-rétegek. Forrás: GothicVania Town (Luis Zuno / @ansimuz) —
 // public domain, UGYANAZ a csomag, amiből a hangulati propok jönnek.
 // MINDKETTŐ SZÁRMAZTATOTT, és a származtatás VESZTESÉGMENTES:
@@ -252,6 +285,7 @@ const SFX_SOUNDS: Array<{ key: string; url: string }> = [
   { key: SFX_KEYS.PLAYER_DEATH, url: playerDeathUrl },
   { key: SFX_KEYS.HARVESTER_DEATH, url: harvesterDeathSfxUrl },
   { key: SFX_KEYS.GRAVECALLER_DEATH, url: gravecallerDeathSfxUrl },
+  { key: SFX_KEYS.KING_SLAM, url: kingSlamUrl },
 ];
 
 // Gravecaller (Enemy 2): öt külön sheet, mind 96x96-os frame-ekkel — a knight
@@ -265,12 +299,25 @@ const GRAVECALLER_SHEETS: Array<{ key: string; url: string }> = [
   { key: GRAVECALLER_TEXTURES.DEATH, url: gravecallerDeathUrl },
 ];
 
-// Sima képek (nem sprite sheetek): a Level 1 parallax rétegei + a boss aréna álló háttere.
+// Mad King (Boss 2): hét külön sheet, mind 160x111-es frame-ekkel — a knight
+// (PLAYER_SHEETS) és a Gravecaller mintájára.
+const MAD_KING_SHEETS: Array<{ key: string; url: string }> = [
+  { key: KING_TEXTURES.IDLE, url: kingIdleUrl },
+  { key: KING_TEXTURES.RUN, url: kingRunUrl },
+  { key: KING_TEXTURES.SLASH, url: kingSlashUrl },
+  { key: KING_TEXTURES.LUNGE, url: kingLungeUrl },
+  { key: KING_TEXTURES.LEAP, url: kingLeapUrl },
+  { key: KING_TEXTURES.DEATH, url: kingDeathUrl },
+  { key: KING_TEXTURES.HIT, url: kingHitUrl },
+];
+
+// Sima képek (nem sprite sheetek): a Level 1 parallax rétegei + a boss arénák álló háttere.
 const BACKGROUND_IMAGES: Array<{ key: string; url: string }> = [
   { key: BACKGROUND_TEXTURES.SKY, url: bgSkyUrl },
   { key: BACKGROUND_TEXTURES.MOUNTAINS, url: bgMountainsUrl },
   { key: BACKGROUND_TEXTURES.RUINS, url: bgRuinsUrl },
   { key: BACKGROUND_TEXTURES.BOSS_ARENA, url: bossArenaUrl },
+  { key: BACKGROUND_TEXTURES.BOSS2_ARENA, url: boss2ArenaUrl },
   { key: BACKGROUND_TEXTURES.TOWN_SKY, url: bgTownSkyUrl },
   { key: BACKGROUND_TEXTURES.TOWN, url: bgTownUrl },
 ];
@@ -355,6 +402,13 @@ export default class BootScene extends Phaser.Scene {
       });
     }
 
+    for (const sheet of MAD_KING_SHEETS) {
+      this.load.spritesheet(sheet.key, sheet.url, {
+        frameWidth: KING_FRAME_WIDTH,
+        frameHeight: KING_FRAME_HEIGHT,
+      });
+    }
+
     for (const sheet of [
       { key: BOSS_TEXTURE_KEY, url: bossSheetUrl },
       { key: BOSS_CLEAN_TEXTURE_KEY, url: bossCleanSheetUrl },
@@ -383,6 +437,7 @@ export default class BootScene extends Phaser.Scene {
     createCrowHarvesterAnimations(this);
     createGravecallerAnimations(this);
     createGraftedWingBreakerAnimations(this);
+    createMadKingAnimations(this);
 
     this.scene.start(START_SCENE);
   }

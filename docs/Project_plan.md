@@ -509,6 +509,9 @@ Minden nagyobb pálya végén lehet egy boss.
 
 Első vertical slice-ban elég **1 boss**.
 
+> **Állapot (2026-08-30):** két boss van kész — a **Grafted Wing-Breaker** (Level 1 után) és
+> a **Mad King** (Level 2 után). A harmadik, a démon, a következő iteráció.
+
 ## Boss – The Grafted Wing-Breaker
 
 Példa:
@@ -602,6 +605,37 @@ A cél egy olyan boss, amely:
 > player támadás-hitboxainál): a slash hatótávja a kasza mért nyúlása a csapás frame-jén.
 > Ez a placeholderhez képest megduplázta a közelharci hatótávot — a fight ettől nehezebb,
 > a hangolás manuális játszás után következik.
+
+
+## Boss 2 – The Mad King *(Phase: a döntési pont 3. iterációja, 2026-08-30)*
+
+Az őrült király (16. pont): a haldokló felesége miatt paktált a démonnal, és ezzel ő fogatta
+el a varjakat. A Level 2 (`The Crowless Quarter`) után, a saját tróntermében várja Lazarust.
+
+**A harc előtt PÁRBESZÉD van** (`ui/Dialogue.ts`) — magától lemegy, a jobbra-nyíl gyorsítja.
+Ez a projekt első valódi dialógusa; a részletek a 20. pont helyesbítésénél.
+
+**Szándékosan TISZTÁN KÖZELHARCI**, kontrasztként a Wing-Breaker távolsági nyomásához:
+
+| akció | animáció | megjegyzés |
+|---|---|---|
+| kardcsapás | `Attack1` (4 frame) | reaktív: `≤ SLASH_RANGE` (142) belül mindig ez jön |
+| ugró becsapódás | `Attack3` (4 frame) | a Phase 1 gap-closere; a cél a felugráskor rögzül |
+| kitörés | `Attack2` (4 frame) | **CSAK Phase 2**; piros telegraph, egyenes vonalú roham |
+
+50 % HP alatt: gyorsabb mozgás + megnyílik a kitörés — pontosan a Wing-Breaker szerkezete
+(ott a charge nyílt meg).
+
+**Az ugrás a lény lényege**: ez az egyetlen dolog, ami a távolról tűzgolyózó playert bünteti,
+és ez tartja életben a Phase 1-et (ahol a kitörés még zárva van). A ballisztikája a
+`GRAVITY_Y`-ból LEVEZETETT, egyetlen hangolóponttal (`LEAP_RISE_PX`); a cél a felugrás
+pillanatában rögzül, tehát a guggolás alatt oldalra lépve kikerülhető — ugyanaz a
+telegraph-elv, mint a Shadow Spellnél.
+
+**Asset:** *Medieval King Pack 2* — **CC-0**, a licenc a repóban van. A csomagban nincs cast
+animáció (innen a tisztán közelharci karakter), viszont van valódi ugró ÉS valódi dash
+animáció — a Wing-Breakernél mindkettőt megtartott pózzal kellett pótolni.
+
 
 ---
 
@@ -835,6 +869,17 @@ Romos kastély.
 - nehezebb platforming
 - lore
 
+> **KIMARAD KÜLÖN PÁLYAKÉNT (2026-08-30, user-döntés).** A Level 2 után KÖZVETLENÜL a király
+> harca következik, utána pedig rögtön a végső ellenfél — nincs közte platforming-pálya.
+> A „Throne of the Damned" téma nem vész el: **a Boss 2 arénája MAGA a trónterem**
+> (`assets/backgrounds/throne-room/boss2-arena.png`).
+>
+> Ez a 37. pont scope-fegyelmét követi: a vertical slice-hoz két pálya + három boss elég, és
+> egy harmadik pálya a meglévő elemekből (CrowHarvester, Gravecaller, mozgó platform,
+> spike, reaper) csak mennyiségi ismétlés lenne. Ha később mégis kell, a `Level2Layout.ts`
+> adatmodulja 1:1-ben lemásolható egy `Level3Layout.ts`-be, és a király ajtaja elé
+> beilleszthető.
+
 ### Final Level – The Broken Gate
 
 A végső terület.
@@ -882,6 +927,25 @@ A boss belépése és a zene fontos része a játékélménynek.
 >   ismét az arénába. A teljes `systems/GameState.ts` továbbra is későbbi fázis.
 > - **Zene:** a boss theme és az átvezető zenéje a Phase 8 – Atmosphere része; a kódban
 >   jelenleg csak dokumentált beakasztási pontok (`TODO (Phase 8)`) vannak.
+
+> **Kiegészítés (2026-08-30) — a Boss 2 arénája (`Boss2Scene`):**
+>
+> Ugyanaz a fix 800×450-es felépítés, üres padlóval. Két érdemi eltérés:
+>
+> - **A belépő KÉT részből áll: párbeszéd, majd cím-kártya.** A király `DORMANT` a párbeszéd
+>   alatt is (nem mozog, nem sebezhető), a player pedig TELJESEN befagyasztva — a
+>   `PlayerController` csak a harc kezdetekor jön létre, mert a konstruktora regisztrálja a
+>   támadás-billentyűket.
+> - **A `GROUND_TOP` a KÉPHEZ igazodik (369), nem fordítva.** A Boss 1-nél a padlóvonal (418)
+>   már adott volt, ezért ott a festményt kellett kivágni; itt új scene, tehát a rajzolt
+>   padlóélt mértük meg, és a talajt tettük oda — a trónterem így vágás nélkül megmarad.
+>   **Ez a recept a végső arénára is alkalmazható** (a `Final boss background.png` ugyanaz
+>   az 1672×941).
+>
+> A vereség/győzelem lánca a Boss 1-ével azonos: vereség → `Level2Scene` a saját
+> checkpointjára; győzelem → `kingDefeated` registry-flag + `NarrationScene`. Az átvezető
+> célja a `FinalBossScene` LÉTEZÉSÉTŐL függ — amíg nincs regisztrálva, a Level 2-re tesz
+> vissza. **Zene egyelőre nincs** (a user külön adja hozzá).
 
 > **Kiegészítés (Phase 8, 6. iteráció) — az aréna padlója üres lett:**
 >
@@ -1284,8 +1348,22 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 > - Új, eredetileg nem tervezett scene: **`scenes/NarrationScene.ts`** — adatvezérelt
 >   szöveges átvezető (`{ lines, nextScene, title? }`), typewriter megjelenítéssel. Nem
 >   "boss utáni" scene: ugyanez fogja kiszolgálni a 9. pont introját és a tervezett
->   `EndingScene.ts` / `ui/Dialogue.ts` szerepét is, ezért azok külön fájlként valószínűleg
->   már nem lesznek szükségesek.
+>   `EndingScene.ts` szerepét is, ezért az külön fájlként valószínűleg már nem lesz szükséges.
+>
+> **HELYESBÍTÉS (2026-08-30):** a fenti bekezdés eredetileg az **`ui/Dialogue.ts`**-t is a
+> `NarrationScene` által kiváltottnak mondta. **Ez tévedésnek bizonyult, és a modul elkészült**
+> — mert a kettő más szerepű:
+>
+> | | `NarrationScene` | `ui/Dialogue` |
+> |---|---|---|
+> | hol | saját, teljes képernyős scene | egy futó scene-en BELÜL, a szereplők előtt |
+> | mikor | pályák/fejezetek KÖZÖTT | egy jeleneten belül (a király harca előtt) |
+> | léptetés | KÉZZEL (Space/Enter) | MAGÁTÓL; a jobbra-nyíl csak gyorsít |
+> | beszélő | nincs | van (a panel fejléce) |
+>
+> A `NarrationScene` a világ hangja két jelenet között; a `Dialogue` két szereplő beszélgetése
+> egy jeleneten belül. Egy teljes képernyős, kézzel léptetett szövegdoboz a király előtt
+> kitakarta volna magát a királyt — pont azt, amiért a jelenet létezik.
 
 ---
 
@@ -1399,12 +1477,20 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 >
 > 1. **Enemy 2 – Caster (`Gravecaller`) — KÉSZ.** Lásd a 11. pontot. A Level 1 `E2`
 >    platformján áll, a korábbi CrowHarvester helyén (14. pont).
-> 2. **Level 2 – The Crowless Quarter** — a geometria (`Level2Layout.ts`) és a látvány
->    (GothicVania Town: parallax háttér, terrain, fa-platformok, háttér-házak, propok) KÉSZ.
->    Hátravan: zene, SFX, és a hazard-/lövedék-placeholderek cseréje.
-> 3. **Boss 2** — hátravan. Jelölt aréna-háttér: `2D helper/level/Bossbackground_2.png`
->    (angyal-szobros katedrália, nyitott égbolttal) — külön aréna, nem a Boss 1 variánsa.
-> 4. **Enemy 3 – Beast** — opcionális, a 11. pont szerint is.
+> 2. **Level 2 – The Crowless Quarter — KÉSZ.** Geometria (`Level2Layout.ts`), látvány
+>    (GothicVania Town) és zene (`Shadowforge Convergence`) megvan. Hátravan: SFX, és a
+>    hazard-/lövedék-/létra-/ajtó-placeholderek cseréje.
+> 3. **Boss 2 – The Mad King — KÉSZ (2026-08-30).** Lásd a 12. pontot. A trónterem-aréna
+>    (`Second boss background.png`), a párbeszéd-rendszer (`ui/Dialogue.ts`) és a teljes
+>    lánc `Level2 → átvezető → király → átvezető` megvan. **Zene még nincs** (user adja hozzá).
+>    *(A korábban jelölt `Bossbackground_2.png` végül NEM ez lett — az továbbra is szabad.)*
+> 4. **A végső ellenfél (a démon)** — a soron következő iteráció. A `Boss2Scene` győzelmi ága
+>    már a `'FinalBossScene'` kulcsot célozza, és az aréna-háttér is megvan
+>    (`2D helper/level/Final boss background.png`).
+> 5. **Enemy 3 – Beast** — opcionális, a 11. pont szerint is.
+>
+> **A `Level 3 – The Throne of the Damned` KIMARADT külön pályaként** (14. pont) — a
+> trónterem a Boss 2 arénája lett.
 >
 > A Gravecaller iterációja **általánosította a scene enemy-kezelését** (`LevelEnemy`
 > strukturális interfész + `type` mező az `ENEMY_SPAWNS`-ban), tehát a Beast vagy egy új

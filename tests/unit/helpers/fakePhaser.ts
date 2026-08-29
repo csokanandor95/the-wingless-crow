@@ -170,6 +170,10 @@ export function createFakePhaserModule() {
       // INKLUZÍV mindkét végén — a tesztek tartomány-ellenőrzése erre épül.
       Between: (min: number, max: number) =>
         Math.floor(Math.random() * (max - min + 1)) + min,
+      // A MadKing ugrásának vízszintes sebességét korlátozza. A valódi Phaser.Math.Clamp
+      // ugyanezt teszi: min <= érték <= max.
+      Clamp: (value: number, min: number, max: number) =>
+        Math.max(min, Math.min(max, value)),
       Distance: {
         Between: (x1: number, y1: number, x2: number, y2: number) =>
           Math.hypot(x2 - x1, y2 - y1),

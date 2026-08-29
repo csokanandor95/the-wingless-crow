@@ -91,8 +91,24 @@ import type { Damageable, PhysicsOverlapObject } from '../combat/DamageSystem';
 /** A registry-kulcs SZÁNDÉKOSAN különbözik a Level 1 `'checkpoint'`-jától (lásd fent). */
 const CHECKPOINT_REGISTRY_KEY = 'level2Checkpoint';
 
-/** A boss-ajtó célja. A scene MÉG NEM LÉTEZIK — a transition kódja már rá van kötve. */
+/**
+ * A boss-ajtó VÉGSŐ célja. Nem közvetlenül ide megyünk: előbb a `NarrationScene` fut le a
+ * `LEVEL2_END_NARRATION`-nel — ugyanaz a szerkezet, mint a Boss 1 győzelme után, csak itt az
+ * átvezető a harc ELŐTT áll (a trónterembe érkezés).
+ */
 const BOSS_SCENE_KEY = 'Boss2Scene';
+
+/**
+ * Placeholder lore-átvezető a Level 2 és a király arénája között — a végleges szöveget a
+ * Phase 9 – Lore írja meg, a csere ennek a tömbnek a szerkesztése. (A BossScene
+ * BOSS_VICTORY_NARRATION-jével azonos minta: a narrációs adat annál a scene-nél él, ahonnan
+ * az átvezető indul.)
+ */
+const LEVEL2_END_NARRATION = [
+  'A negyed véget ér. A macskaköves út egy kapuban fut ki,\nés a kapu mögött nincs több utca.',
+  'A kastély áll. Egyetlen ablakában sem ég fény —\ncsak a tróntermében, ahol soha nem alszik ki.',
+  'Odabent valaki beszél. Nem hozzá,\nhanem valakihez, aki már nem válaszol.',
+];
 
 const RESPAWN_DELAY_MS = 1200;
 /** Az ajtó-átmenet hossza. */
@@ -301,7 +317,7 @@ export default class Level2Scene extends Phaser.Scene {
 
     this.interactKey = this.input.keyboard!.addKey('E');
     this.doorPromptText = this.add
-      .text(400, 400, this.doorPromptLabel(), {
+      .text(400, 400, 'E: Belépés', {
         fontFamily: 'monospace',
         fontSize: '16px',
         color: '#ffffff',
@@ -309,23 +325,6 @@ export default class Level2Scene extends Phaser.Scene {
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setVisible(false);
-
-    // IDEIGLENES debug-visszaút, hogy a Level1 -> Boss -> átvezető -> Level2 lánc kézzel
-    // körbejárható maradjon. A Boss2Scene elkészültekor törlendő.
-    this.input.keyboard?.once('keydown-R', () => this.scene.start('Level1Scene'));
-  }
-
-  /**
-   * A Boss 2 aréna még nem létezik. A prompt ezt megmondja ahelyett, hogy egy néma, hatás
-   * nélküli `E` maradna — a transition kódja viszont már a `BOSS_SCENE_KEY`-t célozza, tehát
-   * a scene regisztrálásakor magától élni fog.
-   */
-  private bossSceneExists(): boolean {
-    return BOSS_SCENE_KEY in this.scene.manager.keys;
-  }
-
-  private doorPromptLabel(): string {
-    return this.bossSceneExists() ? 'E: Belépés' : 'E: Checkpoint  (Boss 2 — még nem létezik)';
   }
 
   /**
@@ -636,26 +635,24 @@ export default class Level2Scene extends Phaser.Scene {
 
     this.checkpoint.activate(DOOR_CHECKPOINT.x, DOOR_CHECKPOINT.y);
 
-    if (!this.bossSceneExists()) {
-      // A checkpoint attól még él: a pálya végigjátszható, csak nincs hova továbbmenni.
-      this.doorPromptText.setText('Checkpoint mentve — a Boss 2 aréna még nem készült el.');
-      return;
-    }
-
     this.isTransitioning = true;
     this.doorPromptText.setText('Checkpoint mentve...').setVisible(true);
 
     // A zene a KÉPPEL EGYÜTT halkul el, ugyanabból a konstansból, amiből a kamera-fade. A
     // scene shutdownja önmagában is elvágná (az AudioManager hookja), de fade nélkül —
-    // pont a fekete képernyő pillanatában pattanna le. FONTOS, hogy ez a hívás a fenti
-    // `bossSceneExists()` korai return UTÁN van: ott a pálya megy tovább, a zenének szólnia
-    // kell. (A Level1Scene.activateCheckpointAndTransition() mintája.)
+    // pont a fekete képernyő pillanatában pattanna le.
+    // (A Level1Scene.activateCheckpointAndTransition() mintája.)
     this.audio.stopMusic(TRANSITION_FADE_MS);
 
     // FADE_OUT_COMPLETE, nem a fadeOut() callbackje: utóbbi a fade MINDEN frame-jén lefutna,
     // tehát frame-enként újraindítaná a cél scene-t (CLAUDE.md 4. tanulság).
+    // A trónterembe NEM közvetlenül lépünk be: előbb a szöveges átvezető fut le, és az
+    // indítja a boss arénát (a NarrationScene adatvezérelt, lásd NarrationData).
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start(BOSS_SCENE_KEY);
+      this.scene.start('NarrationScene', {
+        lines: LEVEL2_END_NARRATION,
+        nextScene: BOSS_SCENE_KEY,
+      });
     });
     this.cameras.main.fadeOut(TRANSITION_FADE_MS, 0, 0, 0);
   }

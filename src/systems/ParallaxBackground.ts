@@ -27,6 +27,8 @@ export const BACKGROUND_TEXTURES = {
    * kulcsoknak egyetlen forrása legyen, amit a BootScene betölthet.
    */
   BOSS_ARENA: 'bg-boss-arena',
+  /** Boss 2 aréna (trónterem) — szintén egyetlen álló kép, lásd Boss2Scene. */
+  BOSS2_ARENA: 'bg-boss2-arena',
   /** Level 2 (GothicVania Town) — lásd `LEVEL2_BACKGROUND_LAYERS`. */
   TOWN_SKY: 'bg-town-sky',
   TOWN: 'bg-town',

@@ -44,6 +44,11 @@ export const SFX_KEYS = {
   HARVESTER_DEATH: 'sfx-harvester-death',
   /** A Gravecaller halála — hosszabb, „elnyújtottabb" haláltusa. */
   GRAVECALLER_DEATH: 'sfx-gravecaller-death',
+  /**
+   * A Mad King ugró becsapódása, a FÖLDET ÉRÉS pillanatában. A fight legnehezebb
+   * ütése, ezért kap saját, nehéz hangot a közös ENEMY_SWING helyett.
+   */
+  KING_SLAM: 'sfx-king-slam',
 } as const;
 
 export const DEFAULT_MUSIC_VOLUME = 0.45;
@@ -100,6 +105,7 @@ export const DEFAULT_SFX_DETUNE_RANGE = 120;
  * | CrowHarvester halál | 0.362        | 100 %               | 0.40   |
  * | Gravecaller halál   | 0.256        | 100 %               | 0.56   |
  * | player halál        | 0.699        | 130 %               | 0.27   |
+ * | király becsapódás   | 0.559        | 130 %               | 0.33   |
  *
  * (*) Az ugrás a képlet szerint 1.06-ot kívánna; 1.0 a maximum, amit torzítás nélkül
  * kiadhatunk, tehát ez a hang marad kissé a célszint alatt. A forrásfájl egyszerűen halk
@@ -114,6 +120,7 @@ export const PLAYER_JUMP_VOLUME = 1;
 export const PLAYER_DEATH_VOLUME = 0.27;
 export const HARVESTER_DEATH_VOLUME = 0.4;
 export const GRAVECALLER_DEATH_VOLUME = 0.56;
+export const KING_SLAM_VOLUME = 0.33;
 
 /**
  * A halál-hangok pontos magasságon szólnak. A detune-szórás célja, hogy egy ISMÉTLŐDŐ hang

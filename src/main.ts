@@ -4,6 +4,7 @@ import Level1Scene from './scenes/Level1Scene';
 import BossScene from './scenes/BossScene';
 import NarrationScene from './scenes/NarrationScene';
 import Level2Scene from './scenes/Level2Scene';
+import Boss2Scene from './scenes/Boss2Scene';
 import { GRAVITY_Y } from './config/physics';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -25,7 +26,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [BootScene, Level1Scene, BossScene, NarrationScene, Level2Scene],
+  scene: [BootScene, Level1Scene, BossScene, NarrationScene, Level2Scene, Boss2Scene],
 };
 
 new Phaser.Game(config);

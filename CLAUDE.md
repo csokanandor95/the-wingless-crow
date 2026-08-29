@@ -95,7 +95,8 @@ A pálya 3200 → 6000 px, a talaj szegmensekre bomlott, és szakadékok került
 Wing-Breaker*, a Project_plan.md 12. pontja szerinti névvel), fix 800×450-es boss aréna,
 boss entrance, HP-bar, két fázis, boss victory. A győzelem után egy adatvezérelt szöveges
 átvezető (`NarrationScene`) következik, onnan a `Level2Scene`.
-**A teljes lánc végigjátszható:** `Level1 → ajtó (E) → BossScene → NarrationScene → Level2Scene`.
+**A teljes lánc végigjátszható:** `Level1 → ajtó (E) → BossScene → NarrationScene →
+Level2Scene → ajtó (E) → NarrationScene → Boss2Scene → NarrationScene → (végső boss)`.
 
 **Phase 8 (Atmosphere) ELINDULT — 1. iteráció: boss music kész.** `systems/AudioManager.ts`
 (egy zenesáv, loop, fade-in/fade-out) + `assets/audio/boss-theme.mp3` (2 MB). A zene a boss
@@ -343,6 +344,72 @@ a csomag, amiből a Level 1 hangulati propjai jönnek, tehát **nem nyílt új j
 - **A fa-platformnak KÉT változata van** — állvány (lábak a talajig) és konzol —, és a
   választás **LEVEZETETT**: `platformHasLegs()`. Részletek lentebb, a „Level 2 terrain"
   szakaszban.
+
+**BOSS 2 — THE MAD KING KÉSZ (2026-08-30).** A lánc bezárult: a Level 2 ajtaja már nem
+zsákutca. Az útvonal `Level2Scene → (ajtó, E) → NarrationScene → Boss2Scene[ párbeszéd →
+belépő → harc ] → NarrationScene → (végső boss, köv. iteráció)`.
+Új modulok: `bosses/MadKing.ts`, `bosses/MadKingAnimations.ts`, `scenes/Boss2Scene.ts`,
+`ui/Dialogue.ts`.
+
+- **ELTÉR A `Project_plan.md`-TŐL (user-döntés, a dokumentum frissítve):** a
+  **`Level 3 – The Throne of the Damned` külön platforming-pályaként KIMARAD.** A király
+  harca közvetlenül a Level 2 után jön, utána pedig rögtön a végső ellenfél. A trónterem-téma
+  a Boss 2 arénájában él tovább.
+- **A király TISZTÁN KÖZELHARCI** — tudatos kontraszt a Wing-Breakerrel, aki távolsági
+  nyomást ad (lövedék + Shadow Spell). Nem az asset hiányossága: a csomagban nincs cast
+  animáció, cserébe VAN valódi ugró és valódi kitörés animáció, tehát mindkét mozdulat
+  hitelesen ki van rajzolva (a Wing-Breaker dash-éhez képest, ami megtartott póz).
+- **Phase 1 = reaktív kardcsapás + ugró becsapódás; Phase 2 (50 %) = + kitörés és gyorsabb
+  mozgás.** Pontosan a Boss 1 szerkezete (ott a charge nyílt meg), tehát a rotáció-logika és
+  a tesztek 1:1-ben átvihetők voltak.
+- **Az ugrás BALLISZTIKÁJA levezetett, nem hangolt**: a `LEAP_RISE_PX` (140) az EGYETLEN
+  hangolópont, abból jön a `GRAVITY_Y`-nal a felfelé induló sebesség ÉS a repülési idő, és
+  abból a vízszintes sebesség, ami pont a célra viszi. A cél a FELUGRÁS pillanatában rögzül
+  (a Shadow Spell elve), tehát oldalra lépve kikerülhető.
+- **A háttér TINT NÉLKÜL megy be** — szemben a Boss 1 `0xb0b0b0`-jával, és ez MÉRÉS: a
+  trónterem nyers fényessége a játéktérben `mean 36.3`, míg a Boss 1 festményének TINTELT
+  eredménye `59.7 × 0.69 = 41.2`. Ez a kép eleve sötétebb annál, amire a Boss 1-et
+  sötétíteni kellett.
+- **A `GROUND_TOP` a KÉPHEZ igazodik (369), nem fordítva.** A Boss 1-nél a festményt kellett
+  KIVÁGNI, mert ott a 418-as padlóvonal már adott volt; itt új scene, tehát a padlóvonalat
+  mértük a képhez — így a trónterem vágás nélkül, teljes egészében megmarad.
+- **A király NEM fadel ki halálkor** (a Wing-Breaker hamuvá válik): a Death sheet utolsó
+  frame-je egy a földön maradó test, és a lore szerint a király FELOLDOZÁST kap — látszania
+  kell, hogy ott fekszik a trónja előtt.
+- **A `Level2Scene` R debug-billentyűje és a `bossSceneExists()` feltételes promptja
+  TÖRÖLVE** — a Boss2Scene innentől létezik. A helyükre ugyanez a minta lépett a Boss2Scene
+  győzelmi ágán: amíg a `FinalBossScene` nincs regisztrálva, az átvezető a Level 2-re tesz
+  vissza, és a végső aréna elkészültekor magától átvált rá.
+- **Zene NINCS** (user külön adja hozzá). A `Boss2Scene` `AudioManager`-t azért kap, mert az
+  SFX-hez kell; a `playMusic()` helye a belépőnél `TODO`-val meg van jelölve. Halott
+  `MUSIC_KEYS` bejegyzés SZÁNDÉKOSAN nem került be.
+
+**PÁRBESZÉD-RENDSZER (`src/ui/Dialogue.ts`) — ÚJ.** Ez tölti be a `Project_plan.md` 20.
+pontjában tervezett `ui/Dialogue.ts` slotot. **A terv korábbi megjegyzése — hogy a
+`NarrationScene` valószínűleg kiváltja — MEGDŐLT**, mert a kettő más szerepű:
+
+| | `NarrationScene` | `ui/Dialogue` |
+|---|---|---|
+| hol | saját, teljes képernyős scene | egy futó scene-en BELÜL |
+| mikor | pályák KÖZÖTT | a szereplők előtt, harc előtt |
+| léptetés | KÉZZEL (Space/Enter) | MAGÁTÓL; a jobbra-nyíl csak gyorsít |
+| beszélő | nincs | van (a panel fejléce) |
+
+- **A mag PURE** (`charsRevealedAt`, `autoAdvanceDue`), és az időt a scene adja
+  (`update(deltaMs)`), nem egy `time.addEvent` — a `SwingingReaper` precedense.
+- **EGY `update()` LEGFELJEBB EGY sort léptet** (nincs `while` ciklus). Ez szándékos: egy
+  frame-akadás vagy egy háttérbe tett fül után a Phaser több száz ms-os deltát ad, ami
+  különben átpörgetne több sornyi párbeszédet, mielőtt a player elolvashatná. Unit teszt őrzi.
+- **Az `advance()` az EGYETLEN léptető belépési pont** — ugyanaz fut a nyílra és az automata
+  továbblépésre. Gépelés közben befejezi a sort (és onnantól a tartás ideje ketyeg, tehát
+  nincs külön „skipped" állapot), kész sornál a következőre lép.
+- **A panel geometriája LEVEZETETT**: a teteje `GROUND_TOP + 3`, tehát TELJES EGÉSZÉBEN a
+  járható felszín ALATT ül — sosem takarja a királyt vagy Lazarust. Következmény: egy
+  párbeszéd-sor legfeljebb 2 sorra tördelődhet.
+- **A player a párbeszéd alatt TELJESEN befagyasztva**: a `PlayerController` csak a
+  `beginFight()`-ban jön létre. Nem elég az `update()`-jét kihagyni — a konstruktora
+  regisztrálja a J/F billentyű- és pointer-listenereket, tehát a player különben a
+  párbeszéd alatt is támadhatna és varázsolhatna.
 - **HAT háttér-ház** világ-koordinátásan (`BACKDROP_BUILDINGS`, `BUILDING_DEPTH = -15`) és
   **17 hangulati prop** (`DECOR_PROPS`, tint nélkül), mind unit-tesztelt elhelyezéssel.
 - Ami a Level 2-n MÉG placeholder: a **létra** és a **boss-ajtó** (a csomagban nincs létra,
@@ -380,7 +447,7 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**) + **Boss** le van fedve a Project_plan.md §23 bontása szerint (**16 fájl, 469 teszt** — ebből 6 az animáció-/háttér-/VFX-vezérlést, 2 a **pálya-geometriát** (Level 1 + Level 2), 1 a **mozgó platformot**, 1 pedig a **hazardokat** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**) + **mindkét Boss** le van fedve a Project_plan.md §23 bontása szerint (**19 fájl, 530 teszt** — ebből 7 az animáció-/háttér-/VFX-vezérlést, 2 a **pálya-geometriát** (Level 1 + Level 2), 1 a **mozgó platformot**, 1 a **hazardokat**, 1 pedig a **párbeszéd-rendszert** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -421,6 +488,7 @@ the-wingless-crow/
 │   │       ├── stone-chain-run-5.wav   # player lépés — a "Chain" (láncing-csörgős) változat
 │   │       ├── stone-jump.wav          # player ugrás — a SIMA változat, SZÁNDÉKOSAN nem a
 │   │                                   # Chain: annak a végén külön csörgő utórezgés ül
+│   │       ├── rock-wall-1.wav         # Mad King becsapódás (Spells/) — 2 mp-es dörej
 │   │       ├── necro-hurt.wav          # CrowHarvester halál \ Monster Growls Attack and
 │   │       ├── necro-death-2.wav       # Gravecaller halál   / Deaths V.1 — licenc TISZTÁZANDÓ
 │   │       └── death-groan-17.wav      # player halál. SZÁRMAZTATOTT: a forrás
@@ -435,6 +503,10 @@ the-wingless-crow/
 │   │   │   └── 03-ruins.png      # RGBA sziluett, teteje a forrás y=193..227-nél
 │   │   ├── cathedral/
 │   │   │   └── boss-arena.png    # 800x450, ÁTMÉRETEZETT/KIVÁGOTT — lásd BossScene alább
+│   │   ├── throne-room/
+│   │   │   └── boss2-arena.png   # 800x450, CSAK ÁTMÉRETEZVE (nincs kivágás): a forrás
+│   │   │                         # 1672x941 aspektusa gyakorlatilag azonos a 800x450-ével.
+│   │   │                         # A rajzolt padlóél a 369. sorra esik = Boss2Scene.GROUND_TOP
 │   │   └── gothic-town/          # Level 2 parallax. GothicVania Town (Luis Zuno) — PUBLIC DOMAIN.
 │   │       │                     # MINDKETTŐ SZÁRMAZTATOTT, de VESZTESÉGMENTESEN: a forrás alsó
 │   │       │                     # sávja bitre azonos sorokból áll, tehát lefelé toldható.
@@ -495,9 +567,24 @@ the-wingless-crow/
 │       │                         # 4512x96 = 47 frame — SZÁRMAZTATOTT: a forrás 6016x128
 │       │                         # (128x128-as frame), abból frame-enként (16,16,96,96)
 │       │                         # kivágással. Lásd a 19. technikai tanulságot.
-│       └── grafted-wing-breaker/ # Boss 1 sprite, eredeti fájlnéven (Bringer of Death, Clembod)
-│           ├── Bringer-of-Death-SpritSheet.png          # 1120x744 = 8x8 db 140x93-as frame
-│           └── Bringer-of-Death-SpritSheet_no-Effect.png # ugyanaz effektek nélkül; 1 frame kell belőle
+│       ├── grafted-wing-breaker/ # Boss 1 sprite, eredeti fájlnéven (Bringer of Death, Clembod)
+│       │   ├── Bringer-of-Death-SpritSheet.png          # 1120x744 = 8x8 db 140x93-as frame
+│       │   └── Bringer-of-Death-SpritSheet_no-Effect.png # ugyanaz effektek nélkül; 1 frame kell belőle
+│       └── mad-king/             # Boss 2 sprite (Medieval King Pack 2) — CC-0, a licenc a
+│           │                     # repóban van. HÉT sheet, MIND 160x111-es frame-mel, a talp
+│           │                     # mindegyiken a frame y=105-énél. VÁLTOZATLAN másolatok.
+│           ├── Idle.png          # 8 frame \ 1280x111
+│           ├── Run.png           # 8 frame /
+│           ├── Attack1.png       # 4 frame — SLASH, f2 a csapás (a penge x=151-ig ér)
+│           ├── Attack2.png       # 4 frame — LUNGE (Phase 2), f2 a kitörés mozgás-csíkkal
+│           ├── Attack3.png       # 4 frame — LEAP: f0-1 guggolás, f2 levegőben, f3 becsapódás
+│           ├── Death.png         # 6 frame, f5 = a földön maradó test (NINCS fade utána)
+│           ├── Take-Hit.png      # 4 frame — CSAK a falnak rohanó kitörés staggerje.
+│           │                     # A szóköz kivéve a névből: a Vite-import azzal törékeny
+│           └── license.txt       # CC-0 — ez NEM nyitott jogi tétel
+│           # A csomag Jump.png / Fall.png sheetje SZÁNDÉKOSAN kimaradt (az Attack3 f2 MAGA a
+│           # levegőben lévő póz), és a "Take Hit - white silhouette.png" sem kell: a
+│           # találat-villanás a bevett setTint + TintModes.FILL úton megy.
 ├── tests/
 │   └── unit/
 │       ├── player.test.ts       # Project_plan.md §23 Player scope
@@ -505,6 +592,8 @@ the-wingless-crow/
 │       ├── crowHarvester.test.ts # §23 Enemy scope (CrowHarvester HP/damage/death/state transitions)
 │       ├── gravecaller.test.ts  # §23 Enemy scope (Gravecaller — vertikális kapu, kite, cast->reposition)
 │       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, slash/projectile/spell/charge, death)
+│       ├── madKing.test.ts      # §23 Boss scope, Boss 2 (HP, fázis, slash/leap/lunge, death)
+│       ├── dialogue.test.ts     # a párbeszéd pure magja + a léptetés (nyíl vs. automatikus)
 │       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown, SFX)
 │       ├── level1Layout.test.ts # a Level 1 geometria invariánsai (elérhetőség-BFS, gapek, enemy-bounds, spike-ok)
 │       ├── level2Layout.test.ts # ugyanaz a Level 2-re + ugrás-plafon, mozgó platform, létrák,
@@ -515,6 +604,7 @@ the-wingless-crow/
 │       ├── crowHarvesterAnimations.test.ts # state->anim + a facing-kompenzáció regressziós tesztje
 │       ├── gravecallerAnimations.test.ts   # state->anim, facing, LEVEZETETT geometria/cast-időzítés
 │       ├── bossAnimations.test.ts         # state->anim, facing-kompenzáció SCALE-lel, levezetett konstansok
+│       ├── madKingAnimations.test.ts      # state->anim, facing, ÉS a leap ballisztikájának levezetése
 │       ├── afterImageTrail.test.ts        # a dash sebesség-csíkja: throttle + geometria-másolás
 │       ├── parallaxBackground.test.ts     # scroll->tilePositionX + a Level 1 ÉS Level 2 réteg-terv
 │       └── helpers/
@@ -542,13 +632,15 @@ the-wingless-crow/
 │   │   ├── SpikeField.ts         # statikus tüskemezők (látvány tileSprite + külön hitbox Zone)
 │   │   └── SwingingReaper.ts     # determinisztikus lengő kasza (pure swingAngleAt mag)
 │   ├── ui/
-│   │   └── TutorialHint.ts       # egyszer megjelenő billentyű-súgó (ez nyitja meg az ui/ mappát)
+│   │   ├── TutorialHint.ts       # egyszer megjelenő billentyű-súgó (ez nyitja meg az ui/ mappát)
+│   │   └── Dialogue.ts           # in-scene párbeszéd-panel: MAGÁTÓL megy, nyíllal gyorsítható
 │   ├── scenes/
 │   │   ├── BootScene.ts          # placeholder textúrák + audio betöltés + loading kijelzés
 │   │   ├── Level1Scene.ts        # 6000px pálya; a geometria a levels/Level1Layout.ts-ből jön
 │   │   ├── BossScene.ts          # 800x450 fix aréna, boss entrance, HP-bar, victory/defeat ágak
 │   │   ├── NarrationScene.ts     # adatvezérelt szöveges átvezető (typewriter), újrahasználható
-│   │   └── Level2Scene.ts        # 7200px pálya; a geometria a levels/Level2Layout.ts-ből jön
+│   │   ├── Level2Scene.ts        # 7200px pálya; a geometria a levels/Level2Layout.ts-ből jön
+│   │   └── Boss2Scene.ts         # 800x450 fix aréna: párbeszéd -> belépő -> harc
 │   ├── player/
 │   │   ├── Player.ts             # + CLIMB state, LadderContact interface, respawn()
 │   │   ├── PlayerAnimations.ts   # sprite geometria, anim kulcsok/frame-tartományok, animKeyForState()
@@ -560,7 +652,9 @@ the-wingless-crow/
 │   │   └── GravecallerAnimations.ts   # 5 textúra egy 96x96-os geometriával, a cast-időzítés forrása
 │   ├── bosses/
 │   │   ├── GraftedWingBreaker.ts # Boss 1, két fázis, slash / projectile / spell / charge
-│   │   └── GraftedWingBreakerAnimations.ts # sheet geometria, anim kulcsok, időzítések forrása
+│   │   ├── GraftedWingBreakerAnimations.ts # sheet geometria, anim kulcsok, időzítések forrása
+│   │   ├── MadKing.ts            # Boss 2, két fázis, slash / leap-slam / lunge (tisztán közelharci)
+│   │   └── MadKingAnimations.ts  # sheet geometria, anim kulcsok, időzítés ÉS a leap ballisztikája
 │   ├── systems/
 │   │   ├── CheckpointSystem.ts   # egyetlen aktív respawn-pont tárolása
 │   │   ├── LevelCheckpoint.ts    # a köztes checkpoint jelölője + zónája (mindkét pályán)
@@ -1221,6 +1315,99 @@ helyett MELEGÍTÉS `(58,38,56)` → `(58,30,31)`.
   házak a `BUILDING_DEPTH`-en hátrébb vannak a terrainnél, tehát egy előttük álló állvány
   takarja őket — pontosan a forrás preview rétegzése.
 
+### Boss 2 — The Mad King (`src/bosses/MadKing.ts`, `MadKingAnimations.ts`)
+
+A `GraftedWingBreaker` szerkezetét követi (state machine + `delayedCall`-láncok, exportált
+tuning-konstansok, geometriából LEVEZETETT hatótávok), de a karaktere szándékosan ellentétes:
+**tisztán közelharci**. Nincs lövedéke és nincs varázslata — a távolról tűzgolyózó playert az
+UGRÁSA bünteti, nem egy saját bolt.
+
+- **State machine:**
+  `DORMANT → APPROACH → SLASH / LEAP_WINDUP → LEAP_AIR → LEAP_SLAM / LUNGE_WINDUP → LUNGE → COOLDOWN → DEAD`
+- **`DORMANT`** = a párbeszéd ÉS a belépő ideje: nem mozog, nem támad, és **nem is sebezhető**.
+  A scene a belépő-animáció végén hívja az `activate()`-et.
+- HP: 300 (`MAX_HP`). **Phase 2 a 50 %-nál**: gyorsabb mozgás (`MOVE_SPEED_P1` 80 →
+  `MOVE_SPEED_P2` 130) + **megnyílik a kitörés**. Ugyanaz a szerkezet, mint a Boss 1-nél
+  (ott a charge nyílt meg), tehát a rotáció-logika 1:1-ben átvihető volt.
+- **`ATTACK_ROTATION = ['LEAP', 'LUNGE']`**, a `LUNGE` `phase === 2` szűrővel. A **slash
+  reaktív**: `≤ SLASH_RANGE` (142) belül mindig ő nyer, és NEM forgatja a rotációt. Az
+  `enterPhase2()` a rotációt a `LUNGE` slotjára állítja, hogy a fázis a szignatúrájával nyisson.
+- **SLASH** (`Attack1`, 4 frame): a sebzés a csapás frame-jén (`f2`) oldódik fel. A
+  `SLASH_STARTUP_MS` az ANIMÁCIÓS modul `SLASH_WINDUP_MS`-éből jön, ami maga is SZÁMÍTOTT
+  (`SLASH_FRAMES.indexOf(2) * SLASH_SLOT_MS` = 330) — a frame-lista átírása magával viszi.
+- **LEAP** (`Attack3`): a Phase 1 EGYETLEN gap-closere, ezért `LEAP_MIN_RANGE = 170`, épp a
+  `SLASH_RANGE` (142) fölött — így nincs „holt sáv", ahol a király csak sétálna. A cél x a
+  **FELUGRÁS pillanatában rögzül** (a Shadow Spell elve), tehát a guggolás alatt oldalra
+  lépve kikerülhető. A becsapódás a **fizikából** derül ki (`body.blocked.down`), nem
+  időzítőből — így sosem csúszhat el a látványtól. Sebzés 22, sáv `SLAM_HIT_HALF_WIDTH` (58).
+  - **A ballisztika LEVEZETETT**, egyetlen hangolóponttal (`LEAP_RISE_PX = 140`):
+    ```
+    LEAP_VELOCITY_Y = sqrt(2 * GRAVITY_Y * LEAP_RISE_PX)     // config/physics.ts-ből
+    LEAP_AIRTIME_MS = 2000 * LEAP_VELOCITY_Y / GRAVITY_Y
+    vx              = clamp((targetX - x) / airtime, ±LEAP_MAX_SPEED_X)
+    ```
+    Unit teszt őrzi, hogy a becsapódás helye tényleg a célra esik, és hogy a tényleges
+    emelkedés (`v² / 2g`) a `LEAP_RISE_PX`.
+  - **A `LEAP_AIR` az EGYETLEN állapot, ahol az `update()` NEM nyúl a `velocityX`-hez.** Egy
+    ott elhelyezett `setVelocityX(0)` függőlegesen ejtené le a királyt a levegőben. Explicit
+    regressziós teszt van rá.
+  - **A `LEAP_SLAM` állapot ÁTMENETI**: a `resolveSlam()` ugyanabban a hívásban cooldownba
+    lép. A becsapódás PÓZÁT a `COOLDOWN → lastAction` anim-leképezés tartja a képen — ugyanaz
+    a minta, amivel a Boss 1 a slash animációját folytatja a cooldown alatt.
+- **LUNGE** (`Attack2`, CSAK Phase 2): a Boss 1 charge-ának a mintája — piros telegraph-tint,
+  az irány a windup ELEJÉN rögzül, `hasHitThisLunge` miatt rohamonként egy találat, falnak
+  ütközve idő előtt vége + `Take Hit` stagger. **Itt VAN valódi dash animáció** (a Boss 1-nél
+  megtartott pózt kellett használni); a lendület érzetét ugyanaz az `AfterImageTrail` egészíti ki.
+- **A király NEM flinchel találatra** (a Boss 1 elve): fehér `TintModes.FILL` villanás. A
+  `Take Hit` frame-ek helye a falnak rohanó kitörés staggerje.
+- **Halálkor NINCS fade** (a Wing-Breaker hamuvá válik): a `Death` sheet utolsó frame-je egy a
+  földön maradó test, és a lore szerint a király FELOLDOZÁST kap — látszania kell.
+- **Minden hang eventtel megy** (`'king-slash'`, `'king-slam'`, `'king-lunge-windup'`), a
+  `playSfx()`-et a scene hívja — a bevett delegálási minta.
+- **Geometria (MÉRT):** frame 160×111, body 24×54 a `(68, 51)` offseten, a talp a frame
+  y=105-énél, `SCALE = 2` → `FEET_OFFSET_Y = 54`, `HALF_WIDTH = 24`. A `SLASH_RANGE` a mért
+  penge-nyúlásból (`BLADE_REACH_PX = 71`) × `SCALE`.
+  **A test közepe (80) PONT a frame közepe (160/2)**, tehát az `applyFacing()` itt
+  matematikailag no-op — a megosztott `systems/SpriteFacing.ts`-en mégis átmegy, hogy egy
+  jövőbeli body-eltolás ne okozzon néma elcsúszást (16. tanulság).
+
+### Boss2Scene (`src/scenes/Boss2Scene.ts`)
+
+A `BossScene` szerkezetének a párja (fix 800×450-es aréna, nincs kameragörgetés, üres padló,
+player↔boss collider nélkül, HP-bar + „PHASE II" felirat). Ami MÁS:
+
+- **A belépő KÉT részből áll: párbeszéd, majd cím-kártya.** `create()` → `startDialogue()` →
+  (a `Dialogue` `onComplete`-je) → `startEntrance()` → `beginFight()`.
+- **A player a párbeszéd alatt TELJESEN befagyasztva**: a `PlayerController` csak a
+  `beginFight()`-ban jön létre, ezért a mező típusa `PlayerController | null`, és az `update()`
+  `this.controller?.update()`-et hív. **Nem elég az `update()`-et kihagyni** — a controller
+  KONSTRUKTORA regisztrálja a J/F billentyű- és pointer-listenereket, tehát a player különben
+  a párbeszéd alatt is támadhatna és varázsolhatna.
+- **`update(_time, delta)`** — a `BossScene`-é paramétertelen; itt a `delta` kell a
+  `Dialogue`-nak (a párbeszéd a scene idejéből ketyeg, nem saját timerből).
+- **`GROUND_TOP = 369` — a KÉPHEZ mérve, nem fordítva.** A `BossScene`-nél a 418-as padlóvonal
+  már adott volt, ezért ott a festményt kellett KIVÁGNI; itt új scene, tehát a rajzolt padlóélt
+  mértük meg (a forrás 771–773. sora → a 800×450-es képen a 369.), és a talajt tettük oda. Így
+  a trónterem vágás nélkül, teljes egészében megmarad.
+- **A háttér TINT NÉLKÜL megy be** — mérés, nem ízlés: a kép nyers fényessége a játéktérben
+  `mean 36.3`, míg a Boss 1 festményének TINTELT eredménye `59.7 × 0.69 = 41.2`.
+- **Zene NINCS** (a user külön adja hozzá). Az `AudioManager` az SFX miatt kell; a
+  `playMusic()` helye a belépőnél `TODO`-val meg van jelölve, és halott `MUSIC_KEYS` bejegyzés
+  SZÁNDÉKOSAN nem került be.
+- **Győzelem:** `registry.set('kingDefeated', true)` → `NarrationScene`. A cél a
+  `finalSceneExists()`-től függ (`'FinalBossScene' in this.scene.manager.keys`): amíg a végső
+  aréna nincs regisztrálva, a Level 2-re tesz vissza. **Ez ugyanaz a minta, amit a
+  `Level2Scene` használt a még nem létező `Boss2Scene`-re** — a scene felvételekor magától él majd.
+- **Vereség:** fade → `Level2Scene`, ahol a player a SAJÁT checkpoint-registry pontján (a
+  boss-ajtónál) éled újra.
+
+### Párbeszéd (`src/ui/Dialogue.ts`)
+
+In-scene szövegmező beszélő-névvel: **magától lemegy**, a **jobbra-nyíl** gyorsítja.
+A részletes indoklás (miért nem váltja ki a `NarrationScene`, mi a pure mag, miért léptet egy
+`update()` legfeljebb egy sort, hogyan levezetett a panel geometriája) fentebb, a
+**„PÁRBESZÉD-RENDSZER"** blokkban van.
+
 ### NarrationScene (`src/scenes/NarrationScene.ts`)
 - Adatvezérelt, újrahasználható szöveges átvezető: `scene.start('NarrationScene', { lines, nextScene, title? })`
 - Typewriter reveal; **Space/Enter** = gépelés közben teljes sor, kész sornál a következő sor;
@@ -1254,6 +1441,7 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   | `PLAYER_DEATH` | `death-groan-17` | a `die()`-ból (a zuhanás-halált is beleértve) |
   | `HARVESTER_DEATH` | `necro-hurt` | a CrowHarvester `die()`-jából |
   | `GRAVECALLER_DEATH` | `necro-death-2` | a Gravecaller `die()`-jából |
+  | `KING_SLAM` | `rock-wall-1` | a Mad King ugrása, a FÖLDET ÉRÉS pillanatában |
 - **A PLAYER LÉPÉSE A PROJEKT EGYETLEN ISMÉTLŐDŐ SFX-e.** Minden más hang diszkrét eseményre
   szól; ez a `Player.updateFootsteps()` kadenciájára ismétlődik, amíg a player fut.
   - A kadencia **LEVEZETETT**: `FOOTSTEP_INTERVAL_MS = RUN_ANIM_MS / RUN_FOOTFALLS`
@@ -1593,12 +1781,24 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   A fájlnévben megtartott sorszám az egyetlen kapocs. *(Megjegyzés: ugyanott van egy
   `01. Death Groan (Male).wav` is — a sorszámozás arra utal, hogy egy nagyobb, azonosítatlan
   hangkészletből származnak.)*
+- **NYITOTT JOGI TÉTEL (ÚJ):** a Boss 2 arénájának háttere
+  (`assets/backgrounds/throne-room/boss2-arena.png`) a `2D helper/level/Second boss
+  background.png`-ből származik, ami — a `Bossbackground_1.png`-hez hasonlóan — **önálló
+  fájlként, licenc nélkül érkezett.** Ugyanaz a kategória; publikálás előtt tisztázandó.
+  *(A `Final boss background.png` ugyanott van, szintén licenc nélkül — az a következő
+  iterációé lesz.)*
+- **A Mad King sprite licence RENDBEN VAN, ÉS A REPÓBAN IS.** A forráscsomag
+  (`2D helper/enemy/Medieval King Pack 2`) `License.txt`-je: *"This pack - Medieval King
+  Pack 2 is Creative Commons Zero (CC-0). Can be used in commercial and non-commercial
+  projects."* **Ez NEM nyitott jogi tétel** — a CC-0 miatt még kreditet sem kíván, és a
+  licenc be van másolva (`assets/sprites/mad-king/license.txt`), a knight mintájára.
 - **A boss aréna hátterének (`assets/backgrounds/cathedral/boss-arena.png`) licence
   szintén nincs tisztázva** — a forrás a `2D helper/level/Bossbackground_1.png`, ami
   önálló fájlként, licenc nélkül érkezett. A user gyűjtésébe ez is bekerül; publikálás
   előtt ellenőrizni kell. **Megjegyzés:** a `Bossbackground_2.png` (ugyanott, angyal-
-  szobros katedrális, nyitott égbolttal) NEM ennek a fázis-variánsa, hanem egy külön
-  aréna — jó jelölt egy jövőbeli Boss #2-höz.
+  szobros katedrális, nyitott égbolttal) NEM ennek a fázis-variánsa, hanem egy külön aréna.
+  Boss 2 jelöltként FELMERÜLT, de a user végül a `Second boss background.png` trónterem
+  mellett döntött — a `Bossbackground_2.png` így továbbra is szabad.
 - **A boss sprite licence RENDBEN VAN, de a fájl nincs a repóban.** A forráscsomag
   (`2D helper/enemy/Bringer-Of-Death`, Clembod) `License.txt`-je: *"You can use this asset for
   personal and commercial purpose, you can modify this object to your needs. Credit is not
@@ -1632,10 +1832,9 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   lila, Gravecaller zöld. *(A Necromancer csomagban VAN cast-effekt sheet, de a mérés
   szerint az egy szétfoszló BECSAPÓDÁS — 30→4 px —, nem loopolható repülő bolt, ezért
   maradt a placeholder; valódi asset az `assets/effects/` iterációban.)*
-- A `Level2Scene`-ben az **R billentyű** visszavisz a `Level1Scene`-re — kizárólag azért, hogy a `Level1 → Boss → átvezető → Level2` lánc manuálisan körbejárható legyen, amíg a `Boss2Scene` nem létezik. Annak elkészültekor törlendő
 - A Level 2 **létrája (`ladder-placeholder`) és boss-ajtaja (`door-placeholder`)** még kódból generált: a GothicVania Town csomagban nincs létra, a cathedral `door-gate` geometriája (`DOOR_APERTURE`, `DOOR_THRESHOLD_PX`) pedig ahhoz a konkrét PNG-hez van mérve. Olcsó részleges javítás a Level 1 `tile-ladder`-ének újrahasználata (már be van töltve)
-- A **`BootScene.START_SCENE` jelenleg `'Level2Scene'`** — fejlesztéshez, hogy a Level 2 közvetlenül tesztelhető legyen. **Commit előtt `'Level1Scene'`-re állítandó**
-- A `BOSS_VICTORY_NARRATION` szövege placeholder lore — a végleges a Phase 9 – Lore-ban készül
+- A **`BootScene.START_SCENE` jelenleg `'Level1Scene'`** (a normál érték). Fejlesztéshez átírható bármelyik pálya/aréna kulcsára — pl. `'Boss2Scene'`, hogy a király harca közvetlenül tesztelhető legyen —, de **commit előtt mindig vissza `'Level1Scene'`-re**
+- **NÉGY placeholder lore-szöveg** van a kódban, mind a Phase 9 – Lore-ban cserélendő (mindegyik egy tömb-szerkesztés): a `BossScene.BOSS_VICTORY_NARRATION`, a `Level2Scene.LEVEL2_END_NARRATION`, valamint a `Boss2Scene` `KING_DIALOGUE`-ja és `KING_VICTORY_NARRATION`-ja
 - A `BootScene` "Betöltés..." szövege + progress-sávja nyers `add.text` / `Graphics` — a `ui/` modulba költözik, amint több asset (sprite-ok) is betöltendő lesz
 - `main.ts`-ben `arcade.debug` — jelenleg **`false`**. `true`-ra állítva kirajzolja a physics
   bodykat és a létra zónáját; a layout hangolásához hasznos, a látvány megítéléséhez zavaró
@@ -1643,18 +1842,23 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 
 ## Következő lépés
 
-**A DÖNTÉSI PONT ELDŐLT: „Többi Enemy típus, Level2 és 2. Boss".** Ezen belül az
-**Enemy 2 (Gravecaller) KÉSZ** — lásd fentebb. Ami a választott irányból még hátravan:
+**A DÖNTÉSI PONT ELDŐLT: „Többi Enemy típus, Level2 és 2. Boss".** Ebből az
+**Enemy 2 (Gravecaller), a Level 2 és a Boss 2 (The Mad King) is KÉSZ** — lásd fentebb.
+Ami a választott irányból még hátravan:
 
 1. **Level 2 – The Crowless Quarter.** A geometria (`Level2Layout.ts`, 7200 px, 9 szakasz,
    mozgó platformok, hazardok, 10 CrowHarvester + 4 Gravecaller) és a LÁTVÁNY is KÉSZ.
    A **zene is KÉSZ** (`Shadowforge Convergence`, AlkaKrab — lásd az Audio szakaszt).
    Hátravan: **SFX**, és a hazard-/lövedék-/létra-/ajtó-placeholderek cseréje.
-2. **Boss 2.** Jelölt aréna-háttér már van: `2D helper/level/Bossbackground_2.png`
-   (angyal-szobros katedrális, nyitott égbolttal) — külön aréna, nem a Boss 1 variánsa.
-   A `Level2Scene` ajtaja már a `'Boss2Scene'` kulcsot célozza: a scene regisztrálásakor
-   magától élni fog.
-3. **Enemy 3 – Beast** (opcionális, a terv szerint is): gyorsabb, agresszívebb.
+2. ~~**Boss 2.**~~ **KÉSZ** — *The Mad King*, lásd fentebb. Zene még nincs (user adja hozzá).
+3. **A VÉGSŐ ELLENFÉL (a démon).** Ez a soron következő iteráció. Ami már készen áll hozzá:
+   - a `Boss2Scene` győzelmi ága a `'FinalBossScene'` kulcsot célozza, és amíg az nincs
+     regisztrálva, a Level 2-re tesz vissza — a scene felvételekor magától átvált rá;
+   - az aréna-háttér már megvan: `2D helper/level/Final boss background.png` (1672x941,
+     ugyanaz a méret, mint a másik kettő — tehát ugyanaz a „mérd meg a padlóélt, és ahhoz
+     igazítsd a `GROUND_TOP`-ot" recept alkalmazható, kivágás nélkül);
+   - a `NarrationScene` és a `ui/Dialogue` is újrahasználható (utóbbi adatvezérelt).
+4. **Enemy 3 – Beast** (opcionális, a terv szerint is): gyorsabb, agresszívebb.
    `PATROL → DETECT → CHARGE → ATTACK → COOLDOWN`.
 
 Hasznos, hogy a Gravecaller iterációja **általánosította a scene enemy-kezelését**: a

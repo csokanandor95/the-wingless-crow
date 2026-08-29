@@ -210,6 +210,12 @@ export interface MockGraphics {
   clear: ReturnType<typeof vi.fn>;
   lineStyle: ReturnType<typeof vi.fn>;
   lineBetween: ReturnType<typeof vi.fn>;
+  // A ui/Dialogue panelje kitöltött + körvonalazott téglalapot rajzol, és a kamerához
+  // rögzíti magát; a SwingingReaper lánca csak vonalat húz. A felület tehát mindkettőt fedi.
+  fillStyle: ReturnType<typeof vi.fn>;
+  fillRect: ReturnType<typeof vi.fn>;
+  strokeRect: ReturnType<typeof vi.fn>;
+  setScrollFactor(v: number): MockGraphics;
   setDepth(v: number): MockGraphics;
   destroy(): void;
 }
@@ -221,6 +227,16 @@ export function createMockGraphics(): MockGraphics {
     clear: vi.fn(),
     lineStyle: vi.fn(),
     lineBetween: vi.fn((_x1: number, _y1: number, _x2: number, _y2: number) => undefined),
+    fillStyle: vi.fn(),
+    fillRect: vi.fn(
+      (_x: number, _y: number, _width: number, _height: number) => undefined
+    ),
+    strokeRect: vi.fn(
+      (_x: number, _y: number, _width: number, _height: number) => undefined
+    ),
+    setScrollFactor() {
+      return graphics;
+    },
     setDepth(v) {
       graphics.depth = v;
       return graphics;
@@ -241,6 +257,10 @@ function createMockText() {
     setText: vi.fn(() => text),
     setOrigin: vi.fn(() => text),
     setVisible: vi.fn(() => text),
+    // A ui/Dialogue a kamerához rögzíti és a panel fölé emeli a feliratait.
+    setScrollFactor: vi.fn(() => text),
+    setDepth: vi.fn(() => text),
+    setAlpha: vi.fn(() => text),
     // A CrowHarvester.destroy()-a felszabadítja a debug HP-szöveget (a scene-en belüli
     // enemy-reset miatt már nem elég a scene-shutdown takarítása).
     destroy: vi.fn(() => {
