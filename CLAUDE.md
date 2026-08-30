@@ -380,9 +380,9 @@ belépő → harc ] → NarrationScene → (végső boss, köv. iteráció)`.
   TÖRÖLVE** — a Boss2Scene innentől létezik. A helyükre ugyanez a minta lépett a Boss2Scene
   győzelmi ágán: amíg a `FinalBossScene` nincs regisztrálva, az átvezető a Level 2-re tesz
   vissza, és a végső aréna elkészültekor magától átvált rá.
-- **Zene NINCS** (user külön adja hozzá). A `Boss2Scene` `AudioManager`-t azért kap, mert az
-  SFX-hez kell; a `playMusic()` helye a belépőnél `TODO`-val meg van jelölve. Halott
-  `MUSIC_KEYS` bejegyzés SZÁNDÉKOSAN nem került be.
+- **Zene KÉSZ** (`assets/audio/veil-of-eternal-nightfall.mp3` — AlkaKrab,
+  `6. Veil of Eternal Nightfall (Loop)`, UGYANAZ a csomag, mint a boss theme és a Level 2
+  sávja, tehát nem nyitott új jogi tételt). A PÁRBESZÉD UTÁN, a belépőnél indul.
 
 **PÁRBESZÉD-RENDSZER (`src/ui/Dialogue.ts`) — ÚJ.** Ez tölti be a `Project_plan.md` 20.
 pontjában tervezett `ui/Dialogue.ts` slotot. **A terv korábbi megjegyzése — hogy a
@@ -476,6 +476,9 @@ the-wingless-crow/
 │   │   │                         # `2. Shadowforge Convergence (Loop)`. A LOOP-változat kell,
 │   │   │                         # nem a `Tracks mp3/` teljes szám (annak intrója minden
 │   │   │                         # loop-fordulónál újraszólna)
+│   │   ├── veil-of-eternal-nightfall.mp3
+│   │   │                         # Boss 2 (Mad King) theme. UGYANAZ az AlkaKrab csomag:
+│   │   │                         # `6. Veil of Eternal Nightfall (Loop)`
 │   │   ├── library-of-veles.mp3  # Level 1 ambient (Free Dark Fantasy Music) — licenc TISZTÁZANDÓ
 │   │   └── sfx/                  # Free Fantasy SFX Pack (TomMusic), WAV — licenc TISZTÁZANDÓ
 │   │       ├── sword-attack-2.wav      # player kardsuhintás (a sorszám a kapocs a csomaghoz)
@@ -1444,9 +1447,11 @@ player↔boss collider nélkül, HP-bar + „PHASE II" felirat). Ami MÁS:
   a trónterem vágás nélkül, teljes egészében megmarad.
 - **A háttér TINT NÉLKÜL megy be** — mérés, nem ízlés: a kép nyers fényessége a játéktérben
   `mean 36.3`, míg a Boss 1 festményének TINTELT eredménye `59.7 × 0.69 = 41.2`.
-- **Zene NINCS** (a user külön adja hozzá). Az `AudioManager` az SFX miatt kell; a
-  `playMusic()` helye a belépőnél `TODO`-val meg van jelölve, és halott `MUSIC_KEYS` bejegyzés
-  SZÁNDÉKOSAN nem került be.
+- **A zene a PÁRBESZÉD UTÁN indul**, a `startEntrance()`-ben — nem a `create()`-ben. Így a
+  dialógus végig csendben megy, és a sáv a cím-kártyával EGYÜTT csap be, a harc nyitányaként
+  (`MUSIC_KEYS.BOSS2_THEME` = `Veil of Eternal Nightfall`). Fade-in nincs külön megadva: a
+  `DEFAULT_FADE_IN_MS` (800) gyakorlatilag a cím be-fadelésének hossza (700), tehát a kép és a
+  hang együtt jön fel. A győzelem ÉS a vereség ága is `stopMusic()`-kal zár.
 - **Győzelem:** `registry.set('kingDefeated', true)` → `NarrationScene`. A cél a
   `finalSceneExists()`-től függ (`'FinalBossScene' in this.scene.manager.keys`): amíg a végső
   aréna nincs regisztrálva, a Level 2-re tesz vissza. **Ez ugyanaz a minta, amit a
@@ -1568,11 +1573,11 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   szól, ezért marad háttérben; a boss theme érezhetően felerősödik hozzá képest; az SFX
   mindkettő fölött átvág. Egy „csak feljebb veszem egy kicsit" hangolás nem fordíthatja
   meg észrevétlenül a sorrendet
-- **Három sáv van** (`MUSIC_KEYS`): `BOSS_THEME` (a `BossScene` belépőjétől),
-  `LEVEL1_THEME` (a `Level1Scene` teljes hosszán) és `LEVEL2_THEME` (a `Level2Scene` teljes
-  hosszán). Egyszerre sosem szól kettő: a `playMusic()` hard-stoppolja az előzőt, mindkét
-  pálya már az ajtó-fade alatt felszabadítja a sávját, és a Phaser a régi scene SHUTDOWN-ját
-  a következő scene `create()`-je ELŐTT futtatja
+- **Négy sáv van** (`MUSIC_KEYS`): `BOSS_THEME` (a `BossScene` belépőjétől), `BOSS2_THEME`
+  (a `Boss2Scene` belépőjétől — a PÁRBESZÉD UTÁN), `LEVEL1_THEME` (a `Level1Scene` teljes
+  hosszán) és `LEVEL2_THEME` (a `Level2Scene` teljes hosszán). Egyszerre sosem szól kettő: a
+  `playMusic()` hard-stoppolja az előzőt, mindkét pálya már az ajtó-fade alatt felszabadítja a
+  sávját, és a Phaser a régi scene SHUTDOWN-ját a következő scene `create()`-je ELŐTT futtatja
 - **A KÉT pálya-sáv fade-inje SZÁNDÉKOSAN eltér**, és ez nem ízlés, hanem a két belépés
   különbsége (unit teszt őrzi a sorrendet):
   - `LEVEL_MUSIC_FADE_IN_MS` (2000) — a Level 1 közvetlenül az oldalbetöltés után indul,
@@ -1808,9 +1813,11 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   csomagból való (`2D helper/music/Loops mp3/`):
   - `boss-theme.mp3` = `4. Cursed Citadel (After Intro & Loop).mp3` — **bitre azonos**
     másolat (md5 `29fac9c22b67191a2cfaccff4e6be568`, 2 044 105 bájt, méréssel igazolva);
-  - `shadowforge-convergence.mp3` = `2. Shadowforge Convergence (Loop).mp3`.
+  - `shadowforge-convergence.mp3` = `2. Shadowforge Convergence (Loop).mp3`;
+  - `veil-of-eternal-nightfall.mp3` = `6. Veil of Eternal Nightfall (Loop).mp3` (Boss 2).
   A `2D helper/Credits.txt` az AlkaKrabot a boss theme miatt **már kreditálja**; a
-  `02. Shadowforge Convergence (level 2 music)` sorral kiegészítendő (a user gyűjtése).
+  `02. Shadowforge Convergence (level 2 music)` és a `06. Veil of Eternal Nightfall
+  (boss 2 music)` sorokkal kiegészítendő (a user gyűjtése).
   **NEM teljesen lezárt tétel viszont a licenc SZÖVEGE:** a csomaghoz — a TomMusic /
   Free Dark Fantasy esetével ellentétben — **van** dokumentum (`2D helper/music/Loops mp3/
   AlkaKrab Music License Info.pdf`), de a tartalma **nincs átolvasva** (a PDF beágyazott
@@ -1977,8 +1984,8 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
   A csomagban ezután is maradt kihasználatlan elem: a `stairs*` lépcső-készlet (16×32-es
   fokok — a projektben nincs átlós járható elem), a `window`/`roof`/`wall` házépítő csempék,
   és a `Music/rpg_village02_loop` sáv.
-- **Menü / átvezető ambient.** A Level 1, a Level 2 és a boss aréna zenéje KÉSZ (1., 9. és
-  12. iteráció). Már csak a `NarrationScene` néma. Figyelem: az `AudioManager`
+- **Menü / átvezető ambient.** MIND A NÉGY sáv KÉSZ: Level 1, Level 2, és mindkét boss
+  aréna. Már csak a `NarrationScene` néma. Figyelem: az `AudioManager`
   **scene-hatókörű** (a scene shutdownja elvágja) — ez a pálya-zenéknél előny, de egy
   scene-eken ÁTÍVELŐ sávhoz (pl. menü → pálya megszakítás nélkül) game-szintűvé kell emelni.
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),

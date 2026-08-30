@@ -11,6 +11,7 @@ import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 import AudioManager, {
   bindPlayerSfx,
   KING_SLAM_VOLUME,
+  MUSIC_KEYS,
   SFX_KEYS,
 } from '../systems/AudioManager';
 import AfterImageTrail from '../systems/AfterImageTrail';
@@ -138,7 +139,7 @@ export default class Boss2Scene extends Phaser.Scene {
     this.outcomeScheduled = false;
 
     // Nem kell kézzel takarítani: az AudioManager maga iratkozik fel a scene SHUTDOWN-jára.
-    // Zenét EGYELŐRE nem indít — a boss 2 theme külön kerül be.
+    // A zene NEM itt indul, hanem a párbeszéd után, a belépőnél (lásd startEntrance()).
     this.audio = new AudioManager(this);
 
     this.cameras.main.setBackgroundColor(BACKGROUND_COLOR);
@@ -224,8 +225,15 @@ export default class Boss2Scene extends Phaser.Scene {
       .setAlpha(0)
       .setDepth(100);
 
-    // TODO (Phase 8): boss 2 zene — a user külön adja hozzá. A helye itt van, a belépő
-    // KÍSÉRETEKÉNT (a BossScene azonos pontján indul a boss theme).
+    // A zene a PÁRBESZÉD UTÁN indul — nem a create()-ben —, tehát a dialógus végig csendben
+    // megy, és a sáv a cím-kártyával EGYÜTT csap be, a harc nyitányaként. Ugyanaz a pont,
+    // ahol a BossScene a boss theme-et indítja (Project_plan.md 15.: „a zene a belépőt
+    // KÍSÉRI, nem utána indul").
+    //
+    // Fade-in NINCS külön megadva: a DEFAULT_FADE_IN_MS (800) pont a cím be-fadelésének
+    // hossza (700), tehát a kép és a hang együtt jön fel. A pálya-sávok hosszabb fade-inje
+    // (2000/4000) ide NEM való — ott az a cél, hogy az ambient észrevétlenül ússzon be.
+    this.audio.playMusic(MUSIC_KEYS.BOSS2_THEME);
 
     this.tweens.add({
       targets: [title, subtitle],

@@ -45,6 +45,11 @@ import level1ThemeUrl from '../../assets/audio/library-of-veles.mp3';
 // License Info.pdf`), de a szövege nincs átolvasva — publikálás előtt tisztázandó
 // (lásd CLAUDE.md nyitott jogi tételek). A forrás-cím a fájlnévben a kapocs a csomaghoz.
 import level2ThemeUrl from '../../assets/audio/shadowforge-convergence.mp3';
+// Boss 2 (Mad King) theme: UGYANAZ az AlkaKrab csomag, `6. Veil of Eternal Nightfall (Loop)`.
+// Nem nyit új jogi tételt — ugyanaz a `2D helper/music/Loops mp3/` mappa, amiből a boss theme
+// és a Level 2 sávja is jön (a licenc-PDF átolvasása továbbra is nyitott, lásd CLAUDE.md).
+// A LOOP-változat kell: az AudioManager `loop: true`-val játszik.
+import boss2ThemeUrl from '../../assets/audio/veil-of-eternal-nightfall.mp3';
 // Harci SFX: "Free Fantasy SFX Pack" (TomMusic), a csomag `Attacks/` és `Spells/`
 // almappáiból. A csomag ReadMe.txt-je NEM tartalmaz licencszöveget, csak elérhetőségeket —
 // publikálás előtt tisztázandó (lásd CLAUDE.md nyitott jogi tételek). A fájlnevekben
@@ -268,6 +273,7 @@ const PLAYER_SHEETS: Array<{ key: string; url: string }> = [
 
 const MUSIC_TRACKS: Array<{ key: string; url: string }> = [
   { key: MUSIC_KEYS.BOSS_THEME, url: bossThemeUrl },
+  { key: MUSIC_KEYS.BOSS2_THEME, url: boss2ThemeUrl },
   { key: MUSIC_KEYS.LEVEL1_THEME, url: level1ThemeUrl },
   { key: MUSIC_KEYS.LEVEL2_THEME, url: level2ThemeUrl },
 ];

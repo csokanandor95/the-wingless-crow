@@ -969,7 +969,11 @@ A boss belépése és a zene fontos része a játékélménynek.
 > A vereség/győzelem lánca a Boss 1-ével azonos: vereség → `Level2Scene` a saját
 > checkpointjára; győzelem → `kingDefeated` registry-flag + `NarrationScene`. Az átvezető
 > célja a `FinalBossScene` LÉTEZÉSÉTŐL függ — amíg nincs regisztrálva, a Level 2-re tesz
-> vissza. **Zene egyelőre nincs** (a user külön adja hozzá).
+> vissza.
+>
+> **Zene:** `6. Veil of Eternal Nightfall (Loop)` (AlkaKrab — ugyanaz a csomag, mint a Boss 1
+> theme-je és a Level 2 sávja). A PÁRBESZÉD UTÁN, a cím-kártyával együtt indul: a dialógus
+> szándékosan csendben megy le, és a zene a harc nyitánya.
 
 > **Kiegészítés (Phase 8, 6. iteráció) — az aréna padlója üres lett:**
 >

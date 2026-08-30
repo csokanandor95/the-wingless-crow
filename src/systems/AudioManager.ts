@@ -10,6 +10,8 @@ import Phaser from 'phaser';
 // A kettő nem nyúl egymáshoz: egy SFX soha nem szakítja meg a zenét, és fordítva.
 export const MUSIC_KEYS = {
   BOSS_THEME: 'boss-theme',
+  /** A Mad King arénája. A belépőnél indul, a dialógus UTÁN — lásd Boss2Scene. */
+  BOSS2_THEME: 'boss2-theme',
   LEVEL1_THEME: 'level1-theme',
   LEVEL2_THEME: 'level2-theme',
 } as const;
