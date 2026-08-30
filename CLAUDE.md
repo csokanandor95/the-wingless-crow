@@ -411,9 +411,16 @@ belépő → harc ] → NarrationScene → (végső boss, köv. iteráció)`.
 - **Aréna:** `assets/backgrounds/broken-gate/final-arena.png`, `GROUND_TOP = 369` (MÉRT),
   **tint nélkül** (a három közül a legsötétebb kép). A belépő a Boss 2-ével azonos:
   párbeszéd → cím-kártya. Részletek lentebb, a „FinalBossScene" szakaszban.
-- **Zene NINCS** (user adja hozzá) — szándékosan nem is vettünk fel `FINAL_BOSS_THEME`
-  kulcsot hiányzó fájlra, mert a Vite-import miatt a build elszállna. A bekötés pontosan a
-  Boss 2 receptje, kommentelt `TODO`-val a helyén.
+- **Zene KÉSZ** (`MUSIC_KEYS.FINAL_BOSS_THEME`): a `2. Shadowforge Convergence (Loop)`
+  (AlkaKrab), ami **EREDETILEG a Level 2 ambientje volt** — user-döntés, hogy a végső harcra
+  kerüljön át, a Level 2 pedig az `1. Whispers of the Abyss (Loop)`-ot kapja. A PÁRBESZÉD
+  UTÁN, a cím-kártyával együtt indul (a Boss 2 mintája). **Az asset FÁJLNEVE változatlan**
+  (`shadowforge-convergence.mp3`): a projektben a fájlnév a FORRÁS-számra mutat, nem a
+  felhasználás helyére — a csere így tiszta kulcs-átkötés volt, nem fájlmozgatás.
+- **Az árny-hullám ÉS az idézés hangja ugyanaz** (`firebuff-2`, a már meglévő
+  `SFX_KEYS.BOSS_SPELL_IMPACT`) — user-döntés. Új asset NEM kellett: a fájl bitre azonos a
+  Wing-Breaker Shadow Spelljéhez már betöltöttel. Mindkettő a KIOLDÁS pillanatában szól.
+  **A villanás továbbra is SZÁNDÉKOSAN néma** (nincs hozzá illő hang a csomagokban).
 - **Együtt járó JAVÍTÁS a `Level2Scene`-ben:** az ajtaja eddig MINDIG a `Boss2Scene`-t
   célozta, `kingDefeated` ellenőrzés nélkül — szemben a Level 1-gyel, ami a `bossDefeated`-et
   nézi. Enélkül a démontól kikapva a player újra végig kellett volna verje a Mad Kinget,
@@ -515,10 +522,15 @@ the-wingless-crow/
 │   │   │                         # = AlkaKrab `4. Cursed Citadel (After Intro & Loop)` — BITRE
 │   │   │                         # azonos másolat (md5 29fac9c2..., 2 044 105 bájt)
 │   │   ├── shadowforge-convergence.mp3
-│   │   │                         # Level 2 ambient. UGYANAZ az AlkaKrab csomag:
-│   │   │                         # `2. Shadowforge Convergence (Loop)`. A LOOP-változat kell,
-│   │   │                         # nem a `Tracks mp3/` teljes szám (annak intrója minden
-│   │   │                         # loop-fordulónál újraszólna)
+│   │   │                         # A VÉGSŐ ARÉNA (FinalBossScene) theme-je. UGYANAZ az AlkaKrab
+│   │   │                         # csomag: `2. Shadowforge Convergence (Loop)`.
+│   │   │                         # FIGYELEM: ez a sáv EREDETILEG a Level 2 ambientje volt, és
+│   │   │                         # 2026-08-30-án került át ide (user-döntés). A FÁJLNÉV
+│   │   │                         # SZÁNDÉKOSAN változatlan: a projektben a fájlnév a FORRÁS-
+│   │   │                         # számra mutat, nem a felhasználás helyére
+│   │   ├── whispers-of-the-abyss.mp3
+│   │   │                         # Level 2 ambient (az előző sáv helyén). UGYANAZ az AlkaKrab
+│   │   │                         # csomag: `1. Whispers of the Abyss (Loop)`
 │   │   ├── veil-of-eternal-nightfall.mp3
 │   │   │                         # Boss 2 (Mad King) theme. UGYANAZ az AlkaKrab csomag:
 │   │   │                         # `6. Veil of Eternal Nightfall (Loop)`
@@ -530,7 +542,8 @@ the-wingless-crow/
 │   │       ├── fireball-1.wav          # Gravecaller lövedék (Spells/)
 │   │       ├── fireball-2.wav          # player tűzgolyó   (Spells/)
 │   │       ├── fireball-3.wav          # boss lövedék      (Spells/)
-│   │       ├── firebuff-2.wav          # boss Shadow Spell becsapódás (Spells/)
+│   │       ├── firebuff-2.wav          # boss varázslat-becsapódás (Spells/) — HÁROM helyen:
+│       │                           # Wing-Breaker Shadow Spell + démon árny-hullám ÉS idézés
 │   │       ├── stone-chain-run-5.wav   # player lépés — a "Chain" (láncing-csörgős) változat
 │   │       ├── stone-jump.wav          # player ugrás — a SIMA változat, SZÁNDÉKOSAN nem a
 │   │                                   # Chain: annak a végén külön csörgő utórezgés ül
@@ -1706,7 +1719,7 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   | `ENEMY_SWING` | `sword-attack-3` | CrowHarvester + boss közelharc, a CSAPÁS pillanatában |
   | `FIREBALL_CAST` | `fireball-2` | a player `'fireball-cast'`-jánál, a lövedék születésekor |
   | `BOSS_PROJECTILE` | `fireball-3` | a `'boss-projectile'`-nél; más hang, mint a playeré |
-  | `BOSS_SPELL_IMPACT` | `firebuff-2` | `SPELL_IMPACT_MS`-nél, amikor az oszlop FÖLDET ÉR |
+  | `BOSS_SPELL_IMPACT` | `firebuff-2` | HÁROM helyen: a Wing-Breaker Shadow Spelljének becsapódásakor (`SPELL_IMPACT_MS`), és a démon ÁRNY-HULLÁMÁNÁL + IDÉZÉSÉNÉL (a kioldás pillanatában) |
   | `GRAVECALLER_CAST` | `fireball-1` | a `'gravecaller-projectile'`-nél; HARMADIK tűzgolyó-hang |
   | `PLAYER_FOOTSTEP` | `stone-chain-run-5` | futás közben, `FOOTSTEP_INTERVAL_MS`-enként |
   | `PLAYER_JUMP` | `stone-jump` | a `jump()` grounded-guardja mögül |
@@ -1787,9 +1800,10 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   szól, ezért marad háttérben; a boss theme érezhetően felerősödik hozzá képest; az SFX
   mindkettő fölött átvág. Egy „csak feljebb veszem egy kicsit" hangolás nem fordíthatja
   meg észrevétlenül a sorrendet
-- **Négy sáv van** (`MUSIC_KEYS`): `BOSS_THEME` (a `BossScene` belépőjétől), `BOSS2_THEME`
-  (a `Boss2Scene` belépőjétől — a PÁRBESZÉD UTÁN), `LEVEL1_THEME` (a `Level1Scene` teljes
-  hosszán) és `LEVEL2_THEME` (a `Level2Scene` teljes hosszán). Egyszerre sosem szól kettő: a
+- **ÖT sáv van** (`MUSIC_KEYS`): `BOSS_THEME` (a `BossScene` belépőjétől), `BOSS2_THEME`
+  (a `Boss2Scene` belépőjétől — a PÁRBESZÉD UTÁN), `FINAL_BOSS_THEME` (a `FinalBossScene`
+  belépőjétől — szintén a párbeszéd után), `LEVEL1_THEME` (a `Level1Scene` teljes hosszán) és
+  `LEVEL2_THEME` (a `Level2Scene` teljes hosszán). Egyszerre sosem szól kettő: a
   `playMusic()` hard-stoppolja az előzőt, mindkét pálya már az ajtó-fade alatt felszabadítja a
   sávját, és a Phaser a régi scene SHUTDOWN-ját a következő scene `create()`-je ELŐTT futtatja
 - **A KÉT pálya-sáv fade-inje SZÁNDÉKOSAN eltér**, és ez nem ízlés, hanem a két belépés
@@ -2164,15 +2178,13 @@ Ami a választott irányból még hátravan:
 3. ~~**A VÉGSŐ ELLENFÉL (a démon).**~~ **KÉSZ (2026-08-30)** — *Ancient Demon, Omen of
    Crows*, lásd fentebb. Vele jött az **ending** és a **`CreditsScene`**, tehát
    **A LÁNC BEZÁRULT**: `Level 1 → Boss 1 → Level 2 → Boss 2 → Final Boss → ending →
-   credits`. **Zene még nincs** (user adja hozzá).
+   credits`.
 4. **Enemy 3 – Beast** (opcionális, a terv szerint is): gyorsabb, agresszívebb.
    `PATROL → DETECT → CHARGE → ATTACK → COOLDOWN`.
 
 **A választott irányból tehát MINDEN kész, ami nem opcionális.** Ami a játék egészéből
 hátravan:
 
-- **A végső boss ZENÉJE** (user adja hozzá) — a bekötés 1 asset + 1 `MUSIC_KEYS` bejegyzés +
-  1 `playMusic()` hívás a `FinalBossScene.startEntrance()`-ben, kommentelt `TODO`-val a helyén.
 - **A `CreditsScene` TARTALMA** (user: későbbi iteráció) — és ugyanott a nyitott
   licenc-tételek lezárása.
 - **Phase 9 – Lore:** HAT placeholder szöveg cseréje (lásd lentebb).
@@ -2242,13 +2254,8 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
   A csomagban ezután is maradt kihasználatlan elem: a `stairs*` lépcső-készlet (16×32-es
   fokok — a projektben nincs átlós járható elem), a `window`/`roof`/`wall` házépítő csempék,
   és a `Music/rpg_village02_loop` sáv.
-- **Menü / átvezető ambient.** Négy sáv KÉSZ: Level 1, Level 2, Boss 1 és Boss 2. **A VÉGSŐ
-  BOSS ARÉNÁJA (`FinalBossScene`) MÉG NÉMA** — a user külön adja hozzá a sávot; szándékosan
-  nem vettünk fel `MUSIC_KEYS.FINAL_BOSS_THEME`-et hiányzó fájlra, mert a Vite-import miatt
-  a build elszállna. A bekötés a Boss 2 receptje: 1 asset + 1 `MUSIC_KEYS` bejegyzés + 1
-  `playMusic()` a `startEntrance()`-ben (a párbeszéd UTÁN) + `stopMusic()` a győzelem/vereség
-  ágon; kommentelt `TODO` áll a pontos helyén. A `NarrationScene` és a `CreditsScene` szintén
-  néma. Figyelem: az `AudioManager`
+- **Menü / átvezető ambient.** MIND AZ ÖT sáv KÉSZ: Level 1, Level 2 és mind a három boss
+  aréna. Már csak a `NarrationScene` és a `CreditsScene` néma. Figyelem: az `AudioManager`
   **scene-hatókörű** (a scene shutdownja elvágja) — ez a pálya-zenéknél előny, de egy
   scene-eken ÁTÍVELŐ sávhoz (pl. menü → pálya megszakítás nélkül) game-szintűvé kell emelni.
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),

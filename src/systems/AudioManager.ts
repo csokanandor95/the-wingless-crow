@@ -12,7 +12,15 @@ export const MUSIC_KEYS = {
   BOSS_THEME: 'boss-theme',
   /** A Mad King arénája. A belépőnél indul, a dialógus UTÁN — lásd Boss2Scene. */
   BOSS2_THEME: 'boss2-theme',
+  /**
+   * A végső aréna (`FinalBossScene`). A sáv a `2. Shadowforge Convergence (Loop)`, ami
+   * KORÁBBAN a Level 2 ambientje volt — user-döntés, hogy a végső harcra kerüljön át.
+   * Az ASSET FÁJLNEVE változatlanul `shadowforge-convergence.mp3`: a projektben a fájlnév a
+   * forrás-számra mutat, nem a felhasználási helyre, tehát a csere csak KULCS-átkötés.
+   */
+  FINAL_BOSS_THEME: 'final-boss-theme',
   LEVEL1_THEME: 'level1-theme',
+  /** A Level 2 sávja `1. Whispers of the Abyss (Loop)` lett (AlkaKrab, ugyanaz a csomag). */
   LEVEL2_THEME: 'level2-theme',
 } as const;
 
@@ -23,7 +31,14 @@ export const SFX_KEYS = {
   FIREBALL_CAST: 'sfx-fireball-cast',
   /** A boss lövedéke. SZÁNDÉKOSAN másik hang, mint a playeré: hallani, kié a lövedék. */
   BOSS_PROJECTILE: 'sfx-boss-projectile',
-  /** A Shadow Spell BECSAPÓDÁSA — nem a cast, és nem is a telegraph alatt. */
+  /**
+   * Boss-varázslat becsapódása — nem a cast, és nem is a telegraph alatt.
+   *
+   * HÁROM helyen szól, mind a becsapódás/kioldás pillanatában (user-döntés): a Wing-Breaker
+   * Shadow Spelljénél, valamint az Ancient Demon ÁRNY-HULLÁMÁNÁL és IDÉZÉSÉNÉL. Közös hang,
+   * mint az `ENEMY_SWING` a három közelharci lénynél — a ±120 cent detune-szórás miatt a
+   * sorozatos megszólalás sem válik gépiessé.
+   */
   BOSS_SPELL_IMPACT: 'sfx-boss-spell-impact',
   /**
    * A Gravecaller lövedéke, a KIOLDÁS pillanatában. Harmadik, saját tűzgolyó-hang: a

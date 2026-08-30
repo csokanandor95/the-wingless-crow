@@ -1046,7 +1046,14 @@ A boss belépése és a zene fontos része a játékélménynek.
 > dialógus alatt teljesen befagyasztva). Vereség → `Level2Scene`; győzelem → `demonDefeated`
 > registry-flag + `NarrationScene` (ending) → `CreditsScene`.
 >
-> **Zene még nincs** (user adja hozzá) — a bekötés pontosan a Boss 2 receptje.
+> **Zene:** `2. Shadowforge Convergence (Loop)` (AlkaKrab), ami EREDETILEG a Level 2
+> ambientje volt — user-döntés, hogy a végső harcra kerüljön át; a Level 2 azóta az
+> `1. Whispers of the Abyss (Loop)`-ot kapja (ugyanaz a csomag, tehát nem nyílt új jogi
+> tétel). A PÁRBESZÉD UTÁN, a cím-kártyával együtt indul.
+>
+> **SFX:** az árny-hullám ÉS az idézés is a `Firebuff 2` hangot kapja (TomMusic) — ugyanaz,
+> amit a Wing-Breaker Shadow Spellje használ, tehát új asset sem kellett. A villanás
+> SZÁNDÉKOSAN néma marad.
 
 > **Kiegészítés (Phase 8, 6. iteráció) — az aréna padlója üres lett:**
 >
@@ -1610,7 +1617,7 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 >    a `FinalBossScene` fix 800×450-es arénájában, párbeszéddel és belépővel. Vele jött az
 >    **ending** (`NarrationScene`, csak szöveg fekete háttéren — user-döntés) és a
 >    **`CreditsScene`** („Thanks for playing" + a felhasznált assetek/zenék szerzői,
->    egyelőre placeholder tartalommal). **A lánc ezzel bezárult.** Zene még nincs.
+>    egyelőre placeholder tartalommal). **A lánc ezzel bezárult**, zenével és SFX-szel együtt.
 >
 >    **Együtt járó javítás a `Level2Scene`-ben:** az ajtaja eddig MINDIG a `Boss2Scene`-t
 >    célozta, `kingDefeated` ellenőrzés nélkül — szemben a Level 1-gyel, ami a

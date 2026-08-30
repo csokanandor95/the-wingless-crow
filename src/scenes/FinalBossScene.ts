@@ -9,7 +9,7 @@ import {
 } from '../bosses/AncientDemonAnimations';
 import ShadeMinion from '../bosses/ShadeMinion';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
-import AudioManager, { bindPlayerSfx, SFX_KEYS } from '../systems/AudioManager';
+import AudioManager, { bindPlayerSfx, MUSIC_KEYS, SFX_KEYS } from '../systems/AudioManager';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 import Dialogue, { type DialogueLine } from '../ui/Dialogue';
 
@@ -163,11 +163,7 @@ export default class FinalBossScene extends Phaser.Scene {
     this.outcomeScheduled = false;
 
     // Nem kell kézzel takarítani: az AudioManager maga iratkozik fel a scene SHUTDOWN-jára.
-    //
-    // TODO (Phase 8): a final boss theme. A user külön adja hozzá; a bekötés pontosan a
-    // Boss2Scene receptje — 1 asset + 1 MUSIC_KEYS bejegyzés + egy playMusic() hívás a
-    // startEntrance()-ben (a párbeszéd UTÁN, a cím-kártyával együtt), plus stopMusic() a
-    // scheduleVictory()/scheduleDefeat() ágon. Addig a scene csak SFX-hez használja.
+    // A zene NEM itt indul, hanem a párbeszéd után, a belépőnél (lásd startEntrance()).
     this.audio = new AudioManager(this);
 
     this.cameras.main.setBackgroundColor(BACKGROUND_COLOR);
@@ -254,6 +250,12 @@ export default class FinalBossScene extends Phaser.Scene {
       .setAlpha(0)
       .setDepth(100);
 
+    // A zene a PÁRBESZÉD UTÁN indul — nem a create()-ben —, tehát a dialógus végig csendben
+    // megy, és a sáv a cím-kártyával EGYÜTT csap be, a harc nyitányaként. Pontosan a
+    // Boss2Scene mintája; a DEFAULT_FADE_IN_MS (800) gyakorlatilag a cím be-fadelésének
+    // hossza (700), tehát a kép és a hang együtt jön fel.
+    this.audio.playMusic(MUSIC_KEYS.FINAL_BOSS_THEME);
+
     this.tweens.add({
       targets: [title, subtitle],
       alpha: 1,
@@ -324,10 +326,16 @@ export default class FinalBossScene extends Phaser.Scene {
       this.cameras.main.shake(200, 0.008);
     });
 
-    // TODO (Phase 8 – SFX): a villanásnak ('demon-blink-out' / 'demon-blink-in') és az
-    // idézésnek nincs saját hangja. SZÁNDÉKOSAN néma marad, amíg nincs hozzá illő asset:
-    // egy rossz hang (pl. egy tűzgolyó-pukkanás) rosszabb, mint a csend.
+    // Az idézés UGYANAZT a varázslat-hangot kapja, mint az árny-hullám (user-döntés): a
+    // démon mindkét képessége ugyanabból a sötét energiából jön, és a ±120 cent
+    // detune-szórás miatt a két hang sorozatban sem válik gépiessé. A hang a KIOLDÁS
+    // pillanatában szól — a 'demon-summon' event pontosan akkor jön, amikor a kasza lecsap
+    // és az árnyékok megjelennek.
+    //
+    // TODO (Phase 8 – SFX): a VILLANÁS ('demon-blink-out' / 'demon-blink-in') továbbra is
+    // néma. Szándékosan: egy rossz hang rosszabb, mint a csend.
     this.demon.on('demon-summon', (points: Array<{ x: number; y: number }>) => {
+      this.audio.playSfx(SFX_KEYS.BOSS_SPELL_IMPACT);
       for (const point of points) {
         this.shades.push(new ShadeMinion(this, point.x, point.y));
       }

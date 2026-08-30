@@ -78,6 +78,21 @@ describe('AudioManager', () => {
       expect(new Set(keys).size).toBe(keys.length);
     });
 
+    // A `2. Shadowforge Convergence (Loop)` EREDETILEG a Level 2 ambientje volt, és 2026-08-30-án
+    // került át a végső arénára (user-döntés); a Level 2 azóta az `1. Whispers of the Abyss
+    // (Loop)`-ot kapta. Mivel a ketto egy ideig UGYANAZ a sáv volt, egy későbbi "ez duplikátum,
+    // vonjuk össze" takarítás csendben elvenné a végső harc zenéjét. Ez a teszt rögzíti, hogy
+    // KÉT külön kulcs kell.
+    it('a végső aréna és a Level 2 KÜLÖN zene-kulcsot használ', () => {
+      expect(MUSIC_KEYS.FINAL_BOSS_THEME).toBeDefined();
+      expect(MUSIC_KEYS.FINAL_BOSS_THEME).not.toBe(MUSIC_KEYS.LEVEL2_THEME);
+    });
+
+    // Mind az ÖT zenét játszó scene-nek (2 pálya + 3 boss aréna) saját kulcsa van.
+    it('minden zenét játszó scene-nek van kulcsa', () => {
+      expect(Object.keys(MUSIC_KEYS)).toHaveLength(5);
+    });
+
     // A level ambient egy több perces szakaszon végig szól -> háttérben kell maradnia;
     // a harci SFX-nek pedig mindkét zenesáv fölött át kell vágnia. Egy későbbi
     // "csak feljebb veszem egy kicsit" hangolás nem fordíthatja meg észrevétlenül a sorrendet.

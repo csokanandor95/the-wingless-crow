@@ -55,7 +55,15 @@ import level1ThemeUrl from '../../assets/audio/library-of-veles.mp3';
 // újraszólna. A csomaghoz VAN licenc-dokumentum (`2D helper/music/Loops mp3/AlkaKrab Music
 // License Info.pdf`), de a szövege nincs átolvasva — publikálás előtt tisztázandó
 // (lásd CLAUDE.md nyitott jogi tételek). A forrás-cím a fájlnévben a kapocs a csomaghoz.
-import level2ThemeUrl from '../../assets/audio/shadowforge-convergence.mp3';
+//
+// FIGYELEM: ez a sáv 2026-08-30 óta a VÉGSŐ ARÉNÁÉ, nem a Level 2-é (user-döntés). A fájlnév
+// SZÁNDÉKOSAN változatlan: a projektben a fájlnév a FORRÁS-számra mutat, nem a felhasználás
+// helyére — a csere tehát csak kulcs-átkötés volt.
+import finalBossThemeUrl from '../../assets/audio/shadowforge-convergence.mp3';
+// Level 2 ambient: UGYANAZ az AlkaKrab csomag, `1. Whispers of the Abyss (Loop)`. A LOOP-ra
+// vágott változat kell, nem a `Tracks mp3/` teljes szám: az AudioManager `loop: true`-val
+// játszik, tehát a Tracks-verzió intrója minden fordulónál újraszólna.
+import level2ThemeUrl from '../../assets/audio/whispers-of-the-abyss.mp3';
 // Boss 2 (Mad King) theme: UGYANAZ az AlkaKrab csomag, `6. Veil of Eternal Nightfall (Loop)`.
 // Nem nyit új jogi tételt — ugyanaz a `2D helper/music/Loops mp3/` mappa, amiből a boss theme
 // és a Level 2 sávja is jön (a licenc-PDF átolvasása továbbra is nyitott, lásd CLAUDE.md).
@@ -322,6 +330,7 @@ const MUSIC_TRACKS: Array<{ key: string; url: string }> = [
   { key: MUSIC_KEYS.BOSS2_THEME, url: boss2ThemeUrl },
   { key: MUSIC_KEYS.LEVEL1_THEME, url: level1ThemeUrl },
   { key: MUSIC_KEYS.LEVEL2_THEME, url: level2ThemeUrl },
+  { key: MUSIC_KEYS.FINAL_BOSS_THEME, url: finalBossThemeUrl },
 ];
 
 const SFX_SOUNDS: Array<{ key: string; url: string }> = [
