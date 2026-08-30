@@ -110,8 +110,15 @@ const WALK_FRAMES = { start: 0, end: 7 };
 const HURT_FRAMES = { start: 0, end: 3 };
 const DEATH_FRAMES = { start: 0, end: 5 };
 
-/** Attack1: f0 kar hátra, f1 penge magasan, f2 A CSAPÁS (ív x=151-ig), f3 kifutás. */
-const SLASH_FRAMES = [0, 0, 1, 2, 3];
+/**
+ * Attack1: f0 kar hátra, f1 penge magasan, f2 A CSAPÁS (ív x=151-ig), f3 kifutás.
+ *
+ * A windup-kockák SZÁNDÉKOSAN meg vannak ismételve: a `f0` (a legmagasabb, tehát a
+ * legolvashatóbb sziluett) és a `f1` (összehúzott, mindjárt lecsap) 3-3 slotot kap, a csapás
+ * és a kifutás egyet-egyet. Így a mozdulat „felhúz… CSATT" ritmusú, nem egyenletes.
+ * A hosszának MÉRT oka van — lásd a SLASH_WINDUP_MS levezetését lentebb.
+ */
+const SLASH_FRAMES = [0, 0, 0, 1, 1, 1, 2, 3];
 const SLASH_STRIKE_FRAME = 2;
 /** Attack3: f0-f1 a földi guggolás, f2 a levegőben, f3 a becsapódás. */
 const LEAP_WINDUP_FRAMES = [0, 0, 1, 1];
@@ -129,11 +136,29 @@ const LUNGE_DASH_FRAME = 2;
 /** Egy slash-frame hossza. */
 const SLASH_SLOT_MS = 110;
 /**
- * A támadás kezdetétől a csapásig: a SLASH_FRAMES listában az f2 a 3. slot (index 3), tehát
- * 330 ms. SZÁMÍTVA, nem beírva — ha a lista változik, ez magától követi.
+ * A támadás kezdetétől a csapásig: a SLASH_FRAMES listában az f2 a 6. slot (index 6), tehát
+ * 660 ms. SZÁMÍTVA, nem beírva — ha a frame-lista változik, ez magától követi.
+ *
+ * **Miért pont ennyi (MÉRÉS, nem ízlés).** A csapás kikerüléséhez a playernek `SLASH_RANGE + 10`
+ * = 152 px-re kell jutnia, pontblank helyzetből (a két test félszélessége = 38 px) indulva.
+ * A `JUMP_VELOCITY` (-500) és a `GRAVITY_Y` (800) mellett egy ÁLLÓ ugrás ezt 475 ms-nél éri el:
+ *
+ *   | windup | csak ugrás      | ugrás + hátralépés |
+ *   |--------|-----------------|--------------------|
+ *   | 330 ms | 127 px ELTALÁLJA| 160 px kikerüli    |
+ *   | 660 ms | 160 px kikerüli | 231 px kikerüli    |
+ *
+ * A korábbi 330 ms-mal tehát a sima ugrás NEM volt elég — a playernek ugrania ÉS hátrálnia
+ * kellett, 330 ms alatt, amiből ~250 ms az emberi reakcióidő. Ez tette a támadást
+ * kézi teszten „nem reagálhatóvá".
+ *
+ * **660 ms egyben a természetes PLAFON is:** a player ugrásának apexe 625 ms-nél van, tehát
+ * ezen túl egy álló ugrás már nem növeli a távolságot (550 -> 660 ms: 159 -> 160 px). Hosszabb
+ * windup csak lomhává tenné a királyt, kikerülhetőbbé nem. **Ne emeld 660 fölé.**
+ * A `madKing.test.ts` ezt a levezetést futtatható állításként őrzi.
  */
-export const SLASH_WINDUP_MS = SLASH_FRAMES.indexOf(SLASH_STRIKE_FRAME) * SLASH_SLOT_MS; // 330
-export const SLASH_TOTAL_MS = SLASH_FRAMES.length * SLASH_SLOT_MS; // 550
+export const SLASH_WINDUP_MS = SLASH_FRAMES.indexOf(SLASH_STRIKE_FRAME) * SLASH_SLOT_MS; // 660
+export const SLASH_TOTAL_MS = SLASH_FRAMES.length * SLASH_SLOT_MS; // 880
 
 /** A guggolás, ami után elrugaszkodik. A cél x ENNEK a végén rögzül. */
 export const LEAP_WINDUP_MS = 520;

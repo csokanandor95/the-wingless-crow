@@ -64,9 +64,17 @@ export const MOVE_SPEED_P2 = 130;
  * ez magától együtt mozog.
  */
 export const SLASH_RANGE = BLADE_REACH_PX * SCALE; // 142
-export const SLASH_DAMAGE = 16;
-/** Az ANIMÁCIÓBÓL: pont akkor sebez, amikor a penge íve (f2) képre kerül. */
-export const SLASH_STARTUP_MS = SLASH_WINDUP_MS; // 330
+/**
+ * A király LEGGYAKORIBB támadása, ezért ez a sebzés-szám számít a legtöbbet a harc
+ * elviselhetőségében: 12-vel a player 8 csapást bír el a 100 HP-jából.
+ */
+export const SLASH_DAMAGE = 12;
+/**
+ * Az ANIMÁCIÓBÓL: pont akkor sebez, amikor a penge íve (f2) képre kerül. A 660 ms MÉRT érték
+ * — ennyi kell ahhoz, hogy a player egy sima ugrással kikerülje a csapást; a levezetés a
+ * MadKingAnimations.SLASH_WINDUP_MS kommentjében van.
+ */
+export const SLASH_STARTUP_MS = SLASH_WINDUP_MS; // 660
 
 // --- Ugró becsapódás (Phase 1-ben ÉS Phase 2-ben) ---------------------------
 // A király a player AKKORI x-ére ugrik (a cél a FELUGRÁS pillanatában rögzül, mint a
@@ -79,12 +87,28 @@ export const SLASH_STARTUP_MS = SLASH_WINDUP_MS; // 330
  * séta-szakaszokká esne szét.
  */
 export const LEAP_MIN_RANGE = 170;
-export const SLAM_DAMAGE = 22;
+export const SLAM_DAMAGE = 18;
 /** király félszélesség + player félszélesség + a becsapódás lökéshulláma. */
 export const SLAM_HIT_HALF_WIDTH = HALF_WIDTH + PLAYER_BODY_WIDTH / 2 + 20; // 58
 /** A vízszintes sebesség felső korlátja: ennél messzebbre nem tud pontosan ugrani. */
 export const LEAP_MAX_SPEED_X = 300;
 export const LEAP_COOLDOWN_MS = 3000;
+
+/**
+ * A becsapódás utáni FELÁLLÁS — a király ilyenkor kirántja a kardját a kőből. SZÁNDÉKOSAN
+ * jóval hosszabb a közös `ACTION_COOLDOWN_MS`-nél: ez a harc fő PUNISH-ABLAKA.
+ *
+ * LEVEZETETT követelmény a player exportált konstansaiból (unit teszt őrzi):
+ *
+ *   visszafutás a kitérés után   ~300 ms  (SLAM_HIT_HALF_WIDTH / MOVE_SPEED)
+ *   két kardcsapás                500 ms  (startupDelayMs 150, majd cooldownMs 350 -> 2. találat 500-nál)
+ *   menekülés (ugrás + hátralépés) ~310 ms (a SLASH_WINDUP_MS-nél leírt ballisztikából)
+ *   ------------------------------------
+ *                                ~1110 ms -> 1500, tartalékkal
+ *
+ * Ez a user által kért ritmus: „2 gyors kardtámadás, majd elugrani".
+ */
+export const SLAM_RECOVERY_MS = 1500;
 /** Ha a fizika valamiért nem adna földet érést, a repülés ekkor mindenképp lezárul. */
 export const LEAP_MAX_AIR_MS = LEAP_AIRTIME_MS * 2;
 
@@ -93,14 +117,17 @@ export const LEAP_MAX_AIR_MS = LEAP_AIRTIME_MS * 2;
 export const LUNGE_MIN_RANGE = 160;
 export const LUNGE_VERTICAL_TOLERANCE = 60;
 export const LUNGE_SPEED = 460;
-export const LUNGE_DAMAGE = 24;
+export const LUNGE_DAMAGE = 22;
 /** király félszélesség + player félszélesség + tolerancia. */
 export const LUNGE_HIT_RANGE = HALF_WIDTH + PLAYER_BODY_WIDTH / 2 + 8; // 46
 export const LUNGE_MAX_MS = 900;
 export const LUNGE_COOLDOWN_MS = 3000;
 
-/** Slash/leap utáni rövid pihenő, mielőtt újra dönt. */
-export const ACTION_COOLDOWN_MS = 850;
+/**
+ * Slash utáni rövid pihenő, mielőtt újra dönt. A becsapódásnak SAJÁT, jóval hosszabb
+ * ablaka van (`SLAM_RECOVERY_MS`) — az a harc fő punish-pillanata, ez csak egy kifújás.
+ */
+export const ACTION_COOLDOWN_MS = 900;
 
 /**
  * Ha a player vízszintesen szinte pontosan a király felett/alatt áll, a "merre induljak"
@@ -120,9 +147,22 @@ export const DIRECTION_DEADZONE = 6;
 export const ATTACK_ROTATION = ['LEAP', 'LUNGE'] as const;
 type RotatedAttack = (typeof ATTACK_ROTATION)[number];
 
-const HIT_FLASH_MS = 100;
+/** Exportált, mert a telegraph-védelem tesztje pont EZT a callbacket kell hogy elsüsse. */
+export const HIT_FLASH_MS = 100;
 const HIT_FLASH_TINT = 0xffffff;
-const LUNGE_TELEGRAPH_TINT = 0xff2222;
+
+/**
+ * A KÉT TELEGRAPH SZÍNE SZÁNDÉKOSAN ELVÁLIK, mert más választ kíván:
+ *   arany = jön a kardcsapás  -> UGORJ  (a magasság visz ki a hatótávból)
+ *   piros = jön a kitörés     -> TÉRJ KI oldalra (az egyenes vonalú roham elől)
+ * Exportáltak, hogy a unit teszt le tudja kötni a megkülönböztethetőségüket.
+ *
+ * A Boss 1-nél a sárga slash-windup tintet SZÁNDÉKOSAN töröltük („a telegraph maga az
+ * animáció") — ott viszont a támadás 10 frame-es. A királynak csak 4 frame-e van, tehát az
+ * animáció önmagában kevesebb információt hordoz, és a kézi teszt szerint nem is volt elég.
+ */
+export const SLASH_TELEGRAPH_TINT = 0xffd070;
+export const LUNGE_TELEGRAPH_TINT = 0xff2222;
 
 export default class MadKing extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public kingState: KingState = KingState.DORMANT;
@@ -308,10 +348,17 @@ export default class MadKing extends Phaser.Physics.Arcade.Sprite implements Dam
     this.lastAction = 'SLASH';
     this.kingState = KingState.SLASH;
     this.setVelocityX(0);
+    // Arany villanás a magasra emelt kard MELLÉ: a 660 ms-os windup így nemcsak elég hosszú
+    // a kitéréshez, hanem félreérthetetlenül jelzi is, hogy most kell ugrani.
+    this.applyTint(SLASH_TELEGRAPH_TINT);
     this.restartAnimation();
 
     this.scene.time.delayedCall(SLASH_STARTUP_MS, () => {
       if (this.kingState === KingState.DEAD) return;
+      // A telegraph a CSAPÁS pillanatában tűnik el, nem előbb. `resetTint()` és nem
+      // `clearTintState()`: az állapot ekkor még SLASH, tehát utóbbi pont visszatenné az
+      // aranyat (ugyanaz a fogás, mint az endLunge()-ban a pirossal).
+      this.resetTint();
       // A csapás hangja a lecsapás PILLANATÁBAN szól (f2), nem a kar hátrahúzásakor — a
       // bevett delegálási minta: a scene játssza le.
       this.emit('king-slash');
@@ -412,7 +459,10 @@ export default class MadKing extends Phaser.Physics.Arcade.Sprite implements Dam
       this.playerRef.takeDamage(SLAM_DAMAGE);
     }
 
-    this.enterCooldown(ACTION_COOLDOWN_MS);
+    // SLAM_RECOVERY_MS, NEM a közös ACTION_COOLDOWN_MS: ez a harc fő punish-ablaka, amiben a
+    // playernek be kell férnie két kardcsapással és el is kell ugrania. Lásd a konstans
+    // levezetését.
+    this.enterCooldown(SLAM_RECOVERY_MS);
     this.scene.time.delayedCall(LEAP_COOLDOWN_MS, () => {
       this.canLeap = true;
     });
@@ -554,12 +604,18 @@ export default class MadKing extends Phaser.Physics.Arcade.Sprite implements Dam
   }
 
   /**
-   * A kitörés piros telegraph-ját NEM szabad letörölni egy hit-villanással: a player abból
-   * olvassa ki, hogy jön a roham. Ezért a visszaállítás állapotfüggő.
+   * A telegraph-okat NEM szabad letörölni egy hit-villanással: a player azokból olvassa ki,
+   * hogy mi jön és mit kell tennie. Ezért a visszaállítás állapotfüggő — enélkül egy jól
+   * időzített találat pont a legfontosabb pillanatban vakítaná el a playert.
    */
   private clearTintState(): void {
     if (this.kingState === KingState.LUNGE_WINDUP || this.kingState === KingState.LUNGE) {
       this.applyTint(LUNGE_TELEGRAPH_TINT);
+      return;
+    }
+
+    if (this.kingState === KingState.SLASH) {
+      this.applyTint(SLASH_TELEGRAPH_TINT);
       return;
     }
 

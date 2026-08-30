@@ -632,6 +632,30 @@ Ez a projekt első valódi dialógusa; a részletek a 20. pont helyesbítésén�
 pillanatában rögzül, tehát a guggolás alatt oldalra lépve kikerülhető — ugyanaz a
 telegraph-elv, mint a Shadow Spellnél.
 
+### Fairness-hangolás (2026-08-30, kézi teszt után)
+
+Az első verzió túl nehéz volt: a király gyorsan és gyakran támadott, a player rövid hatótávú
+kardja pedig nem tudott reagálni rá. **A javítás nem könnyítés, hanem MEGTANULHATÓSÁG** — a
+kihívás (és a 300 HP) megmaradt.
+
+A diagnózis mérés: a csapás kikerüléséhez a playernek 152 px-re kell jutnia, pontblank 38
+px-ről; a `JUMP_VELOCITY`/`GRAVITY_Y` mellett egy ÁLLÓ ugrás ezt 475 ms-nél éri el. A korábbi
+**330 ms**-os windup alatt tehát a sima ugrás NEM volt elég (csak 127 px-ig vitt) — ugrani ÉS
+hátrálni kellett, 330 ms alatt, amiből ~250 ms a reakcióidő.
+
+- **`SLASH_WINDUP_MS` 330 → 660** (a frame-listából számítva; 660 az ugrás-apex miatt egyben
+  a természetes plafon is — fölötte már nem javít a kikerülhetőségen).
+- **Új `SLAM_RECOVERY_MS` (1500)** a becsapódás után, a közös `ACTION_COOLDOWN_MS` helyett:
+  ez a harc fő punish-ablaka. LEVEZETETT a player konstansaiból (visszafutás + két kardcsapás
+  + menekülés ≈ 1110 ms).
+- **Sebzés:** slash 16 → 12, becsapódás 22 → 18, kitörés 24 → 22.
+- **Arany slash-telegraph** (`0xffd070`) a piros kitörés-telegraph mellé: a két jelzés más
+  választ kíván (ugorj / térj ki oldalra), ezért nem oszthatnak színt.
+
+Mindezt a `madKing.test.ts` „Fairness-invariánsok" blokkja **futtatható állításként** rögzíti,
+a player exportált konstansaiból levezetve — ugyanaz az elv, amivel a `level1Layout.test.ts` a
+pálya-specet teszi ellenőrizhetővé.
+
 **Asset:** *Medieval King Pack 2* — **CC-0**, a licenc a repóban van. A csomagban nincs cast
 animáció (innen a tisztán közelharci karakter), viszont van valódi ugró ÉS valódi dash
 animáció — a Wing-Breakernél mindkettőt megtartott pózzal kellett pótolni.

@@ -233,7 +233,7 @@ const LOADING_BAR_HEIGHT = 14;
  * fejlesztés közben ez a leggyorsabb út az új szakaszokhoz. **Commit előtt mindig állítsd
  * vissza `'Level1Scene'`-re.**
  */
-const START_SCENE = 'Level2Scene';
+const START_SCENE = 'Boss2Scene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a

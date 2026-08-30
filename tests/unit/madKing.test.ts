@@ -32,21 +32,39 @@ import MadKing, {
   LUNGE_MAX_MS,
   LUNGE_COOLDOWN_MS,
   ACTION_COOLDOWN_MS,
+  SLAM_RECOVERY_MS,
+  SLASH_TELEGRAPH_TINT,
+  LUNGE_TELEGRAPH_TINT,
+  HIT_FLASH_MS,
   ATTACK_ROTATION,
 } from '../../src/bosses/MadKing';
 import {
+  HALF_WIDTH,
   LEAP_AIRTIME_MS,
   LEAP_VELOCITY_Y,
   LEAP_WINDUP_MS,
   LUNGE_WINDUP_MS,
 } from '../../src/bosses/MadKingAnimations';
-import Player, { MAX_HP as PLAYER_MAX_HP } from '../../src/player/Player';
+import Player, {
+  MAX_HP as PLAYER_MAX_HP,
+  MOVE_SPEED,
+  JUMP_VELOCITY,
+} from '../../src/player/Player';
+import { BODY_WIDTH as PLAYER_BODY_WIDTH } from '../../src/player/PlayerAnimations';
+import { ATTACK_CONFIGS, AttackType } from '../../src/combat/Attack';
+import { GRAVITY_Y } from '../../src/config/physics';
 import {
   createMockScene,
   getBody,
   createDelayedCallRunner,
   type MockScene,
 } from './helpers/phaserTestUtils';
+
+/**
+ * A windup-plafon ellenőrzésének megengedett túllépése: a hossz frame-SLOTOKBÓL adódik,
+ * tehát nem eshet pontosan az ugrás-apexre. Egy slot (110 ms) a tűréshatár.
+ */
+const SLASH_SLOT_TOLERANCE_MS = 110;
 
 const KING_X = 400;
 const KING_Y = 315;
@@ -246,6 +264,108 @@ describe('MadKing (Boss 2)', () => {
 
       expect(player.getHP()).toBe(PLAYER_MAX_HP);
     });
+
+    it('a windup alatt ARANY telegraph van, a csapás pillanatában eltűnik', () => {
+      const runner = createDelayedCallRunner(scene);
+      const tinted = king as unknown as { tintColor: number | null; tintMode: number };
+      const player = createPlayerAt(scene, KING_X - (SLASH_RANGE - 20), KING_Y);
+
+      king.update(player);
+      expect(tinted.tintColor).toBe(SLASH_TELEGRAPH_TINT);
+
+      runner.run(SLASH_STARTUP_MS);
+      expect(tinted.tintColor).toBeNull();
+    });
+
+    it('egy TALÁLAT a windup alatt NEM törli a telegraph-ot', () => {
+      // Runner (nem stepper): a windup alatt KÉT callback van ütemezve — a csapás
+      // (SLASH_STARTUP_MS) és a hit-villanás (HIT_FLASH_MS) —, és pont az utóbbit kell
+      // elsütni, miközben a támadás MÉG FUT. A stepper regisztrációs sorrendben haladna,
+      // tehát a csapást lőné el.
+      const runner = createDelayedCallRunner(scene);
+      const tinted = king as unknown as { tintColor: number | null };
+      const player = createPlayerAt(scene, KING_X - (SLASH_RANGE - 20), KING_Y);
+
+      king.update(player);
+      // A player közben megsebzi: a fehér villanás felteszi magát...
+      king.takeDamage(10);
+      expect(tinted.tintColor).toBe(0xffffff);
+
+      // ...de a villanás lejártakor az ARANY telegraph tér vissza, nem a tint nélküli
+      // alapállapot. Enélkül egy jól időzített találat pont a legfontosabb pillanatban
+      // vakítaná el a playert.
+      runner.run(HIT_FLASH_MS);
+      expect(tinted.tintColor).toBe(SLASH_TELEGRAPH_TINT);
+    });
+
+    it('a két telegraph SZÍNE elválik — más választ kíván', () => {
+      // arany = jön a csapás -> UGORJ;  piros = jön a roham -> TÉRJ KI oldalra.
+      expect(SLASH_TELEGRAPH_TINT).not.toBe(LUNGE_TELEGRAPH_TINT);
+    });
+  });
+
+  // A user kézi tesztje szerint a király „túl gyors és erős" volt, és a csapásaira nem
+  // lehetett reagálni. Az alábbi állítások ezeket a követelményeket rögzítik LEVEZETVE, a
+  // player exportált konstansaiból — nem beégetett számokból. Ha valaki visszagyorsítja a
+  // királyt, ezek buknak, nem a következő kézi végigjátszás.
+  describe('Fairness-invariánsok (a kézi teszt visszajelzéséből)', () => {
+    /** A player fél testszélessége + a királyé: ennyire kerülnek egymáshoz közelharcban. */
+    const CONTACT_DISTANCE = HALF_WIDTH + PLAYER_BODY_WIDTH / 2;
+    /** A resolveSlashHit() ekkora toleranciával számol a hatótáv fölött. */
+    const HIT_TOLERANCE = 10;
+
+    /** Az ugrás magassága t másodperccel a felugrás után. */
+    const jumpHeightAt = (t: number): number =>
+      Math.max(0, -JUMP_VELOCITY * t - 0.5 * GRAVITY_Y * t * t);
+
+    /**
+     * Mennyi idő alatt jut ki a player a csapás hatóköréből pontblank helyzetből?
+     * A `resolveSlashHit()` 2D távolságot néz, tehát az ugrás magassága IS beleszámít.
+     */
+    const escapeMs = (withRetreat: boolean): number => {
+      for (let t = 0; t < 2; t += 0.005) {
+        const dx = CONTACT_DISTANCE + (withRetreat ? MOVE_SPEED * t : 0);
+        if (Math.hypot(dx, jumpHeightAt(t)) > SLASH_RANGE + HIT_TOLERANCE) return t * 1000;
+      }
+      return Infinity;
+    };
+
+    it('a csapás windupja alatt egy SIMA UGRÁS is kiviszi a playert a hatótávból', () => {
+      // Ez a user konkrét kérése: „legyen látványos (reagálható) windup idő, hogy a player
+      // el tudjon ugrani előle". A korábbi 330 ms-mal ez az állítás BUKOTT (az álló ugrás
+      // csak 127 px-ig vitt, a kellő 152 helyett) — pontosan ez a regresszió.
+      expect(SLASH_STARTUP_MS).toBeGreaterThanOrEqual(escapeMs(false));
+    });
+
+    it('a windup nem hosszabb a szükségesnél — az ugrás apexén túl már nem segít', () => {
+      // A player ugrás-apexe |JUMP_VELOCITY| / GRAVITY_Y után van; azon túl a távolság már
+      // CSÖKKEN, tehát a hosszabb windup csak lomhává tenné a királyt.
+      const apexMs = (-JUMP_VELOCITY / GRAVITY_Y) * 1000;
+      expect(SLASH_STARTUP_MS).toBeLessThanOrEqual(apexMs + SLASH_SLOT_TOLERANCE_MS);
+    });
+
+    it('a becsapódás utáni ablakba befér 2 kardcsapás ÉS a menekülés', () => {
+      const sword = ATTACK_CONFIGS[AttackType.SWORD];
+      // Visszafutás oda, ahonnan a player a becsapódás elől kitért.
+      const approachMs = (SLAM_HIT_HALF_WIDTH / MOVE_SPEED) * 1000;
+      // Két csapás: az első találat a startupnál, a második egy cooldownnal később.
+      const twoHitsMs = sword.cooldownMs + sword.startupDelayMs;
+
+      expect(SLAM_RECOVERY_MS).toBeGreaterThanOrEqual(approachMs + twoHitsMs + escapeMs(true));
+    });
+
+    it('a becsapódás punish-ablaka HOSSZABB, mint egy sima csapás utáni kifújás', () => {
+      expect(SLAM_RECOVERY_MS).toBeGreaterThan(ACTION_COOLDOWN_MS);
+    });
+
+    it('a player legalább 6 közelharci csapást kibír', () => {
+      // A slash a leggyakoribb támadás; egy ~55 másodperces harcban a playernek több hibát
+      // kell elviselnie, mint amennyi a korábbi 16-os sebzésbe belefért (6 találat).
+      expect(Math.ceil(PLAYER_MAX_HP / SLASH_DAMAGE)).toBeGreaterThanOrEqual(6);
+      // A becsapódás és a kitörés SZÁNDÉKOSAN fájóbb: azok kikerülhetők.
+      expect(SLAM_DAMAGE).toBeGreaterThan(SLASH_DAMAGE);
+      expect(LUNGE_DAMAGE).toBeGreaterThan(SLASH_DAMAGE);
+    });
   });
 
   describe('Ugró becsapódás (a Phase 1 gap-closere)', () => {
@@ -376,8 +496,8 @@ describe('MadKing (Boss 2)', () => {
       getBody(king).blocked.down = true;
       king.update(player);
 
-      // Az akció-cooldown lejár, de az ugrás sajátja még nem: a király sétál, nem ugrik.
-      runner.run(ACTION_COOLDOWN_MS);
+      // A becsapódás felállási ideje lejár, de az ugrás sajátja még nem: a király sétál.
+      runner.run(SLAM_RECOVERY_MS);
       expect(king.kingState).toBe(KingState.APPROACH);
 
       getBody(king).blocked.down = false;
@@ -403,7 +523,7 @@ describe('MadKing (Boss 2)', () => {
       runner.run(LEAP_WINDUP_MS);
       getBody(king).blocked.down = true;
       king.update(player);
-      runner.run(ACTION_COOLDOWN_MS);
+      runner.run(SLAM_RECOVERY_MS);
       getBody(king).blocked.down = false;
 
       king.update(player);
@@ -497,7 +617,7 @@ describe('MadKing (Boss 2)', () => {
       runner.run(LEAP_WINDUP_MS);
       getBody(king).blocked.down = true;
       king.update(player);
-      runner.run(ACTION_COOLDOWN_MS);
+      runner.run(SLAM_RECOVERY_MS);
       getBody(king).blocked.down = false;
 
       king.update(player);

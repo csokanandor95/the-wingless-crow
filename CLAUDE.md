@@ -447,7 +447,7 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**) + **mindkét Boss** le van fedve a Project_plan.md §23 bontása szerint (**19 fájl, 530 teszt** — ebből 7 az animáció-/háttér-/VFX-vezérlést, 2 a **pálya-geometriát** (Level 1 + Level 2), 1 a **mozgó platformot**, 1 a **hazardokat**, 1 pedig a **párbeszéd-rendszert** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**) + **mindkét Boss** le van fedve a Project_plan.md §23 bontása szerint (**19 fájl, 538 teszt** — ebből 7 az animáció-/háttér-/VFX-vezérlést, 2 a **pálya-geometriát** (Level 1 + Level 2), 1 a **mozgó platformot**, 1 a **hazardokat**, 1 pedig a **párbeszéd-rendszert** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -1334,12 +1334,17 @@ UGRÁSA bünteti, nem egy saját bolt.
   `enterPhase2()` a rotációt a `LUNGE` slotjára állítja, hogy a fázis a szignatúrájával nyisson.
 - **SLASH** (`Attack1`, 4 frame): a sebzés a csapás frame-jén (`f2`) oldódik fel. A
   `SLASH_STARTUP_MS` az ANIMÁCIÓS modul `SLASH_WINDUP_MS`-éből jön, ami maga is SZÁMÍTOTT
-  (`SLASH_FRAMES.indexOf(2) * SLASH_SLOT_MS` = 330) — a frame-lista átírása magával viszi.
+  (`SLASH_FRAMES.indexOf(2) * SLASH_SLOT_MS` = **660**) — a frame-lista átírása magával viszi.
+  A windup-kockák ezért vannak megismételve (`[0,0,0,1,1,1,2,3]`): „felhúz… CSATT" ritmus.
+  **A 660 ms MÉRT érték** — lásd lentebb a fairness-hangolás blokkot. Sebzés 12.
 - **LEAP** (`Attack3`): a Phase 1 EGYETLEN gap-closere, ezért `LEAP_MIN_RANGE = 170`, épp a
   `SLASH_RANGE` (142) fölött — így nincs „holt sáv", ahol a király csak sétálna. A cél x a
   **FELUGRÁS pillanatában rögzül** (a Shadow Spell elve), tehát a guggolás alatt oldalra
   lépve kikerülhető. A becsapódás a **fizikából** derül ki (`body.blocked.down`), nem
-  időzítőből — így sosem csúszhat el a látványtól. Sebzés 22, sáv `SLAM_HIT_HALF_WIDTH` (58).
+  időzítőből — így sosem csúszhat el a látványtól. Sebzés 18, sáv `SLAM_HIT_HALF_WIDTH` (58).
+  - **A becsapódás után `SLAM_RECOVERY_MS` (1500) jön, NEM a közös `ACTION_COOLDOWN_MS`** —
+    ez a harc fő PUNISH-ABLAKA (a király kirántja a kardját a kőből). Lásd a
+    fairness-hangolás blokkot.
   - **A ballisztika LEVEZETETT**, egyetlen hangolóponttal (`LEAP_RISE_PX = 140`):
     ```
     LEAP_VELOCITY_Y = sqrt(2 * GRAVITY_Y * LEAP_RISE_PX)     // config/physics.ts-ből
@@ -1360,6 +1365,13 @@ UGRÁSA bünteti, nem egy saját bolt.
   megtartott pózt kellett használni); a lendület érzetét ugyanaz az `AfterImageTrail` egészíti ki.
 - **A király NEM flinchel találatra** (a Boss 1 elve): fehér `TintModes.FILL` villanás. A
   `Take Hit` frame-ek helye a falnak rohanó kitörés staggerje.
+- **KÉT telegraph-szín, SZÁNDÉKOSAN elválasztva** (mindkettő exportált, unit teszt őrzi, hogy
+  különböznek): **arany** (`SLASH_TELEGRAPH_TINT`, `0xffd070`) = jön a kardcsapás → UGORJ;
+  **piros** (`LUNGE_TELEGRAPH_TINT`, `0xff2222`) = jön a roham → TÉRJ KI oldalra.
+  A `clearTintState()` MINDKETTŐT visszateszi a hit-villanás után — enélkül egy jól időzített
+  találat pont a legfontosabb pillanatban vakítaná el a playert.
+  *(A Boss 1-nél a sárga slash-windup tintet szándékosan töröltük — ott a támadás 10 frame-es.
+  A királynak csak 4 frame-e van, tehát az animáció önmagában kevesebbet közöl.)*
 - **Halálkor NINCS fade** (a Wing-Breaker hamuvá válik): a `Death` sheet utolsó frame-je egy a
   földön maradó test, és a lore szerint a király FELOLDOZÁST kap — látszania kell.
 - **Minden hang eventtel megy** (`'king-slash'`, `'king-slam'`, `'king-lunge-windup'`), a
@@ -1370,6 +1382,47 @@ UGRÁSA bünteti, nem egy saját bolt.
   **A test közepe (80) PONT a frame közepe (160/2)**, tehát az `applyFacing()` itt
   matematikailag no-op — a megosztott `systems/SpriteFacing.ts`-en mégis átmegy, hogy egy
   jövőbeli body-eltolás ne okozzon néma elcsúszást (16. tanulság).
+
+#### FAIRNESS-HANGOLÁS (2026-08-30, kézi teszt után)
+
+A király első verziója **túl nehéz és nem fair** volt: gyorsan és gyakran támadott, a player
+rövid hatótávú kardja pedig nem tudott reagálni rá. **A diagnózis MÉRÉS volt, nem érzés.**
+
+A csapás kikerüléséhez a playernek `SLASH_RANGE + 10` = **152 px**-re kell jutnia, pontblank
+helyzetből (`HALF_WIDTH` 24 + a player fél testszélessége 14 = **38 px**) indulva. A
+`JUMP_VELOCITY` (−500) és a `GRAVITY_Y` (800) mellett:
+
+| windup | csak ugrás | ugrás + hátralépés |
+|---|---|---|
+| **330 ms (az eredeti)** | 127 px → **ELTALÁLJA** | 160 px → kikerüli |
+| **660 ms (a mostani)** | 160 px → kikerüli | 231 px → kikerüli |
+
+Vagyis 330 ms-mal egy **sima ugrás nem volt elég** — ugrani ÉS hátrálni kellett, 330 ms alatt,
+amiből ~250 ms az emberi reakcióidő. **660 ms egyben a természetes PLAFON is:** a player
+ugrás-apexe 625 ms-nél van, azon túl egy álló ugrás már NEM növel távolságot (550 → 660 ms:
+159 → 160 px). **Ne emeld 660 fölé** — csak lomha lesz tőle, kikerülhetőbb nem.
+
+| | volt | most | miért |
+|---|---|---|---|
+| `SLASH_WINDUP_MS` | 330 | **660** | a fenti mérés; frame-listából számítva |
+| `SLAM_RECOVERY_MS` | — (`ACTION_COOLDOWN_MS` 850) | **1500** | a fő punish-ablak, lásd lentebb |
+| `ACTION_COOLDOWN_MS` | 850 | **900** | apró; az érdemi javítást a windup adja |
+| `SLASH_DAMAGE` | 16 | **12** | a leggyakoribb támadás → a player 8 csapást bír |
+| `SLAM_DAMAGE` | 22 | **18** | kikerülhető, ezért fájóbb marad a slashnél |
+| `LUNGE_DAMAGE` | 24 | **22** | Phase 2, piros telegraph |
+| `MAX_HP` | 300 | **300** | user-döntés: maradjon hosszú, kitartást igénylő harc |
+
+A **`SLAM_RECOVERY_MS` LEVEZETETT**, a player exportált konstansaiból (unit teszt őrzi):
+`visszafutás ~300` (`SLAM_HIT_HALF_WIDTH / MOVE_SPEED`) + `két csapás 500`
+(`startupDelayMs 150`, majd `cooldownMs 350`) + `menekülés ~310` = **~1110 ms** → 1500,
+tartalékkal. Ez a user által kért ritmus: *„2 gyors kardtámadás, majd elugrani"*.
+
+**A `madKing.test.ts` „Fairness-invariánsok" blokkja mindezt futtatható állításként rögzíti** —
+a régi értékekkel visszaellenőrizve pontosan három teszt bukik el. Ha valaki később
+„felgyorsítja" a királyt, nem a következő kézi végigjátszás fogja megtalálni, hanem a CI.
+
+**Ha még mindig nehéz, a hangolás sorrendje:** `SLAM_RECOVERY_MS` ↑ → `ACTION_COOLDOWN_MS` ↑ →
+`SLASH_DAMAGE` ↓. **A `SLASH_WINDUP_MS`-hez ne nyúlj** (lásd a plafont).
 
 ### Boss2Scene (`src/scenes/Boss2Scene.ts`)
 
