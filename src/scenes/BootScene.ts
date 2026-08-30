@@ -23,6 +23,17 @@ import {
   KING_TEXTURES,
 } from '../bosses/MadKingAnimations';
 import {
+  createAncientDemonAnimations,
+  FRAME_HEIGHT as DEMON_FRAME_HEIGHT,
+  FRAME_WIDTH as DEMON_FRAME_WIDTH,
+  DEMON_TEXTURES,
+} from '../bosses/AncientDemonAnimations';
+import {
+  createShadeMinionAnimations,
+  FRAME_SIZE as SHADE_FRAME_SIZE,
+  SHADE_TEXTURES,
+} from '../bosses/ShadeMinionAnimations';
+import {
   createGraftedWingBreakerAnimations,
   CLEAN_TEXTURE_KEY as BOSS_CLEAN_TEXTURE_KEY,
   FRAME_HEIGHT as BOSS_FRAME_HEIGHT,
@@ -146,6 +157,25 @@ import kingLungeUrl from '../../assets/sprites/mad-king/Attack2.png';
 import kingLeapUrl from '../../assets/sprites/mad-king/Attack3.png';
 import kingDeathUrl from '../../assets/sprites/mad-king/Death.png';
 import kingHitUrl from '../../assets/sprites/mad-king/Take-Hit.png';
+// Boss 3 (Ancient Demon, Omen of Crows): az "Undead Executioner" csomag (darkpixel-kronovi /
+// Kronovi-), amit a `2D helper/Credits.txt` MÁR kreditál ("final boss, by Kronovi-"). A csomag
+// mappájában viszont NINCS licencfájl — a licenc SZÖVEGE nyitott tétel, publikálás előtt
+// tisztázandó (lásd CLAUDE.md). Az EREDETI fájlnevek megmaradtak: ez a kapocs a forráshoz.
+//
+// ÖT sheet a bosshoz, mind AZONOS 100x100-as frame-mel. Az `idle.png` SZÁNDÉKOSAN kimarad:
+// ugyanazt a lebegést adja gyorsabban, ráadásul üres záró frame-mel (lásd DEMON_TEXTURES).
+// A csomagban NINCS járás- és NINCS hurt-animáció — ebből lett a démon karaktere (lebeg és
+// villan), lásd AncientDemonAnimations.ts.
+import demonIdleUrl from '../../assets/sprites/ancient-demon/idle2.png';
+import demonComboUrl from '../../assets/sprites/ancient-demon/attacking.png';
+import demonNovaUrl from '../../assets/sprites/ancient-demon/skill1.png';
+import demonSummonUrl from '../../assets/sprites/ancient-demon/summon.png';
+import demonDeathUrl from '../../assets/sprites/ancient-demon/death.png';
+// Az idézett árnyék-lidércek — UGYANABBÓL a csomagból, de 50x50-es frame-mel, ezért külön
+// animációs modullal (a frame-méret animációnként nem térhet el, lásd a 19. tanulságot).
+import shadeAppearUrl from '../../assets/sprites/ancient-demon/summonAppear.png';
+import shadeIdleUrl from '../../assets/sprites/ancient-demon/summonIdle.png';
+import shadeDeathUrl from '../../assets/sprites/ancient-demon/summonDeath.png';
 // Level 1 parallax háttér-rétegek. Forrás: PixelPlatformerSet1 v1.1 (Szadi art) —
 // "License for Everyone / public domain, personal or commercial". A fájlok át lettek
 // nevezve (`01 background.png` -> `01-sky.png` stb.), mert a Vite-import szóközös
@@ -165,6 +195,13 @@ import bossArenaUrl from '../../assets/backgrounds/cathedral/boss-arena.png';
 // (Boss2Scene.GROUND_TOP = 369). A forrás licenc nélkül érkezett — nyitott jogi tétel
 // (lásd CLAUDE.md), mint a Bossbackground_1.png esetében.
 import boss2ArenaUrl from '../../assets/backgrounds/throne-room/boss2-arena.png';
+// Final boss aréna háttere: a "The Broken Gate" romos katedrális-trónterme. SZÁRMAZTATOTT
+// asset — a forrás a `2D helper/level/Final boss background.png` (1672x941), amiből sima
+// 800x450-es KICSINYÍTÉS lett, KIVÁGÁS NÉLKÜL: a forrás aspektusa (1.7768) gyakorlatilag
+// azonos a 800/450-ével (1.7778). A rajzolt dais-perem így a 369. sorra esik =
+// FinalBossScene.GROUND_TOP. A forrás licenc nélkül érkezett — nyitott jogi tétel
+// (lásd CLAUDE.md), mint a másik két boss-háttér esetében.
+import finalArenaUrl from '../../assets/backgrounds/broken-gate/final-arena.png';
 // Level 2 parallax háttér-rétegek. Forrás: GothicVania Town (Luis Zuno / @ansimuz) —
 // public domain, UGYANAZ a csomag, amiből a hangulati propok jönnek.
 // MINDKETTŐ SZÁRMAZTATOTT, és a származtatás VESZTESÉGMENTES:
@@ -227,6 +264,15 @@ import {
 import { DOOR_APERTURE, TILE_TEXTURES } from '../levels/LevelTileset';
 import { TOWN_TILE_TEXTURES } from '../levels/GothicTownTileset';
 
+/**
+ * Az Ancient Demon mögötti derengés mérete és színe. A szélesség/magasság a démon látvány-
+ * méretéből (90x124 világ-px) van felnagyítva, hogy a kontúrt körben elhagyja.
+ */
+const AURA_WIDTH = 150;
+const AURA_HEIGHT = 200;
+const AURA_COLOR = 0x6a3aa8;
+const AURA_STEPS = 24;
+
 const LOADING_BAR_WIDTH = 320;
 const LOADING_BAR_HEIGHT = 14;
 
@@ -238,7 +284,7 @@ const LOADING_BAR_HEIGHT = 14;
  * fejlesztés közben ez a leggyorsabb út az új szakaszokhoz. **Commit előtt mindig állítsd
  * vissza `'Level1Scene'`-re.**
  */
-const START_SCENE = 'Boss2Scene';
+const START_SCENE = 'FinalBossScene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a
@@ -317,6 +363,23 @@ const MAD_KING_SHEETS: Array<{ key: string; url: string }> = [
   { key: KING_TEXTURES.HIT, url: kingHitUrl },
 ];
 
+// Ancient Demon (Boss 3): öt külön sheet, mind 100x100-as frame-ekkel — a knight, a
+// Gravecaller és a Mad King mintájára.
+const ANCIENT_DEMON_SHEETS: Array<{ key: string; url: string }> = [
+  { key: DEMON_TEXTURES.IDLE, url: demonIdleUrl },
+  { key: DEMON_TEXTURES.COMBO, url: demonComboUrl },
+  { key: DEMON_TEXTURES.NOVA, url: demonNovaUrl },
+  { key: DEMON_TEXTURES.SUMMON, url: demonSummonUrl },
+  { key: DEMON_TEXTURES.DEATH, url: demonDeathUrl },
+];
+
+// Az idézett árnyékok: három sheet, mind 50x50-as frame-ekkel.
+const SHADE_MINION_SHEETS: Array<{ key: string; url: string }> = [
+  { key: SHADE_TEXTURES.APPEAR, url: shadeAppearUrl },
+  { key: SHADE_TEXTURES.IDLE, url: shadeIdleUrl },
+  { key: SHADE_TEXTURES.DEATH, url: shadeDeathUrl },
+];
+
 // Sima képek (nem sprite sheetek): a Level 1 parallax rétegei + a boss arénák álló háttere.
 const BACKGROUND_IMAGES: Array<{ key: string; url: string }> = [
   { key: BACKGROUND_TEXTURES.SKY, url: bgSkyUrl },
@@ -324,6 +387,7 @@ const BACKGROUND_IMAGES: Array<{ key: string; url: string }> = [
   { key: BACKGROUND_TEXTURES.RUINS, url: bgRuinsUrl },
   { key: BACKGROUND_TEXTURES.BOSS_ARENA, url: bossArenaUrl },
   { key: BACKGROUND_TEXTURES.BOSS2_ARENA, url: boss2ArenaUrl },
+  { key: BACKGROUND_TEXTURES.FINAL_ARENA, url: finalArenaUrl },
   { key: BACKGROUND_TEXTURES.TOWN_SKY, url: bgTownSkyUrl },
   { key: BACKGROUND_TEXTURES.TOWN, url: bgTownUrl },
 ];
@@ -415,6 +479,20 @@ export default class BootScene extends Phaser.Scene {
       });
     }
 
+    for (const sheet of ANCIENT_DEMON_SHEETS) {
+      this.load.spritesheet(sheet.key, sheet.url, {
+        frameWidth: DEMON_FRAME_WIDTH,
+        frameHeight: DEMON_FRAME_HEIGHT,
+      });
+    }
+
+    for (const sheet of SHADE_MINION_SHEETS) {
+      this.load.spritesheet(sheet.key, sheet.url, {
+        frameWidth: SHADE_FRAME_SIZE,
+        frameHeight: SHADE_FRAME_SIZE,
+      });
+    }
+
     for (const sheet of [
       { key: BOSS_TEXTURE_KEY, url: bossSheetUrl },
       { key: BOSS_CLEAN_TEXTURE_KEY, url: bossCleanSheetUrl },
@@ -444,6 +522,8 @@ export default class BootScene extends Phaser.Scene {
     createGravecallerAnimations(this);
     createGraftedWingBreakerAnimations(this);
     createMadKingAnimations(this);
+    createAncientDemonAnimations(this);
+    createShadeMinionAnimations(this);
 
     this.scene.start(START_SCENE);
   }
@@ -624,6 +704,30 @@ export default class BootScene extends Phaser.Scene {
     bossProjectileGfx.fillCircle(10, 10, 10);
     bossProjectileGfx.generateTexture('boss-projectile-placeholder', 20, 20);
     bossProjectileGfx.destroy();
+
+    // Az Ancient Demon AURÁJA — READABILITY-eszköz, nem dísz.
+    //
+    // MÉRVE: a démon köpenye rgb(14,12,12) = 12.7 luminancia, a final aréna háttere ott,
+    // ahol áll, medián 21.7 — de a legsötétebb tizedében 10.0. A fekete sziluett tehát a
+    // kép sötét foltjaiban ELTŰNIK. Tinttel ez nem javítható: a MULTIPLY tint csak
+    // sötétíteni tud. Ezért kap a démon egy halvány derengést MAGA MÖGÉ.
+    //
+    // Radiális átmenet koncentrikus ellipszisekből: kívülről befelé haladva nő az alfa,
+    // tehát a szél lágyan elfogy, és nem lesz látható korongja. Az ellipszis SZÁNDÉKOSAN
+    // magasabb, mint amilyen széles: a lény is az.
+    const auraGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    for (let step = AURA_STEPS; step > 0; step--) {
+      const ratio = step / AURA_STEPS;
+      auraGfx.fillStyle(AURA_COLOR, (1 - ratio) ** 2);
+      auraGfx.fillEllipse(
+        AURA_WIDTH / 2,
+        AURA_HEIGHT / 2,
+        AURA_WIDTH * ratio,
+        AURA_HEIGHT * ratio
+      );
+    }
+    auraGfx.generateTexture('demon-aura-placeholder', AURA_WIDTH, AURA_HEIGHT);
+    auraGfx.destroy();
 
     // Gravecaller lövedék: HARMADIK szín, mert három lövedék-forrás van a pályán. A player
     // narancs (0xff7a1a), a bossé lila (0xa855f7) — ez mérgeszöld, ami a Level 1 vörösesbarna

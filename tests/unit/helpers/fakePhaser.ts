@@ -120,6 +120,12 @@ export function createFakePhaserModule() {
       this.visible = v;
       return this;
     }
+    /** Az AncientDemon villanása ezzel teszi át magát a player mellé. */
+    setPosition(x: number, y: number) {
+      this.x = x;
+      this.y = y;
+      return this;
+    }
     setScale(x: number, y?: number) {
       this.scaleX = x;
       this.scaleY = y ?? x;
@@ -177,6 +183,12 @@ export function createFakePhaserModule() {
       Distance: {
         Between: (x1: number, y1: number, x2: number, y2: number) =>
           Math.hypot(x2 - x1, y2 - y1),
+      },
+      // A ShadeMinion ezzel fordul a player felé (2D sodródás). A valódi
+      // Phaser.Math.Angle.Between ugyanez: atan2(y2 - y1, x2 - x1), radiánban.
+      Angle: {
+        Between: (x1: number, y1: number, x2: number, y2: number) =>
+          Math.atan2(y2 - y1, x2 - x1),
       },
     },
   };

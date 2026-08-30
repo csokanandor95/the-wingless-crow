@@ -509,8 +509,49 @@ Minden nagyobb pálya végén lehet egy boss.
 
 Első vertical slice-ban elég **1 boss**.
 
-> **Állapot (2026-08-30):** két boss van kész — a **Grafted Wing-Breaker** (Level 1 után) és
-> a **Mad King** (Level 2 után). A harmadik, a démon, a következő iteráció.
+> **Állapot (2026-08-30):** MIND A HÁROM boss kész — a **Grafted Wing-Breaker** (Level 1
+> után), a **Mad King** (Level 2 után) és az **Ancient Demon, Omen of Crows** (a végső
+> ellenfél). A lánc ezzel bezárult: `Level 1 → Boss 1 → Level 2 → Boss 2 → Final Boss →
+> ending → credits`.
+
+## Boss – Ancient Demon, Omen of Crows
+
+A végső ellenfél (16. pont: az ősi démon, aki elfogta a varjakat). Asset: *Undead Executioner*
+(darkpixel-kronovi / Kronovi-).
+
+**A karaktere egy HIÁNYBÓL nő ki, és ez tudatos döntés:** a csomagban NINCS járás-animáció.
+A démon ezért nem sétál, hanem **LEBEG** (lassan sodródik, az idle animációval) és **VILLAN**
+(teleportál a player mellé, alpha-tweennel). Egy ősi, csuklyás lidérc nem gyalogol — a hiányból
+így identitás lett, nem kompromisszum.
+
+A három boss SZÁNDÉKOSAN három különböző nyomást ad:
+
+| | Wing-Breaker | Mad King | Ancient Demon |
+|---|---|---|---|
+| jelleg | távolsági + roham | tisztán közelharci | terület-tagadás + idézés |
+| mozgás | sétál | sétál, ugrik | **lebeg és villan** |
+| gap-closer | charge | ugró becsapódás | **villanás** |
+| Phase 2 | + charge | + kitörés | **+ árnyék-idézés** |
+
+**Támadások:**
+
+- **Kaszakombó** (reaktív, közelharc): KÉT csapás egyetlen mozdulatban, 600 és 1200 ms-nál.
+- **Árny-hullám (nova)**: radiális, MINDKÉT irányba terjedő talajhullám. **Csak UGRÁSSAL
+  kerülhető ki** — a hatótávja (90 px) pontosan a kaszáé, tehát a közelharci sáv a démoné,
+  hacsak a player nincs a levegőben.
+- **Villanás**: a player mellé teleportál. Ez bünteti azt, aki lehagyja a lassú lényt és
+  távolról tűzgolyózik. A villanás alatt SEBEZHETETLEN.
+- **Idézés (Phase 2)**: 2 árnyék-lidérc, akik a player felé sodródnak, érintésre sebeznek
+  (8) és azzal el is pusztulnak; egy csapásra halnak, ~8 mp után maguktól elenyésznek.
+
+**A hatótáv-előnye a projekt LEGKISEBBJE:** a player kardja 75-ről, a démon kaszája 90-ről ér
+el — 15 px, szemben a Wing-Breaker (138) és a Mad King (142) fölényével. Ez tudatos: a démon
+nyomása nem a hatótávból jön, hanem a novából és az árnyékokból.
+
+**A hitboxok itt is MÉRTEK:** a kasza nyúlása (45 forrás-px) és a hullám sugara (38 forrás-px)
+egyaránt az animáció tényleges kiterjedéséből származik. A hullám szimmetria-középpontja
+(x=43) FÜGGETLENÜL ugyanazt adja, mint a köpeny oszlop-sűrűségéből mért testközép — a két
+mérés hitelesíti egymást.
 
 ## Boss – The Grafted Wing-Breaker
 
@@ -914,6 +955,14 @@ Ending.
 
 A pályák száma később változtatható.
 
+> **MEGVALÓSULT (2026-08-30) — KÜLÖN PLATFORMING-PÁLYA NÉLKÜL, mint a Level 3-nál.**
+> A „Broken Gate" a végső boss ARÉNÁJA (`FinalBossScene`, `assets/backgrounds/broken-gate/`),
+> nem egy bejárható pálya. Ugyanaz a scope-döntés, ami a `Level 3 – The Throne of the Damned`-et
+> is kivette: a Boss 2 után KÖZVETLENÜL a végső ellenfél jön.
+>
+> A teljes lánc:
+> `Level 1 → Boss 1 → Level 2 → Boss 2 → átvezető → Final Boss → ending → credits`.
+
 ---
 
 # 15. Boss arénák
@@ -975,6 +1024,30 @@ A boss belépése és a zene fontos része a játékélménynek.
 > theme-je és a Level 2 sávja). A PÁRBESZÉD UTÁN, a cím-kártyával együtt indul: a dialógus
 > szándékosan csendben megy le, és a zene a harc nyitánya.
 
+> **Kiegészítés (2026-08-30) — a végső aréna (`FinalBossScene`):**
+>
+> A Boss 2 receptje szerint készült, és a jóslat bevált: a `Final boss background.png`
+> (1672×941) aspektusa gyakorlatilag azonos a 800×450-ével, tehát **kivágás NÉLKÜL**,
+> egyszerű kicsinyítéssel használható. A rajzolt dais-perem a 368-369. sorra esik, tehát a
+> `GROUND_TOP` itt is **369** — méréssel, nem a Boss 2-ből átvéve.
+>
+> **Tint NINCS**, és ez is mérés: a játéktér nyers fényessége `mean 30.1`, szemben a Boss 2
+> `36.3`-ával és a Boss 1 TINTELT `40.7`-ével — ez a három közül a legsötétebb kép.
+>
+> **ÚJ PROBLÉMA, ami az első két arénánál nem merült fel: a boss OLVASHATÓSÁGA.** A démon
+> köpenye `rgb(14,12,12)` = 12.7 luminancia, a háttér ott, ahol áll, medián 21.7 — de a
+> legsötétebb tizedében 10.0, vagyis a fekete sziluett a kép sötét foltjaiban ELTŰNIK.
+> Tinttel ez nem javítható (a MULTIPLY tint csak sötétíteni tud), ezért a démon egy halvány
+> ibolya **aurát** kap MAGA MÖGÉ, ami a kontúrját mindenhol elválasztja a háttértől — és
+> egyben az „ősi, sötét jelenlét" hangulatát is adja. Egyelőre kódból generált placeholder;
+> valódi VFX az `assets/effects/` iterációban.
+>
+> A belépő a Boss 2-ével azonos: **párbeszéd, majd cím-kártya** (`ui/Dialogue`, a player a
+> dialógus alatt teljesen befagyasztva). Vereség → `Level2Scene`; győzelem → `demonDefeated`
+> registry-flag + `NarrationScene` (ending) → `CreditsScene`.
+>
+> **Zene még nincs** (user adja hozzá) — a bekötés pontosan a Boss 2 receptje.
+
 > **Kiegészítés (Phase 8, 6. iteráció) — az aréna padlója üres lett:**
 >
 > Az eredetileg betett két alacsony oldalsó platform **törölve**. Indok: a boss valódi
@@ -1013,6 +1086,27 @@ A végső boss legyőzése után:
 - rövid narráció jelenik meg
 
 Az ending lehet rövid, 30–60 másodperces.
+
+> **MEGVALÓSULT (2026-08-30).** A lezárás **CSAK SZÖVEG, fekete háttéren** (user-döntés): a
+> meglévő, adatvezérelt `NarrationScene` fut le a `FinalBossScene` `ENDING_NARRATION`
+> tömbjével, VÁLTOZTATÁS NÉLKÜL — ugyanaz a modul, ami a két köztes átvezetőt is adja.
+> Felmerült egy háttérképes változat (a végső aréna festménye elsötétítve a szöveg mögött),
+> de a user a tisztán szöveges lezárást választotta; a képes verzió később egy opcionális
+> `backdrop` mezővel bármikor beilleszthető.
+>
+> Utána a **`CreditsScene`** következik: „THANKS FOR PLAYING" + lassan felfelé görgő lista a
+> felhasznált karakter-, környezet-, zene- és hang-assetek szerzőivel. `Space` gyorsít, a
+> végén pedig **új játékot indít TISZTA registryvel** (a `bossDefeated` / `kingDefeated` /
+> `demonDefeated` flagek és mindkét checkpoint törlésével) — enélkül az új játék a Level 1
+> ajtajánál azonnal a Level 2-re vinne.
+>
+> **A credits TARTALMA egyelőre placeholder** (user: „a részleteit majd egy későbbi
+> iterációban"). A lista a `2D helper/Credits.txt` gyűjtéséből indul; ez egyben az a hely,
+> ahol a még nyitott licenc-tételeket le kell zárni a publikálás előtt.
+
+A szöveg maga placeholder — a végleges lore a Phase 9 dolga (négy helyett most **öt**
+placeholder lore-szöveg van a kódban: a két boss-győzelmi narráció, a Level 2 átvezetője,
+a Boss 2 párbeszéde, valamint a Boss 3 párbeszéde + endingje).
 
 ---
 
@@ -1512,9 +1606,17 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 >    (`Second boss background.png`), a párbeszéd-rendszer (`ui/Dialogue.ts`) és a teljes
 >    lánc `Level2 → átvezető → király → átvezető` megvan. **Zene még nincs** (user adja hozzá).
 >    *(A korábban jelölt `Bossbackground_2.png` végül NEM ez lett — az továbbra is szabad.)*
-> 4. **A végső ellenfél (a démon)** — a soron következő iteráció. A `Boss2Scene` győzelmi ága
->    már a `'FinalBossScene'` kulcsot célozza, és az aréna-háttér is megvan
->    (`2D helper/level/Final boss background.png`).
+> 4. **A végső ellenfél — KÉSZ (2026-08-30).** *Ancient Demon, Omen of Crows* (12. pont),
+>    a `FinalBossScene` fix 800×450-es arénájában, párbeszéddel és belépővel. Vele jött az
+>    **ending** (`NarrationScene`, csak szöveg fekete háttéren — user-döntés) és a
+>    **`CreditsScene`** („Thanks for playing" + a felhasznált assetek/zenék szerzői,
+>    egyelőre placeholder tartalommal). **A lánc ezzel bezárult.** Zene még nincs.
+>
+>    **Együtt járó javítás a `Level2Scene`-ben:** az ajtaja eddig MINDIG a `Boss2Scene`-t
+>    célozta, `kingDefeated` ellenőrzés nélkül — szemben a Level 1-gyel, ami a
+>    `bossDefeated`-et nézi. Enélkül a végső bosstól kikapva a playert ide tesszük vissza,
+>    és újra végig kellene vernie a Mad Kinget. Most a legyőzött király után az ajtó
+>    KÖZVETLENÜL a végső arénába visz (átvezető nélkül, a Level 1 azonos döntése).
 > 5. **Enemy 3 – Beast** — opcionális, a 11. pont szerint is.
 >
 > **A `Level 3 – The Throne of the Damned` KIMARADT külön pályaként** (14. pont) — a

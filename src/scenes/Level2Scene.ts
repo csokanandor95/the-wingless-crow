@@ -99,6 +99,17 @@ const CHECKPOINT_REGISTRY_KEY = 'level2Checkpoint';
 const BOSS_SCENE_KEY = 'Boss2Scene';
 
 /**
+ * A LEGYŐZÖTT király után az ajtó már nem a trónterembe, hanem a végső arénába visz —
+ * pontosan úgy, ahogy a Level 1 ajtaja a `bossDefeated` után a Level 2-re (lásd
+ * Level1Scene.activateCheckpointAndTransition). Enélkül a végső bosstól kikapva a playert
+ * ide tesszük vissza, és újra végig kellene vernie a Mad Kinget, hogy visszajusson.
+ *
+ * Az átvezető ilyenkor KIMARAD (a Level 1 azonos döntése): a `LEVEL2_END_NARRATION` a
+ * trónterembe ÉRKEZÉSRŐL szól, ami másodjára már nem igaz — és a player úgyis látta.
+ */
+const FINAL_SCENE_KEY = 'FinalBossScene';
+
+/**
  * Placeholder lore-átvezető a Level 2 és a király arénája között — a végleges szöveget a
  * Phase 9 – Lore írja meg, a csere ennek a tömbnek a szerkesztése. (A BossScene
  * BOSS_VICTORY_NARRATION-jével azonos minta: a narrációs adat annál a scene-nél él, ahonnan
@@ -317,7 +328,7 @@ export default class Level2Scene extends Phaser.Scene {
 
     this.interactKey = this.input.keyboard!.addKey('E');
     this.doorPromptText = this.add
-      .text(400, 400, 'E: Belépés', {
+      .text(400, 400, this.registry.get('kingDefeated') ? 'E: Tovább — The Broken Gate' : 'E: Belépés', {
         fontFamily: 'monospace',
         fontSize: '16px',
         color: '#ffffff',
@@ -648,7 +659,14 @@ export default class Level2Scene extends Phaser.Scene {
     // tehát frame-enként újraindítaná a cél scene-t (CLAUDE.md 4. tanulság).
     // A trónterembe NEM közvetlenül lépünk be: előbb a szöveges átvezető fut le, és az
     // indítja a boss arénát (a NarrationScene adatvezérelt, lásd NarrationData).
+    const kingDefeated = Boolean(this.registry.get('kingDefeated'));
+
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      if (kingDefeated) {
+        this.scene.start(FINAL_SCENE_KEY);
+        return;
+      }
+
       this.scene.start('NarrationScene', {
         lines: LEVEL2_END_NARRATION,
         nextScene: BOSS_SCENE_KEY,
