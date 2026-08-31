@@ -41,7 +41,7 @@ import { MOVE_SPEED } from '../player/Player';
  *
  * ## Miért rövidebb és szűkebb
  *
- * 4200 px a Level 1 6000-ével és a Level 2 7200-ával szemben, 14 ellenféllel (a Level 2-n 15
+ * 4200 px a Level 1 6000-ével és a Level 2 7200-ával szemben, 12 ellenféllel (a Level 2-n 15
  * volt, két és félszer akkora pályán). A pálya hat „karámra" bomlik, amiket öt rövid gödör
  * választ el — és a gödör itt nem platforming-kihívás, hanem a karám FALA: az
  * `enemyChaseBounds()` a felület peremén megállítja a Beastet, tehát a harc egy zárt cellában
@@ -310,8 +310,10 @@ export const DOOR_CHECKPOINT = {
 // --- Enemyk -----------------------------------------------------------------
 
 /**
- * 5 CrowHarvester + 6 Gravecaller + **3 Beast**. A projektben eddig EGYETLEN Beast volt (a
+ * 3 CrowHarvester + 6 Gravecaller + **3 Beast**. A projektben eddig EGYETLEN Beast volt (a
  * Level 2 utolsó ellenfele); ez a pálya a fajta bemutatója.
+ *
+ * Az `A` előcsarnok SZÁNDÉKOSAN üres — lásd a lenti indoklást.
  *
  * A `patrolMinX/patrolMaxX` KIZÁRÓLAG a nyugalmi séta-körzet — az üldözés (a Beastnél
  * egyben a roham) határát az `enemyChaseBounds()` SZÁMÍTJA a felület pereméből és a
@@ -329,9 +331,17 @@ export const DOOR_CHECKPOINT = {
  * `level3Layout.test.ts` mindkét felét őrzi.
  */
 export const ENEMY_SPAWNS: EnemySpawnDef[] = [
-  // --- A: előcsarnok. Két magányos közelharci ellenfél, sík terepen. ---
-  { id: 'A-crow-1', x: 250, surfaceId: 'G1', patrolMinX: 200, patrolMaxX: 300 },
-  { id: 'A-crow-2', x: 430, surfaceId: 'G1', patrolMinX: 380, patrolMaxX: 480 },
+  // --- A: előcsarnok. SZÁNDÉKOSAN ÜRES (user-döntés, kézi teszt után). ---
+  // Eredetileg két CrowHarvester állt itt (250 és 430), de a `START_X` 120, a
+  // `DETECTION_RANGE` pedig 220: az elsőt már a pálya betöltésének pillanatában (130 px-ről)
+  // észlelte a player, és azonnal támadott. Egy pálya első másodperce nem kezdődhet egy
+  // kikerülhetetlen csapással — a `LADDER_EXIT_CLEARANCE` elvének (a védtelen belépési
+  // pontot nem szabad megtámadni) a start-pontra alkalmazott változata.
+  //
+  // Az üres előcsarnok nem veszteség, hanem a szakasz VALÓDI szerepe: itt lehet
+  // következmény nélkül kipróbálni a galériát — a felugrást ÉS azt, hogy alatta ugorva a
+  // player bever i a fejét. Ez a pálya egyetlen ilyen helye; a `B` karámtól kezdve minden
+  // szakaszban van ellenfél.
 
   // --- B: első karám. A tézis, a legolcsóbb hibaárral (a respawn a pálya eleje). ---
   { id: 'B-beast-1', x: 940, surfaceId: 'G2', patrolMinX: 860, patrolMaxX: 1020, type: 'beast' },

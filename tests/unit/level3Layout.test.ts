@@ -72,6 +72,7 @@ import {
   CHARGE_SPEED as BEAST_CHARGE_SPEED,
   CHARGE_WINDUP_MS as BEAST_CHARGE_WINDUP_MS,
 } from '../../src/enemies/Beast';
+import { DETECTION_RANGE as HARVESTER_DETECTION_RANGE } from '../../src/enemies/CrowHarvester';
 import {
   DETECTION_RANGE as GRAVECALLER_DETECTION_RANGE,
   PROJECTILE_SIZE as GRAVECALLER_PROJECTILE_SIZE,
@@ -620,11 +621,26 @@ describe('ENEMY_SPAWNS', () => {
     }
   });
 
-  it('5 CrowHarvester + 6 Gravecaller + 3 Beast', () => {
+  it('3 CrowHarvester + 6 Gravecaller + 3 Beast', () => {
     const byType = (t: string) => ENEMY_SPAWNS.filter((e) => enemyType(e) === t).length;
-    expect(byType('crow-harvester')).toBe(5);
+    expect(byType('crow-harvester')).toBe(3);
     expect(byType('gravecaller')).toBe(6);
     expect(byType('beast')).toBe(3);
+  });
+
+  it('a START-pont körül NINCS ellenfél — a pálya nem kezdődhet csapással', () => {
+    // REGRESSZIÓ (kézi teszt, 2026-08-31): az `A` szakasz két CrowHarvestere közül az elsőt
+    // a player már a betöltés pillanatában felébresztette (130 px < DETECTION_RANGE 220), és
+    // azonnal támadott. A védett sáv a LEGNAGYOBB detektálási hatótáv, hogy egy jövőbeli
+    // caster se kerülhessen ide.
+    const safeRadius = Math.max(HARVESTER_DETECTION_RANGE, GRAVECALLER_DETECTION_RANGE);
+
+    for (const enemy of ENEMY_SPAWNS) {
+      expect(
+        Math.abs(enemy.x - START_X),
+        `${enemy.id} a start-pont detektálási sávjában áll`
+      ).toBeGreaterThan(safeRadius);
+    }
   });
 
   it('sűrűbb, mint a Level 2 — rövidebb pálya, több ellenfél/px', () => {

@@ -451,9 +451,15 @@ BŐVÜLT, nem lezárult: `... → Boss 2 (Mad King) → átvezető → **Level 3
 - **A Gravecaller-szeparáció LEVEZETETT, nem hangolt:** a caster a saját lapján állót
   eltalálja (a bolt-sáv `[T−31, T−15]` a test `[T−46, T]`-jén belül), a padlón állót viszont
   sem el nem találja, sem **ÉSZRE nem veszi** (105 px > `VERTICAL_DETECTION_RANGE` 80).
-- **4200 px, 14 ellenfél** (3 Beast + 6 Gravecaller + 5 CrowHarvester) — rövidebb ÉS sűrűbb,
+- **4200 px, 12 ellenfél** (3 Beast + 6 Gravecaller + 3 CrowHarvester) — rövidebb ÉS sűrűbb,
   mint a Level 2 (7200 px, 15 lény). Hat karám, öt 120 px-es gödörrel; a gödör nem kihívás,
   hanem a karám FALA (az `enemyChaseBounds()` a perem előtt megállítja a Beastet).
+- **Az `A` előcsarnok SZÁNDÉKOSAN ÜRES** (kézi teszt, 2026-08-31). Eredetileg két
+  CrowHarvester állt itt, de a `START_X` 120, a `DETECTION_RANGE` pedig 220: az elsőt már a
+  betöltés pillanatában felébresztette a player, és azonnal támadott. A szakasz valódi szerepe
+  enélkül állt össze: itt lehet KÖVETKEZMÉNY NÉLKÜL kipróbálni a galériát — a felugrást ÉS
+  azt, hogy alatta ugorva a player beveri a fejét. Unit teszt őrzi, hogy a start-pont körül a
+  legnagyobb detektálási hatótávon belül ne kerüljön ellenfél.
 - **Nincs létra, mozgó platform, lengő kasza.** A kasza konkrétan nem is lehetne: egy penge a
   karám fölött pont a menekülő-ugrásba kényszerítené a playert.
 - **A háttér LAPOS SZÍN, parallax NÉLKÜL** — és ez MÉRÉS, nem ízlés. Lásd a 28. tanulságot.
@@ -469,8 +475,18 @@ machine-je boss-léptékben, **fázis NÉLKÜL** (user-döntés).
   ugrással 174 ms, plusz 250 ms reakcióidő. A padlót a LASSABB válasz adja (480), ezért 520.
   **Így MINDKÉT válasz működik, nem csak az ugrás** — unit teszt őrzi.
 - **A FALKA** (user-döntés): `66 % → 1 CrowHarvester`, `33 % → 1 Gravecaller`. Egyszeri,
-  küszöbönként pontosan egyszer. A boss csak `beast-master-summon` eventet emittál (a démon
-  idézésének mintája) — **új lény-osztály NEM kellett**.
+  küszöbönként pontosan egyszer. A boss csak a TÍPUST emittálja (`beast-master-summon`) —
+  **új lény-osztály NEM kellett**.
+  - **A spawn-pontot a SCENE számolja, a PLAYERHEZ képest** (kézi teszt-javítás): a boss
+    eredetileg a saját pozíciójából adta meg, és a fal mellől hívva a lény a sarokban jelent
+    meg — a playertől akár 680 px-re, ami mindkét fajta `DETECTION_RANGE`-én kívül van, tehát
+    a falka tétlenül sétálgatott. A `SUMMON_SPAWN_DISTANCE` (180) LEVEZETETT: a
+    `CrowHarvester.DETECTION_RANGE` (220) alatt, de a közelharci hatótávja (42) jóval fölött.
+  - **A hívott lények mind a NÉGY határt megkapják** (`patrol` ÉS `chase`), az aréna
+    szélességére. A `chase` NEM elhagyható, pedig a `setCollideWorldBounds` amúgy is
+    megállítaná őket: a `Gravecaller` csak ÁLLÓ helyzetből castol, és az „állok-e?" döntést az
+    `applySpacing()` a chase-határból vezeti le — korlátlan határral a falnak nyomott caster
+    soha nem sült volna el.
 - **Külön `STAGGER` állapot** (a `Beast`-nél nincs): a falnak rohanó roham megtorpanása a
   harc fő punish-ablaka, `STAGGER_MS = 1400` — levezetve két kardcsapásra és a kilépésre.
 - **Az aréna háttere SCENE-BEN ÖSSZERAKOTT**, nem egyetlen festmény — ez az egyetlen ilyen a
@@ -1898,15 +1914,25 @@ A `Boss2Scene` szerkezetének a párja (fix 800x450 aréna, párbeszéd -> cím-
 - **A győzelem az ÖSSZES lidércet megsemmisíti**: a gazdájuk nélkül nincs, ami tartsa őket, és
   a záró beat alatt nem sebezhetik halálra a playert.
 - **Győzelem:** `demonDefeated` registry-flag -> `NarrationScene` (ending) -> `CreditsScene`.
-  **Vereség:** fade -> `Level2Scene`, ahol a boss-ajtó már KÖZVETLENÜL ide vezet vissza.
+- **Vereség: a scene ÖNMAGÁT indítja újra** (`{ skipDialogue: true }`), nem egy pályára tesz
+  vissza. **Ez a végső bossnál MÁS, mint a másik háromnál, és user-döntés (kézi teszt után):**
+  azok ajtaja egy pálya végén van, tehát a visszatérés néhány lépés — ide viszont a Level 2
+  boss-ajtaján át vezetett az út, ami minden bukott próbálkozás után egy 7200 px-es pálya
+  TELJES újrafutását jelentette, a játék leghosszabb harcánál.
+  A **„checkpoint a harc KEZDETÉN"** pontosan azt jelenti, hogy az átvezetőt sem kell
+  újranézni — ezért a `skipDialogue`, ami **scene-DATA, nem registry**: a „már láttam"
+  kizárólag a retry-lánc alatt érdekes. Registryben a `CreditsScene` új-játék takarítását is
+  bővíteni kellene, és egy későbbi, ajtón át érkező belépés is némán elveszítené az átvezetőt.
+  A `scene.start()` ugyanazon a példányon fut, tehát a `create()` eleje továbbra is KÖTELEZŐEN
+  üríti a tömböket és a flageket (CLAUDE.md 3. tanulság).
 
 ### CreditsScene (`src/scenes/CreditsScene.ts`)
 
 Thanks for playing + lassan felfelé görgő szerzői lista (karakterek / környezet / zene /
 hangok). `Space` a végére ugrik, ott pedig **új játékot indít**.
 
-- **Az új játék TÖRLI a registry-t** (`bossDefeated`, `kingDefeated`, `demonDefeated`,
-  `checkpoint`, `level2Checkpoint`). A registry GAME-szintű, tehát enélkül az új játék a
+- **Az új játék TÖRLI a registry-t** (`bossDefeated`, `kingDefeated`, `beastMasterDefeated`,
+  `demonDefeated`, `checkpoint`, `level2Checkpoint`, `level3Checkpoint`). A registry GAME-szintű, tehát enélkül az új játék a
   Level 1 ajtajánál azonnal a Level 2-re vinne, és a player a pálya végén éledne.
 - **A TARTALOM PLACEHOLDER** (user: a részleteit majd egy későbbi iterációban). A lista a
   `2D helper/Credits.txt` gyűjtéséből indul — és ez egyben az a hely, ahol a még nyitott

@@ -8,7 +8,11 @@ import Gravecaller, {
   PROJECTILE_SIZE as GRAVECALLER_PROJECTILE_SIZE,
   PROJECTILE_SPEED as GRAVECALLER_PROJECTILE_SPEED,
 } from '../enemies/Gravecaller';
-import BeastMaster, { BeastMasterState } from '../bosses/BeastMaster';
+import BeastMaster, {
+  BeastMasterState,
+  SUMMON_SPAWN_DISTANCE,
+  type SummonType,
+} from '../bosses/BeastMaster';
 import {
   DEATH_FADE_MS as MASTER_DEATH_FADE_MS,
   FEET_OFFSET_Y as MASTER_FEET_OFFSET_Y,
@@ -70,7 +74,7 @@ const PLAYER_SPAWN_Y = 260;
 const MASTER_SPAWN_X = 620;
 const MASTER_SPAWN_Y = GROUND_TOP - MASTER_FEET_OFFSET_Y;
 
-/** A hívott lények spawn-pontja az arénán belülre szorítva (a Master a peremnél is hívhat). */
+/** A hívott lények spawn-pontja az arénán belülre szorítva. */
 const SUMMON_MARGIN_X = 60;
 
 const BOSS_NAME = 'The Beast Master';
@@ -374,37 +378,73 @@ export default class Boss3Scene extends Phaser.Scene {
       })
     );
 
-    this.master.on(
-      'beast-master-summon',
-      (type: 'crow-harvester' | 'gravecaller', x: number, y: number) => {
-        this.spawnSummon(type, x);
-        // A hívás hangja: ugyanaz a varázslat-becsapódás, amit a démon idézése is használ.
-        this.audio.playSfx(SFX_KEYS.BOSS_SPELL_IMPACT);
-        this.cameras.main.shake(300, 0.008);
-        void y;
-      }
+    this.master.on('beast-master-summon', (type: SummonType) => {
+      this.spawnSummon(type);
+      // A hívás hangja: ugyanaz a varázslat-becsapódás, amit a démon idézése is használ.
+      this.audio.playSfx(SFX_KEYS.BOSS_SPELL_IMPACT);
+      this.cameras.main.shake(300, 0.008);
+    });
+  }
+
+  /**
+   * Hol jelenjen meg a hívott lény?
+   *
+   * **A PLAYERHEZ képest, nem a Masterhez** (kézi teszt, 2026-08-31). A boss korábban a saját
+   * pozíciójából számolta, és ha a falszélen hívott, a lény a sarokban jelent meg — a player
+   * pedig a túloldalon, akár 680 px-re. Az mindkét fajta `DETECTION_RANGE`-én kívül van
+   * (crow 220, caster 400), tehát a falka ott sétálgatott, és a hívás tét nélkül maradt.
+   *
+   * A `SUMMON_SPAWN_DISTANCE` levezetése (a hívott lények konstansaiból) a `BeastMaster`-ben
+   * van, mert az nem aréna-tudás; a CLAMPELÉS viszont igen, ezért az itt.
+   *
+   * A KÖZÉP FELÉ spawnol, tehát a clamp gyakorlatilag sosem harap: a player bármelyik falnál
+   * áll, a 180 px befelé mutat.
+   */
+  private summonSpawnX(): number {
+    const towardCenter = this.player.x < ARENA_WIDTH / 2 ? 1 : -1;
+
+    return Phaser.Math.Clamp(
+      this.player.x + towardCenter * SUMMON_SPAWN_DISTANCE,
+      SUMMON_MARGIN_X,
+      ARENA_WIDTH - SUMMON_MARGIN_X
     );
   }
 
   /**
    * A falka egy tagja. A MEGLÉVŐ enemy-osztályokból jön létre, változtatás nélkül; új
-   * lény-osztály nem kellett.
+   * lény-osztály nem kellett. A spawn Y a típus talp-offsetjéből származik — ugyanaz a
+   * levezetés, mint a pályákon.
    *
-   * A spawn X az arénán belülre van szorítva (a Master a peremnél is hívhat), az Y pedig a
-   * típus talp-offsetjéből származik — ugyanaz a levezetés, mint a pályákon.
+   * **MIND A NÉGY határ az EGÉSZ arénát fedi le**, nem a defaultjuk — és mindkettőnek külön
+   * oka van:
    *
-   * Patrol/chase határ NEM kell: az aréna fallal zárt, és a `setCollideWorldBounds` amúgy is
-   * megállítja őket a peremen.
+   *  - **`patrolMinX/MaxX`** (default: `spawn ± PATROL_RANGE`, crow 80 / caster 60): enélkül
+   *    egy lény, ami elveszíti a playert (`LOSE_RANGE`), egy 120-160 px-es zsebbe ragadna
+   *    vissza — ugyanaz a „csak ott sétálgat" tünet, amit a `summonSpawnX()` a spawn
+   *    OLDALÁRÓL old meg.
+   *  - **`chaseMinX/MaxX`** (default: korlátlan): ez NEM elhagyható, pedig a
+   *    `setCollideWorldBounds` fizikailag amúgy is megállítaná őket. A `Gravecaller` ugyanis
+   *    **csak ÁLLÓ helyzetből castol**, és az „állok-e?" döntést az `applySpacing()` a
+   *    chase-határból vezeti le, nem a tényleges sebességből. Korlátlan határral a falnak
+   *    nyomott caster végig `velocity != 0`-t tartana, tehát SOHA nem sülne el — egy
+   *    ártalmatlan bábu lenne. A határral viszont a dokumentált „sarokba szorítva VISZONT
+   *    tüzel" ág fut le.
    */
-  private spawnSummon(type: 'crow-harvester' | 'gravecaller', x: number): void {
-    const spawnX = Phaser.Math.Clamp(x, SUMMON_MARGIN_X, ARENA_WIDTH - SUMMON_MARGIN_X);
+  private spawnSummon(type: SummonType): void {
+    const spawnX = this.summonSpawnX();
+    const bounds = {
+      patrolMinX: SUMMON_MARGIN_X,
+      patrolMaxX: ARENA_WIDTH - SUMMON_MARGIN_X,
+      chaseMinX: SUMMON_MARGIN_X,
+      chaseMaxX: ARENA_WIDTH - SUMMON_MARGIN_X,
+    };
 
     if (type === 'gravecaller') {
       const caster = new Gravecaller(
         this,
         spawnX,
         GROUND_TOP - GRAVECALLER_SPAWN_OFFSET,
-        {}
+        bounds
       );
 
       caster.on('gravecaller-projectile', (px: number, py: number, direction: number) => {
@@ -432,7 +472,7 @@ export default class Boss3Scene extends Phaser.Scene {
       return;
     }
 
-    const harvester = new CrowHarvester(this, spawnX, GROUND_TOP - HARVESTER_SPAWN_OFFSET, {});
+    const harvester = new CrowHarvester(this, spawnX, GROUND_TOP - HARVESTER_SPAWN_OFFSET, bounds);
     harvester.on('harvester-attack', () => this.audio.playSfx(SFX_KEYS.ENEMY_SWING));
     harvester.on('harvester-death', () =>
       this.audio.playSfx(SFX_KEYS.HARVESTER_DEATH, {

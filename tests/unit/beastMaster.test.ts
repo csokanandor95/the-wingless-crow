@@ -30,6 +30,7 @@ import BeastMaster, {
   MAX_HP,
   MOVE_SPEED as MASTER_MOVE_SPEED,
   STAGGER_MS,
+  SUMMON_SPAWN_DISTANCE,
   SUMMON_THRESHOLDS,
 } from '../../src/bosses/BeastMaster';
 import {
@@ -50,6 +51,14 @@ import {
   MAX_HP as MAD_KING_MAX_HP,
 } from '../../src/bosses/MadKing';
 import { MAX_HP as BEAST_MAX_HP } from '../../src/enemies/Beast';
+import {
+  ATTACK_RANGE as HARVESTER_ATTACK_RANGE,
+  DETECTION_RANGE as HARVESTER_DETECTION_RANGE,
+} from '../../src/enemies/CrowHarvester';
+import {
+  PREFERRED_RANGE as GRAVECALLER_PREFERRED_RANGE,
+  RETREAT_RANGE as GRAVECALLER_RETREAT_RANGE,
+} from '../../src/enemies/Gravecaller';
 import Player, { MOVE_SPEED as PLAYER_MOVE_SPEED } from '../../src/player/Player';
 import { BODY_WIDTH as PLAYER_BODY_WIDTH } from '../../src/player/PlayerAnimations';
 import {
@@ -426,15 +435,33 @@ describe('BeastMaster', () => {
       expect(onSummon).not.toHaveBeenCalled();
     });
 
-    it('a spawn-pont a Master MÖGÖTT van, nem a player felé', () => {
+    it('a spawn-távolság a hívott lények konstansaiból van LEVEZETVE', () => {
+      // REGRESSZIÓ (kézi teszt, 2026-08-31): a falka a fal mellett éledt, a playertől akár
+      // 680 px-re — mindkét fajta DETECTION_RANGE-én kívül —, tehát tétlenül sétálgatott.
+      //
+      // FELÜLRŐL: a SZŰKEBB detektálási hatótáv. A lénynek azonnal észre kell vennie a playert.
+      expect(SUMMON_SPAWN_DISTANCE).toBeLessThanOrEqual(HARVESTER_DETECTION_RANGE);
+      // ALULRÓL: ne a player nyakán éledjen (ugyanaz az elv, amiért a Level 3 A szakaszáról
+      // kikerült a két kezdő crow). Bőven a közelharci hatótáv fölött.
+      expect(SUMMON_SPAWN_DISTANCE).toBeGreaterThan(HARVESTER_ATTACK_RANGE * 2);
+      // A Gravecallernek pont a „megáll és castol" sávba kell esnie: se hátrálás, se közelítés.
+      expect(SUMMON_SPAWN_DISTANCE).toBeGreaterThan(GRAVECALLER_RETREAT_RANGE);
+      expect(SUMMON_SPAWN_DISTANCE).toBeLessThan(GRAVECALLER_PREFERRED_RANGE);
+    });
+
+    it('CSAK a típust emittálja — a pozíciót a scene dönti el', () => {
+      // REGRESSZIÓ (kézi teszt, 2026-08-31): a boss korábban a SAJÁT pozíciójából számolt
+      // spawn-pontot is küldött. A fal mellől hívva a lény a sarokban jelent meg, a player
+      // pedig a túloldalon — mindkét fajta DETECTION_RANGE-én kívül —, tehát a falka
+      // tétlenül sétálgatott. A boss nem is tudhatja a helyes pozíciót: sem az aréna
+      // határait, sem a tisztességes távolságot nem ismeri (lásd Boss3Scene.summonSpawnX).
       const onSummon = vi.fn();
       master.on('beast-master-summon', onSummon);
       master.activate();
 
-      // A Master balra néz (a konstruktor alapállása), tehát a hívott lény tőle JOBBRA jön.
       master.takeDamage(Math.ceil(MAX_HP * 0.4));
       expect(onSummon).toHaveBeenCalledTimes(1);
-      expect(onSummon.mock.calls[0][1]).toBeGreaterThan(MASTER_X);
+      expect(onSummon.mock.calls[0]).toEqual(['crow-harvester']);
     });
   });
 

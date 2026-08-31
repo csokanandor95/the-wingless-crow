@@ -122,30 +122,55 @@ export const CHARGE_TELEGRAPH_TINT = 0xff2222;
 export const HIT_FLASH_MS = 100;
 const HIT_FLASH_TINT = 0xffffff;
 
+/** A falka tagjai — a meglévő enemy-osztályokból, új lény-osztály nélkül. */
+export type SummonType = 'crow-harvester' | 'gravecaller';
+
 /**
  * A FALKA. Egyszeri, HP-küszöbhöz kötött esemény — NEM fázis (a user kérése: „nem kell
  * Phase 2"). A lény nem hozza létre a segítséget, csak `'beast-master-summon'` eventet
- * emittál a típussal és a spawn-ponttal; a példányosítás a scene dolga (a démon
+ * emittál a TÍPUSSAL; a példányosítás ÉS az elhelyezés a scene dolga (a démon
  * `demon-summon`-jának delegálási mintája).
+ *
+ * **A spawn-pontot SZÁNDÉKOSAN nem a boss adja meg** (kézi teszt, 2026-08-31). Eredetileg a
+ * saját pozíciójából számolta (`this.x ± SUMMON_OFFSET_X`), és ez elromlott, amikor a Master
+ * az aréna szélén hívott: a lény a sarokban jelent meg, a player pedig a túloldalon — 680 px
+ * távolságra, ami MINDKÉT lény `DETECTION_RANGE`-én kívül van (crow 220, caster 400). A
+ * falka ilyenkor egyszerűen ott sétálgatott, és a hívás tét nélkül maradt.
+ *
+ * A boss nem is TUDHATJA a helyes pozíciót: nem ismeri sem az aréna határait, sem azt, milyen
+ * távolság tisztességes a playertől. Ez scene-szintű információ — lásd `Boss3Scene`.
  *
  * A két küszöb SZÁNDÉKOSAN eltérő típust hív: előbb egy közelharci CrowHarvester (nyomás,
  * amíg a Master rohamra készül), majd egy távolsági Gravecaller (a levegőbe menekülést
  * bünteti — pont azt, amivel a rohamot ki lehet kerülni).
  */
-export const SUMMON_THRESHOLDS: ReadonlyArray<{ hpRatio: number; type: 'crow-harvester' | 'gravecaller' }> = [
+export const SUMMON_THRESHOLDS: ReadonlyArray<{ hpRatio: number; type: SummonType }> = [
   { hpRatio: 0.66, type: 'crow-harvester' },
   { hpRatio: 0.33, type: 'gravecaller' },
 ];
 
-/** A hívott lény a Master MELLETT jelenik meg, a testén kívül. */
-export const SUMMON_OFFSET_X = 150;
+/**
+ * Milyen messze a PLAYERTŐL éledjen a falka egy tagja.
+ *
+ * A POZÍCIÓT a scene számolja (az arénát csak ő ismeri), de a TÁVOLSÁG a hívott lények
+ * konstansaiból következik, tehát ide tartozik — és így unit-tesztelhető is:
+ *
+ *  - **felülről** a szűkebb detektálási hatótáv (`CrowHarvester.DETECTION_RANGE` = 220): a
+ *    lénynek AZONNAL észre kell vennie a playert, különben a hívás tét nélkül marad;
+ *  - **alulról** a tisztesség: jóval a `CrowHarvester.ATTACK_RANGE` (42) fölött, tehát a lény
+ *    nem a player nyakán éled újra. Ez ugyanaz az elv, amiért a Level 3 `A` szakaszáról
+ *    kikerült a két kezdő CrowHarvester.
+ *
+ * A Gravecallerre is jó: 180 a `RETREAT_RANGE` (140) fölött, de a `PREFERRED_RANGE` (300)
+ * alatt van — vagyis pont a „megáll és castol" sávban éled, nem hátrálva vagy közelítve.
+ */
+export const SUMMON_SPAWN_DISTANCE = 180;
 
 export default class BeastMaster extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public masterState: BeastMasterState = BeastMasterState.DORMANT;
 
   private hp = MAX_HP;
 
-  private facingDirection: 1 | -1 = -1;
   private isAttackBusy = false;
   private canCharge = true;
   private chargeDirection: 1 | -1 = 1;
@@ -452,11 +477,8 @@ export default class BeastMaster extends Phaser.Physics.Arcade.Sprite implements
   }
 
   /**
-   * A falka. Küszöbönként PONTOSAN egyszer sül el (a `summonsFired` halmaz őrzi), és a
-   * lény csak eventet emittál — a scene példányosítja a MEGLÉVŐ enemy-osztályokból.
-   *
-   * A spawn-pont a Master két oldalán van, a testén kívül; a scene a saját aréna-határaira
-   * clampeli.
+   * A falka. Küszöbönként PONTOSAN egyszer sül el (a `summonsFired` halmaz őrzi), és a lény
+   * CSAK a típust emittálja — az elhelyezés a scene dolga (lásd `SUMMON_THRESHOLDS`).
    */
   private checkSummons(): void {
     const ratio = this.hp / MAX_HP;
@@ -466,14 +488,7 @@ export default class BeastMaster extends Phaser.Physics.Arcade.Sprite implements
       if (ratio > threshold.hpRatio) continue;
 
       this.summonsFired.add(index);
-      // A hívott lény a Master MÖGÖTT jelenik meg (a player felől nézve), hogy ne essen
-      // azonnal a kardja elé.
-      this.emit(
-        'beast-master-summon',
-        threshold.type,
-        this.x - SUMMON_OFFSET_X * this.facingDirection,
-        this.y
-      );
+      this.emit('beast-master-summon', threshold.type);
     }
   }
 
@@ -557,7 +572,6 @@ export default class BeastMaster extends Phaser.Physics.Arcade.Sprite implements
   }
 
   private setFacing(faceLeft: boolean): void {
-    this.facingDirection = faceLeft ? -1 : 1;
     applyFacing(this, BEAST_MASTER_FACING, faceLeft);
   }
 

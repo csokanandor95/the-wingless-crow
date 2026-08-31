@@ -82,9 +82,25 @@ const VICTORY_DELAY_MS = DEMON_DEATH_ANIM_MS + 700;
 const DEFEAT_DELAY_MS = 1400;
 const FADE_MS = 700;
 
-/** Vereség esetén ide térünk vissza — nincs Level 3, a Level 2 boss-ajtaja a belépő. */
-const FALLBACK_SCENE_KEY = 'Level2Scene';
+/**
+ * **A harc kezdete MAGA a checkpoint** (user-döntés, kézi teszt után): vereség esetén nem egy
+ * pályára térünk vissza, hanem AZONNAL újraindul az aréna.
+ *
+ * Ez a végső bossnál más, mint a másik háromnál, és szándékosan: azok ajtaja egy pálya végén
+ * van, tehát a visszatérés legfeljebb néhány lépés. Ide viszont a `Level2Scene` boss-ajtaján
+ * át vezetett az út, ami egy 7200 px-es pálya TELJES újrafutását jelentette volna minden
+ * bukott próbálkozás után — a játék leghosszabb harcánál a legrosszabb helyen.
+ *
+ * Az újraindítás `{ skipDialogue: true }`-val megy: a „checkpoint a harc KEZDETÉN" pontosan
+ * azt jelenti, hogy az átvezetőt nem kell újranézni.
+ */
+const RETRY_SCENE_KEY = 'FinalBossScene';
 const CREDITS_SCENE_KEY = 'CreditsScene';
+
+/** A scene indítási adata — csak az ismételt próbálkozás állítja. */
+interface FinalBossSceneData {
+  skipDialogue?: boolean;
+}
 
 /**
  * Placeholder lore-párbeszéd: a végleges szöveget a Phase 9 – Lore írja meg, a csere ennek a
@@ -147,8 +163,22 @@ export default class FinalBossScene extends Phaser.Scene {
   private fightStarted = false;
   private outcomeScheduled = false;
 
+  /**
+   * Igaz, ha ez egy ismételt próbálkozás (vereség után). Ilyenkor a párbeszéd kimarad, és a
+   * belépő cím-kártyával kezdünk.
+   *
+   * Scene-DATA, nem registry: a „már láttam a párbeszédet" pontosan addig érdekes, amíg ez a
+   * retry-lánc tart. Registry-be téve a `CreditsScene` új-játék takarítását is bővíteni
+   * kellene, és egy későbbi, ajtón át érkező belépés is némán elveszítené az átvezetőt.
+   */
+  private skipDialogue = false;
+
   constructor() {
     super('FinalBossScene');
+  }
+
+  init(data: FinalBossSceneData): void {
+    this.skipDialogue = data?.skipDialogue === true;
   }
 
   create(): void {
@@ -199,7 +229,13 @@ export default class FinalBossScene extends Phaser.Scene {
     this.registerDemonEvents();
 
     this.createHud();
-    this.startDialogue();
+
+    // Ismételt próbálkozásnál egyenesen a belépőre ugrunk: a checkpoint a harc KEZDETE.
+    if (this.skipDialogue) {
+      this.startEntrance();
+    } else {
+      this.startDialogue();
+    }
   }
 
   /**
@@ -468,15 +504,20 @@ export default class FinalBossScene extends Phaser.Scene {
     });
   }
 
-  // Vereség: vissza a Level 2-re, ahol a player a saját checkpointján (a boss-ajtónál) éled
-  // újra. Az ajtó onnantól KÖZVETLENÜL ide vezet (lásd Level2Scene.checkDoor), tehát a már
-  // legyőzött Mad Kinget nem kell újra végigverni.
+  /**
+   * Vereség: AZONNAL újraindul az aréna, a párbeszéd nélkül (lásd `RETRY_SCENE_KEY`).
+   *
+   * A `scene.start()` ugyanazon a példányon futtatja újra a `create()`-et, tehát a class
+   * field initializerek NEM futnak le még egyszer (CLAUDE.md 3. tanulság) — a `create()`
+   * eleje ezért üríti ki explicit a `fireballs`/`shades` tömböket és a flageket. A `demon`
+   * és a `player` új példányként jön létre, a régieket a scene shutdownja semmisíti meg.
+   */
   private scheduleDefeat(): void {
     this.outcomeScheduled = true;
     this.audio.stopMusic();
 
     this.time.delayedCall(DEFEAT_DELAY_MS, () => {
-      this.fadeToScene(FALLBACK_SCENE_KEY);
+      this.fadeToScene(RETRY_SCENE_KEY, { skipDialogue: true });
     });
   }
 
