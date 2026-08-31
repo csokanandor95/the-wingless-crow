@@ -656,6 +656,12 @@ export const PROP_TEXTURES = {
   // A Level 2-vel bejött két további prop UGYANEBBŐL a csomagból (`props-sliced/`).
   BARREL: 'prop-barrel',
   SIGN: 'prop-sign',
+  /**
+   * A Level 3 EGYETLEN propja: a GothicVania Church kőkorlátja (gyertyával a jobb pillérén).
+   * Más csomagból jön, mint a fentiek — ezért kap a Level 3 minden propja `PROP_TINT_NONE`-t
+   * (a church paletta ott a hazai pálya, nincs mit korrigálni).
+   */
+  CHURCH_RAIL: 'prop-church-rail',
 } as const;
 
 export type PropTexture = (typeof PROP_TEXTURES)[keyof typeof PROP_TEXTURES];
@@ -714,6 +720,8 @@ export const PROP_ASSETS: Record<
   // `tint` mező viszont KÖTELEZŐ, tehát itt is ki van írva, nem hallgatólagos default.
   [PROP_TEXTURES.BARREL]: { width: 24, height: 30, tint: PROP_TINT_NONE },
   [PROP_TEXTURES.SIGN]: { width: 37, height: 45, tint: PROP_TINT_NONE },
+  // Level 3 — a church korlát. Szintén a saját palettájában marad.
+  [PROP_TEXTURES.CHURCH_RAIL]: { width: 80, height: 64, tint: PROP_TINT_NONE },
 };
 
 export interface DecorPropDef {
@@ -758,6 +766,22 @@ export const BUILDING_TEXTURES = {
   HOUSE_A: 'building-house-a',
   HOUSE_B: 'building-house-b',
   HOUSE_C: 'building-house-c',
+  /**
+   * Level 3 — a GothicVania Church `backgrounds.png` öt panelje + a `column.png`.
+   *
+   * Ugyanaz a SZEREP, mint a házaknál (világ-koordinátás háttér-tömeg a `BUILDING_DEPTH`-en),
+   * de a felépítésük más: **teljesen átlátszatlan, 192 px magas falszakaszok, mind a négy
+   * szélükön `rgb(39,38,56)` kerettel** — pontosan a Level 3 háttérszíne. Ettől ülnek varrat
+   * nélkül a lapos háttéren, és ezért nincs a pályának parallax rétege.
+   *
+   * A `CHURCH_PILLAR` a kivétel: az alpha-kivágott `column.png`, tehát valódi sziluett.
+   */
+  CHURCH_WINDOW: 'building-church-window',
+  CHURCH_COLUMN: 'building-church-column',
+  CHURCH_ALTAR: 'building-church-altar',
+  CHURCH_GARGOYLE: 'building-church-gargoyle',
+  CHURCH_SCONCE: 'building-church-sconce',
+  CHURCH_PILLAR: 'building-church-pillar',
 } as const;
 
 export type BuildingTexture = (typeof BUILDING_TEXTURES)[keyof typeof BUILDING_TEXTURES];
@@ -766,6 +790,14 @@ export const BUILDING_ASSETS: Record<BuildingTexture, { width: number; height: n
   [BUILDING_TEXTURES.HOUSE_A]: { width: 168, height: 183 },
   [BUILDING_TEXTURES.HOUSE_B]: { width: 210, height: 244 },
   [BUILDING_TEXTURES.HOUSE_C]: { width: 221, height: 183 },
+  // Level 3 — a church fal-panelek. Mind 192 magas (a `backgrounds.png` teljes magassága);
+  // a `CHURCH_PILLAR` a különálló `column.png`.
+  [BUILDING_TEXTURES.CHURCH_WINDOW]: { width: 160, height: 192 },
+  [BUILDING_TEXTURES.CHURCH_COLUMN]: { width: 128, height: 192 },
+  [BUILDING_TEXTURES.CHURCH_ALTAR]: { width: 128, height: 192 },
+  [BUILDING_TEXTURES.CHURCH_GARGOYLE]: { width: 80, height: 192 },
+  [BUILDING_TEXTURES.CHURCH_SCONCE]: { width: 64, height: 192 },
+  [BUILDING_TEXTURES.CHURCH_PILLAR]: { width: 114, height: 190 },
 };
 
 /**

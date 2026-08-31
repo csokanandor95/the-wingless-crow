@@ -61,6 +61,13 @@ export function autoAdvanceDue(
 const PANEL_MARGIN_X = 40;
 const PANEL_GAP_ABOVE = 3;
 const PANEL_HEIGHT = 72;
+
+/**
+ * Mennyi helyet foglal a panel a `groundTop` ALATT. Ez a szám az, amiért mind a három
+ * párbeszédes aréna padlóvonala 369-en van: `369 + 75 = 444 <= 450` (a viewport magassága).
+ * Egy új aréna `GROUND_TOP`-jának ezt kell teljesítenie, különben a panel kilóg a képből.
+ */
+export const PANEL_RESERVE_PX = PANEL_GAP_ABOVE + PANEL_HEIGHT; // 75
 const PANEL_PADDING = 9;
 const PANEL_DEPTH = 90;
 

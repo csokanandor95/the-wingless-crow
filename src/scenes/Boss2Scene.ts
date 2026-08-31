@@ -68,11 +68,13 @@ const DEFEAT_DELAY_MS = 1400;
 const FADE_MS = 700;
 
 /**
- * A király a végső ellenfél felé nyit kaput. Amíg a `FinalBossScene` nincs regisztrálva,
- * visszatérünk a Level 2-re — ugyanaz a minta, amivel a Level2Scene kezelte a még nem létező
- * Boss2Scene-t, tehát a végső aréna elkészültekor ez magától él majd.
+ * A király legyőzése után NEM közvetlenül a végső ellenfél jön, hanem a **Level 3 – The Beast
+ * Dungeon**: a démon falkája őrzi az utolsó kaput.
+ *
+ * A `sceneExists()` guard megmarad — ugyanaz a minta, amivel ez a scene a még nem létező
+ * FinalBossScene-t kezelte —, hogy a lánc egy hiányzó scene esetén se szakadjon meg.
  */
-const FINAL_SCENE_KEY = 'FinalBossScene';
+const NEXT_SCENE_KEY = 'Level3Scene';
 const FALLBACK_SCENE_KEY = 'Level2Scene';
 
 /**
@@ -392,17 +394,14 @@ export default class Boss2Scene extends Phaser.Scene {
     this.time.delayedCall(VICTORY_DELAY_MS, () => {
       this.fadeToScene('NarrationScene', {
         lines: KING_VICTORY_NARRATION,
-        nextScene: this.finalSceneExists() ? FINAL_SCENE_KEY : FALLBACK_SCENE_KEY,
+        nextScene: this.sceneExists(NEXT_SCENE_KEY) ? NEXT_SCENE_KEY : FALLBACK_SCENE_KEY,
       });
     });
   }
 
-  /**
-   * A végső aréna még nem létezik. Amíg nincs regisztrálva, a győzelmi átvezető a Level 2-re
-   * tesz vissza — a `FinalBossScene` regisztrálásakor ez magától átvált rá.
-   */
-  private finalSceneExists(): boolean {
-    return FINAL_SCENE_KEY in this.scene.manager.keys;
+  /** Biztonsági háló: egy még nem regisztrált cél-scene esetén a lánc a Level 2-re esik vissza. */
+  private sceneExists(key: string): boolean {
+    return key in this.scene.manager.keys;
   }
 
   // Vereség: vissza a Level 2-re, ahol a player a saját checkpointján (a boss-ajtónál) éled

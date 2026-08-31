@@ -108,6 +108,9 @@ const BRACE_ANIM_MS = CHARGE_WINDUP_MS;
 
 // --- Frame-tartományok ------------------------------------------------------
 //
+// A tartományok EXPORTÁLTAK: a `bosses/BeastMasterAnimations.ts` UGYANEZT a lapot használja
+// (a mini-boss ugyanaz a lény, nagyban), tehát a frame-listáknak egyetlen forrása van.
+//
 //   sor 0: f0-4   IDLE      (5)  — álló póz, buzogány a vállnál (f5 ÜRES)
 //   sor 1: f6-11  ATTACK    (6)  — f6-8 windup, f9 a csapás fehér íve, f10-11 kikövetkezés
 //   sor 2-3: f12-21 RUN     (10) — felegyenesedett futás (f22-23 ÜRES)
@@ -115,19 +118,19 @@ const BRACE_ANIM_MS = CHARGE_WINDUP_MS;
 //   sor 6: f36-37 HURT      (2)  — hátracsapódó test, fej hátravetve (f38-41 ÜRES)
 //   sor 7: f42-44 BRACE     (3)  — leengedett buzogány, megtámasztott állás (f45-47 ÜRES)
 
-const IDLE_FRAMES = { start: 0, end: 4 };
-const LOCOMOTION_FRAMES = { start: 12, end: 21 };
-const CHARGE_FRAMES = { start: 24, end: 33 };
-const HIT_FRAMES = { start: 36, end: 37 };
-const BRACE_FRAMES = { start: 42, end: 44 };
+export const IDLE_FRAMES = { start: 0, end: 4 };
+export const LOCOMOTION_FRAMES = { start: 12, end: 21 };
+export const CHARGE_FRAMES = { start: 24, end: 33 };
+export const HIT_FRAMES = { start: 36, end: 37 };
+export const BRACE_FRAMES = { start: 42, end: 44 };
 
 /**
  * A támadás frame-jei. Ismételni NEM kell (szemben a CrowHarvesterrel, ahol az `f13`-at meg
  * kellett háromszorozni): itt `f6`, `f7`, `f8` három VALÓDI, különböző windup-póz, tehát a
  * csapás (`f9`) magától a 4. slotra esik.
  */
-const ATTACK_FRAMES = { start: 6, end: 11 };
-const ATTACK_SLOTS_BEFORE_STRIKE = 3;
+export const ATTACK_FRAMES = { start: 6, end: 11 };
+export const ATTACK_SLOTS_BEFORE_STRIKE = 3;
 /** A slot-idő a windupból SZÁMÍTÓDIK — így a sebzés és az ív nem tud elcsúszni. */
 export const ATTACK_SLOT_MS = ATTACK_WINDUP_MS / ATTACK_SLOTS_BEFORE_STRIKE; // 130
 const ATTACK_FRAME_COUNT = ATTACK_FRAMES.end - ATTACK_FRAMES.start + 1;

@@ -21,6 +21,9 @@ import {
   FRAME_SIZE as BEAST_FRAME_SIZE,
   TEXTURE_KEY as BEAST_TEXTURE_KEY,
 } from '../enemies/BeastAnimations';
+// A Beast Master UGYANAZT a `goatman.png` lapot használja, mint a Beast — új textúra tehát
+// nem kell, csak saját (lassabb) időzítésű animáció-kulcsok.
+import { createBeastMasterAnimations } from '../bosses/BeastMasterAnimations';
 import {
   createMadKingAnimations,
   FRAME_HEIGHT as KING_FRAME_HEIGHT,
@@ -69,6 +72,12 @@ import finalBossThemeUrl from '../../assets/audio/shadowforge-convergence.mp3';
 // vágott változat kell, nem a `Tracks mp3/` teljes szám: az AudioManager `loop: true`-val
 // játszik, tehát a Tracks-verzió intrója minden fordulónál újraszólna.
 import level2ThemeUrl from '../../assets/audio/whispers-of-the-abyss.mp3';
+// Level 3 (`3. Eclipsed Desolation (Loop)`) és a Beast Master arénája
+// (`5. Dread March (Loop)`) — UGYANAZ az AlkaKrab csomag, tehát nem nyit új jogi tételt.
+// Mindkettő a LOOP-változat: a playMusic() `loop: true`-val játszik, tehát a teljes szám
+// intrója minden fordulónál újraszólna.
+import level3ThemeUrl from '../../assets/audio/eclipsed-desolation.mp3';
+import boss3ThemeUrl from '../../assets/audio/dread-march.mp3';
 // Boss 2 (Mad King) theme: UGYANAZ az AlkaKrab csomag, `6. Veil of Eternal Nightfall (Loop)`.
 // Nem nyit új jogi tételt — ugyanaz a `2D helper/music/Loops mp3/` mappa, amiből a boss theme
 // és a Level 2 sávja is jön (a licenc-PDF átolvasása továbbra is nyitott, lásd CLAUDE.md).
@@ -279,6 +288,29 @@ import signUrl from '../../assets/props/gothic-town/sign.png';
 import houseAUrl from '../../assets/props/gothic-town/house-a.png';
 import houseBUrl from '../../assets/props/gothic-town/house-b.png';
 import houseCUrl from '../../assets/props/gothic-town/house-c.png';
+// Level 3 terrain-csempék. Forrás: GothicVania Church (Luis Zuno / @ansimuz), az
+// `Assets/ENVIRONMENT/tileset.png` 336x224-es lapjáról kivágva, ÁTMÉRETEZÉS NÉLKÜL. A
+// `ground-strip.png` és a `block-strip.png` SZÁRMAZTATOTT (variánsokat fűz egy csíkba, mert
+// egy tileSprite csak egy textúrát tud ismételni) — a forrás-rectek és az indoklás a
+// `src/levels/ChurchTileset.ts` fejlécében. FIGYELEM: a csomag licence PDF-ben van, és a
+// szövege NEM olvasható ki — publikálás előtt tisztázandó (lásd ugyanott).
+import churchGroundUrl from '../../assets/tiles/church/ground-strip.png';
+import churchBlockUrl from '../../assets/tiles/church/block-strip.png';
+import churchArchUrl from '../../assets/tiles/church/arch-gate.png';
+import churchPillarUrl from '../../assets/tiles/church/pillar.png';
+import churchBalustradeUrl from '../../assets/tiles/church/balustrade.png';
+import churchAltarWallUrl from '../../assets/tiles/church/altar-wall.png';
+import churchWallCrossUrl from '../../assets/tiles/church/wall-cross.png';
+import churchFillBlockUrl from '../../assets/tiles/church/fill-block.png';
+// A Level 3 háttér-paneljei: a csomag `backgrounds.png`-jének öt szelete + a `column.png`.
+// Mind ÁTLÁTSZATLAN, `rgb(39,38,56)` kerettel — pontosan a scene háttérszíne, ezért ülnek
+// varrat nélkül a lapos háttéren (és ezért nincs a pályának parallax rétege).
+import churchBgWindowUrl from '../../assets/props/church/bg-window.png';
+import churchBgColumnUrl from '../../assets/props/church/bg-column.png';
+import churchBgAltarUrl from '../../assets/props/church/bg-altar.png';
+import churchBgGargoyleUrl from '../../assets/props/church/bg-gargoyle.png';
+import churchBgSconceUrl from '../../assets/props/church/bg-sconce.png';
+import churchColumnUrl from '../../assets/props/church/column.png';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 import {
   BUILDING_TEXTURES,
@@ -288,6 +320,7 @@ import {
 } from '../levels/LevelGeometry';
 import { DOOR_APERTURE, TILE_TEXTURES } from '../levels/LevelTileset';
 import { TOWN_TILE_TEXTURES } from '../levels/GothicTownTileset';
+import { CHURCH_TILE_TEXTURES } from '../levels/ChurchTileset';
 
 /**
  * Az Ancient Demon mögötti derengés mérete és színe. A szélesség/magasság a démon látvány-
@@ -309,7 +342,7 @@ const LOADING_BAR_HEIGHT = 14;
  * fejlesztés közben ez a leggyorsabb út az új szakaszokhoz. **Commit előtt mindig állítsd
  * vissza `'Level1Scene'`-re.**
  */
-const START_SCENE = 'Level2Scene';
+const START_SCENE = 'Level3Scene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a
@@ -348,6 +381,8 @@ const MUSIC_TRACKS: Array<{ key: string; url: string }> = [
   { key: MUSIC_KEYS.LEVEL1_THEME, url: level1ThemeUrl },
   { key: MUSIC_KEYS.LEVEL2_THEME, url: level2ThemeUrl },
   { key: MUSIC_KEYS.FINAL_BOSS_THEME, url: finalBossThemeUrl },
+  { key: MUSIC_KEYS.LEVEL3_THEME, url: level3ThemeUrl },
+  { key: MUSIC_KEYS.BOSS3_THEME, url: boss3ThemeUrl },
 ];
 
 const SFX_SOUNDS: Array<{ key: string; url: string }> = [
@@ -443,11 +478,32 @@ const TOWN_TILE_IMAGES: Array<{ key: string; url: string }> = [
   { key: TOWN_TILE_TEXTURES.PLATFORM_FOOT, url: townFootUrl },
 ];
 
+// Level 3 terrain. A `GROUND` és a `PLATFORM_BLOCK` tileSprite-ként ismétlődik vízszintesen;
+// a többi egyszeri kép (az `ARCH_GATE` a boss-ajtó, SCALE 2-vel kirakva).
+const CHURCH_TILE_IMAGES: Array<{ key: string; url: string }> = [
+  { key: CHURCH_TILE_TEXTURES.GROUND, url: churchGroundUrl },
+  { key: CHURCH_TILE_TEXTURES.PLATFORM_BLOCK, url: churchBlockUrl },
+  { key: CHURCH_TILE_TEXTURES.ARCH_GATE, url: churchArchUrl },
+  { key: CHURCH_TILE_TEXTURES.PILLAR, url: churchPillarUrl },
+  { key: CHURCH_TILE_TEXTURES.BALUSTRADE, url: churchBalustradeUrl },
+  { key: CHURCH_TILE_TEXTURES.ALTAR_WALL, url: churchAltarWallUrl },
+  { key: CHURCH_TILE_TEXTURES.WALL_CROSS, url: churchWallCrossUrl },
+  { key: CHURCH_TILE_TEXTURES.FILL_BLOCK, url: churchFillBlockUrl },
+];
+
 // Level 2 háttér-épületek — világ-koordinátás díszlet (lásd src/levels/LevelDecor.ts).
 const BUILDING_IMAGES: Array<{ key: string; url: string }> = [
   { key: BUILDING_TEXTURES.HOUSE_A, url: houseAUrl },
   { key: BUILDING_TEXTURES.HOUSE_B, url: houseBUrl },
   { key: BUILDING_TEXTURES.HOUSE_C, url: houseCUrl },
+  // Level 3 — a church fal-panelek. Ugyanaz a SZEREP (világ-koordinátás háttér-tömeg a
+  // BUILDING_DEPTH-en), de átlátszatlan falszakaszok, nem sziluettek.
+  { key: BUILDING_TEXTURES.CHURCH_WINDOW, url: churchBgWindowUrl },
+  { key: BUILDING_TEXTURES.CHURCH_COLUMN, url: churchBgColumnUrl },
+  { key: BUILDING_TEXTURES.CHURCH_ALTAR, url: churchBgAltarUrl },
+  { key: BUILDING_TEXTURES.CHURCH_GARGOYLE, url: churchBgGargoyleUrl },
+  { key: BUILDING_TEXTURES.CHURCH_SCONCE, url: churchBgSconceUrl },
+  { key: BUILDING_TEXTURES.CHURCH_PILLAR, url: churchColumnUrl },
 ];
 
 // Hangulati propok — nem ütköző háttér-dekoráció (lásd src/levels/LevelDecor.ts). Az első
@@ -461,6 +517,9 @@ const PROP_IMAGES: Array<{ key: string; url: string }> = [
   { key: PROP_TEXTURES.CRATE_STACK, url: crateStackUrl },
   { key: PROP_TEXTURES.BARREL, url: barrelUrl },
   { key: PROP_TEXTURES.SIGN, url: signUrl },
+  // Level 3 — a church kőkorlát. MÁSIK csomagból jön, ezért kap a Level 3 minden propja
+  // PROP_TINT_NONE-t (ott ez a hazai paletta).
+  { key: PROP_TEXTURES.CHURCH_RAIL, url: churchBalustradeUrl },
 ];
 
 export default class BootScene extends Phaser.Scene {
@@ -541,6 +600,7 @@ export default class BootScene extends Phaser.Scene {
       ...BACKGROUND_IMAGES,
       ...TILE_IMAGES,
       ...TOWN_TILE_IMAGES,
+      ...CHURCH_TILE_IMAGES,
       ...PROP_IMAGES,
       ...BUILDING_IMAGES,
     ]) {
@@ -555,6 +615,7 @@ export default class BootScene extends Phaser.Scene {
     createCrowHarvesterAnimations(this);
     createGravecallerAnimations(this);
     createBeastAnimations(this);
+    createBeastMasterAnimations(this);
     createGraftedWingBreakerAnimations(this);
     createMadKingAnimations(this);
     createAncientDemonAnimations(this);

@@ -2,21 +2,12 @@ import Phaser from 'phaser';
 import Player, { LadderContact } from '../player/Player';
 import PlayerController from '../player/PlayerController';
 import Fireball from '../combat/Projectile';
-import CrowHarvester from '../enemies/CrowHarvester';
-import Gravecaller, {
-  PROJECTILE_DAMAGE as GRAVECALLER_PROJECTILE_DAMAGE,
-  PROJECTILE_SIZE as GRAVECALLER_PROJECTILE_SIZE,
-  PROJECTILE_SPEED as GRAVECALLER_PROJECTILE_SPEED,
-} from '../enemies/Gravecaller';
 import CheckpointSystem from '../systems/CheckpointSystem';
 import ParallaxBackground, {
   LEVEL1_BACKGROUND_LAYERS,
 } from '../systems/ParallaxBackground';
 import AudioManager, {
   bindPlayerSfx,
-  GRAVECALLER_DEATH_VOLUME,
-  HARVESTER_DEATH_VOLUME,
-  DEATH_SFX_DETUNE_RANGE,
   LEVEL_MUSIC_FADE_IN_MS,
   LEVEL_MUSIC_VOLUME,
   MUSIC_KEYS,
@@ -28,14 +19,12 @@ import SpikeField, { SPIKE_DAMAGE, SPIKE_KNOCKBACK_Y } from '../hazards/SpikeFie
 import SwingingReaper, { REAPER_DAMAGE } from '../hazards/SwingingReaper';
 import createDecorProps from '../levels/LevelDecor';
 import { createGroundSegments, createPlatforms } from '../levels/LevelTerrain';
+import LevelEnemies from '../levels/LevelEnemies';
 import {
   DECOR_PROPS,
   DOOR,
   DOOR_CHECKPOINT,
   ENEMY_SPAWNS,
-  enemyChaseBounds,
-  enemySpawnOffset,
-  enemyType,
   FALL_DEATH_Y,
   FALL_DEPTH,
   GROUND_SEGMENTS,
@@ -49,7 +38,6 @@ import {
   SPIKE_FIELDS,
   START_X,
   START_Y,
-  surfaceSpan,
   TUTORIAL_HINTS,
   WORLD_HEIGHT,
   WORLD_WIDTH,
@@ -65,17 +53,6 @@ import {
   TILE_TEXTURES,
 } from '../levels/LevelTileset';
 import type { Damageable, PhysicsOverlapObject } from '../combat/DamageSystem';
-
-/**
- * Amit a scene EGY enemytől elvár, típustól függetlenül. A CrowHarvester és a Gravecaller
- * strukturálisan kielégíti — nincs közös ősük, és nem is kell: a scene-nek pontosan ennyi
- * kell, és ennyivel a következő enemy típus is ingyen beköthető.
- */
-interface LevelEnemy extends Damageable {
-  readonly y: number;
-  getMaxHP(): number;
-  update(player: Player): void;
-}
 
 const RESPAWN_DELAY_MS = 1200; // rövid szünet a halál-animáció után, mielőtt visszatér a checkpointra
 /** Az ajtó-átmenet hossza. A kamera-fade ÉS a zene kifadelése is ebből dolgozik. */
@@ -121,10 +98,11 @@ export default class Level1Scene extends Phaser.Scene {
   private midCheckpointActivated = false;
 
   private fireballs: Fireball[] = [];
-  /** A Gravecallerek lövedékei — külön tömb, mert a PLAYERT sebzik (mint a bossProjectiles). */
-  private enemyProjectiles: Fireball[] = [];
-  private enemies: CrowHarvester[] = [];
-  private gravecallers: Gravecaller[] = [];
+  /**
+   * Az enemyk spawnolása / respawnja / frissítése + a Gravecallerek boltjai. A `create()`-ben
+   * jön létre, tehát a tömbjei scene-restartkor automatikusan frissek (CLAUDE.md 3. tanulság).
+   */
+  private levelEnemies!: LevelEnemies;
 
   constructor() {
     super('Level1Scene');
@@ -137,9 +115,6 @@ export default class Level1Scene extends Phaser.Scene {
     // őket — különben a régi, már megsemmisített (destroyed body-jú) CrowHarvester/Fireball
     // objektumok bennmaradnának, és az update() rajtuk hívott setVelocityX stb. elszállna.
     this.fireballs = [];
-    this.enemyProjectiles = [];
-    this.enemies = [];
-    this.gravecallers = [];
     this.reapers = [];
     this.isTransitioning = false;
     this.respawnScheduled = false;
@@ -211,16 +186,16 @@ export default class Level1Scene extends Phaser.Scene {
     this.physics.add.collider(this.player, ground);
     this.physics.add.collider(this.player, platforms);
 
-    this.spawnEnemies();
+    this.levelEnemies = new LevelEnemies(this, ENEMY_SPAWNS, LEVEL1_GEOMETRY, this.audio);
+    this.levelEnemies.spawn();
     // FIGYELEM: ezek a colliderek az enemy-tömbök REFERENCIÁJÁRA kötődnek, és a Phaser
-    // minden physics stepben újraiterálja a tartalmukat. Ezért tudja a resetEnemies() helyben
-    // (splice + push) kicserélni a lakóikat anélkül, hogy újra kellene regisztrálni bármit —
-    // és ezért TILOS a tömböket új tömbre cserélni (lásd CLAUDE.md 2. tanulság).
+    // minden physics stepben újraiterálja a tartalmukat. Ezért tudja a LevelEnemies.reset()
+    // helyben (splice + push) kicserélni a lakóikat anélkül, hogy újra kellene regisztrálni
+    // bármit — és ezért TILOS a tömböket új tömbre cserélni (lásd CLAUDE.md 2. tanulság).
     //
-    // A két enemy-fajta ugyanazt a négy regisztrációt kapja: a handlerek csak a Damageable
-    // felületet használják, tehát típusfüggetlenek.
-    const enemyGroups: Phaser.Physics.Arcade.Sprite[][] = [this.enemies, this.gravecallers];
-    for (const group of enemyGroups) {
+    // Mindhárom enemy-fajta ugyanazt a négy regisztrációt kapja: a handlerek csak a
+    // Damageable felületet használják, tehát típusfüggetlenek.
+    for (const group of this.levelEnemies.groups()) {
       this.physics.add.collider(group, ground);
       this.physics.add.collider(group, platforms);
       this.physics.add.overlap(
@@ -251,7 +226,7 @@ export default class Level1Scene extends Phaser.Scene {
     // Az enemy-lövedékek a PLAYERT sebzik — ugyanaz a minta, mint a BossScene
     // bossProjectiles × player overlapje.
     this.physics.add.overlap(
-      this.enemyProjectiles,
+      this.levelEnemies.projectiles,
       this.player,
       this.handleEnemyProjectileHitPlayer,
       undefined,
@@ -259,7 +234,7 @@ export default class Level1Scene extends Phaser.Scene {
     );
 
     // Mindkét lövedék-fajta becsapódik a terepbe.
-    for (const projectiles of [this.fireballs, this.enemyProjectiles]) {
+    for (const projectiles of [this.fireballs, this.levelEnemies.projectiles]) {
       for (const surface of [ground, platforms]) {
         this.physics.add.collider(projectiles, surface, (projectileObj) => {
           const projectile = projectileObj as Fireball;
@@ -417,99 +392,14 @@ export default class Level1Scene extends Phaser.Scene {
     });
   }
 
-  /**
-   * A séta-körzet (`patrolMinX/MaxX`) és az ÜLDÖZÉSI határ két külön dolog: az előbbi az
-   * `ENEMY_SPAWNS` adata, az utóbbit az `enemyChaseBounds()` VEZETI LE a felület pereméből
-   * és a spike-mezőkből. Így a földi enemy a szakadék szélééig követi a playert (nem ütközik
-   * láthatatlan falba a pálya közepén), de nem esik le és nem lép a tüskékre.
-   */
-  private spawnEnemies(): void {
-    for (const def of ENEMY_SPAWNS) {
-      const surface = surfaceSpan(def.surfaceId);
-      const chase = enemyChaseBounds(def);
-      // A séta- és üldözési határok mindkét lénynél ugyanaz az objektum-alak
-      // (GravecallerConfig ≡ CrowHarvesterConfig), csak a spawn Y talp-offsetje típusfüggő.
-      const bounds = {
-        patrolMinX: def.patrolMinX,
-        patrolMaxX: def.patrolMaxX,
-        chaseMinX: chase.min,
-        chaseMaxX: chase.max,
-      };
-      const spawnY = surface.top - enemySpawnOffset(def);
 
-      if (enemyType(def) === 'gravecaller') {
-        const caster = new Gravecaller(this, def.x, spawnY, bounds);
-
-        // A lövedéket a scene hozza létre (mint a player 'fireball-cast'-jánál és a boss
-        // 'boss-projectile'-jánál) — a Gravecaller csak a helyet és az irányt emittálja.
-        caster.on('gravecaller-projectile', (x: number, y: number, direction: number) => {
-          this.enemyProjectiles.push(
-            new Fireball(this, x, y, direction, {
-              texture: 'gravecaller-projectile-placeholder',
-              damage: GRAVECALLER_PROJECTILE_DAMAGE,
-              speed: GRAVECALLER_PROJECTILE_SPEED,
-              size: GRAVECALLER_PROJECTILE_SIZE,
-            })
-          );
-          this.audio.playSfx(SFX_KEYS.GRAVECALLER_CAST);
-        });
-
-        // A haláltusa a `die()`-ból jön, NEM a `destroy()`-ból — így az alábbi
-        // resetEnemies() (ami minden respawnnál mindet megsemmisíti) néma marad.
-        caster.on('gravecaller-death', () =>
-          this.audio.playSfx(SFX_KEYS.GRAVECALLER_DEATH, {
-            volume: GRAVECALLER_DEATH_VOLUME,
-            detuneRange: DEATH_SFX_DETUNE_RANGE,
-          })
-        );
-
-        this.gravecallers.push(caster);
-        continue;
-      }
-
-      const enemy = new CrowHarvester(this, def.x, spawnY, bounds);
-
-      // Csapás-hang. Távolság-alapú némítás NEM kell: a CrowHarvester csak ATTACK_RANGE-en
-      // (42px) belül támad, tehát egy csapkodó lény definíció szerint a player mellett áll,
-      // és mindig a képernyőn van.
-      enemy.on('harvester-attack', () => this.audio.playSfx(SFX_KEYS.ENEMY_SWING));
-
-      enemy.on('harvester-death', () =>
-        this.audio.playSfx(SFX_KEYS.HARVESTER_DEATH, {
-          volume: HARVESTER_DEATH_VOLUME,
-          detuneRange: DEATH_SFX_DETUNE_RANGE,
-        })
-      );
-
-      this.enemies.push(enemy);
-    }
-  }
-
-  /**
-   * A player halálakor az enemyk is újraélednek (a level1-layout spec szerint) — így egy
-   * szakaszt nem lehet ismételt halálokkal "lekoptatni".
-   *
-   * A tömb IDENTITÁSA nem változhat: a create()-ben regisztrált colliderek/overlapek erre a
-   * referenciára kötődnek (CLAUDE.md 2. tanulság), ezért splice + push, sosem új tömb.
-   */
-  private resetEnemies(): void {
-    for (const group of [this.enemies, this.gravecallers]) {
-      for (const enemy of group) {
-        enemy.destroy();
-      }
-      group.splice(0, group.length);
-    }
-    this.spawnEnemies();
-  }
-
-  /** Ugyanaz a helyben-csere, mint a resetEnemies()-nél: a lövedék-colliderek is a tömbre kötnek. */
+  /** A player tűzgolyói + a Gravecallerek boltjai — mindkettő helyben ürül. */
   private clearFireballs(): void {
-    for (const projectiles of [this.fireballs, this.enemyProjectiles]) {
-      for (const projectile of projectiles) {
-        projectile.destroy();
-      }
-      projectiles.splice(0, projectiles.length);
+    for (const projectile of this.fireballs) {
+      projectile.destroy();
     }
+    this.fireballs.splice(0, this.fireballs.length);
+    this.levelEnemies.clearProjectiles();
   }
 
   update(_time: number, delta: number): void {
@@ -532,12 +422,11 @@ export default class Level1Scene extends Phaser.Scene {
       `HP: ${this.player.getHP()}/${this.player.getMaxHP()} | ${this.player.playerState}`
     );
 
-    this.updateEnemies(this.enemies);
-    this.updateEnemies(this.gravecallers);
+    this.levelEnemies.update(this.player);
 
     // Az inaktív lövedékek kitakarítása MINDIG helyben, splice()-szal: a tömbök referenciája
     // be van kötve a physics.add.overlap-ba (CLAUDE.md 2. tanulság).
-    for (const projectiles of [this.fireballs, this.enemyProjectiles]) {
+    for (const projectiles of [this.fireballs, this.levelEnemies.projectiles]) {
       for (let i = projectiles.length - 1; i >= 0; i--) {
         if (!projectiles[i].active) {
           projectiles.splice(i, 1);
@@ -582,7 +471,7 @@ export default class Level1Scene extends Phaser.Scene {
       this.time.delayedCall(RESPAWN_DELAY_MS, () => {
         const { x, y } = this.checkpoint.getRespawnPoint();
         this.clearFireballs();
-        this.resetEnemies();
+        this.levelEnemies.reset();
         this.player.respawn(x, y);
         this.respawnScheduled = false;
         this.fallDeathTriggered = false;
@@ -590,22 +479,6 @@ export default class Level1Scene extends Phaser.Scene {
         // épp a tüskékbe visszaéledő player egy ablaknyi ideig sebezhetetlen lenne.
         this.hazardGate.reset();
       });
-    }
-  }
-
-  /**
-   * Egy enemy-csoport frissítése. Típusfüggetlen: a `LevelEnemy` felület pontosan annyit
-   * kér, amennyit a scene használ, tehát a következő enemy típus ingyen beköthető.
-   */
-  private updateEnemies(enemies: LevelEnemy[]): void {
-    for (const enemy of enemies) {
-      // Biztosíték: a patrol-határok ezt elvileg kizárják, de egy szakadékba került enemy
-      // enélkül némán "patrolozna" a világ alján, a képernyőn kívül.
-      if (!enemy.isDead() && enemy.y > FALL_DEATH_Y) {
-        enemy.takeDamage(enemy.getMaxHP());
-        continue;
-      }
-      enemy.update(this.player);
     }
   }
 

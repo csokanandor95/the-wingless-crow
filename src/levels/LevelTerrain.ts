@@ -27,6 +27,12 @@ import {
   TOWN_TERRAIN_TOP_Y,
   TOWN_TILE_TEXTURES,
 } from './GothicTownTileset';
+import {
+  CHURCH_BLOCK_TILE_HEIGHT,
+  CHURCH_GROUND_TILE_HEIGHT,
+  CHURCH_TERRAIN_TOP_Y,
+  CHURCH_TILE_TEXTURES,
+} from './ChurchTileset';
 
 /**
  * A talaj-szegmensek és a lebegő platformok felépítése — a `Level1Scene`-ből kiemelve, hogy a
@@ -39,6 +45,9 @@ import {
  *   LÁTHATATLAN marad, és a látványt egy tileSprite + a két végzáró kép adja.
  * - **`'gothic-town'`** — a Level 2. Ugyanaz a szétválasztás, de más csempegeometriával, és
  *   a platformoknak KÉT változatuk van (állvány / konzol) — lásd `createTownPlatformVisual`.
+ * - **`'church'`** — a Level 3, és a három közül a LEGEGYSZERŰBB: se végzáró, se láb, se
+ *   szakadék-perem. Nem hiányosság, hanem a csempekészlet természete — lásd
+ *   `createChurchPlatformVisual`.
  * - **`'placeholder'`** — tileset nélküli fallback. A fizikai sprite egyszerűen LÁTHATÓ
  *   marad, és nincs mellette külön látvány-objektum. Ez nem hanyagság: a placeholder textúra
  *   egyszínű téglalap, amit a vízszintes skálázás nem tud torzítani — tehát pont az a
@@ -47,7 +56,7 @@ import {
  * *(A `'cathedral'` korábban `'tiles'` volt. A név akkor vált félrevezetővé, amikor a Level 2
  * megkapta a saját, szintén valódi csempekészletét.)*
  */
-export type TerrainSkin = 'cathedral' | 'gothic-town' | 'placeholder';
+export type TerrainSkin = 'cathedral' | 'gothic-town' | 'church' | 'placeholder';
 
 /**
  * A LÁTHATATLAN fizikai testek csempemérete (`ground-placeholder` 64x32,
@@ -83,6 +92,11 @@ export function createGroundSegments(
 
     if (skin === 'gothic-town') {
       createTownGroundVisual(scene, segment, width);
+      continue;
+    }
+
+    if (skin === 'church') {
+      createChurchGroundVisual(scene, segment, width);
       continue;
     }
 
@@ -134,6 +148,33 @@ function createTownGroundVisual(
     .setDepth(TERRAIN_DEPTH);
 }
 
+/**
+ * A church talaj. **Szakadék-végzáró NINCS**, ugyanabból az okból, mint a `gothic-town`-nál:
+ * a csomagban nem létezik ilyen csempe (a saját `example_2/3`-jának talaja végig folyamatos),
+ * a perem alatti test viszont sima sötét kő — a nyers függőleges vágás tehát tiszta kőfalként
+ * olvas. A Level 1-nél azért kellett végzáró, mert ANNAK a csempéjének díszített, világos
+ * oldala van.
+ *
+ * A rajz `CHURCH_GROUND_SURFACE_OFFSET_Y`-nal a `GROUND_TOP` FÖLÉ kerül, hogy a csempe
+ * törmelék-pereme pontosan a fizikai felszínre essen.
+ */
+function createChurchGroundVisual(
+  scene: Phaser.Scene,
+  segment: GroundSegmentDef,
+  width: number
+): void {
+  scene.add
+    .tileSprite(
+      segment.startX,
+      CHURCH_TERRAIN_TOP_Y,
+      width,
+      CHURCH_GROUND_TILE_HEIGHT,
+      CHURCH_TILE_TEXTURES.GROUND
+    )
+    .setOrigin(0, 0)
+    .setDepth(TERRAIN_DEPTH);
+}
+
 export function createPlatforms(
   scene: Phaser.Scene,
   defs: PlatformDef[],
@@ -163,6 +204,11 @@ export function createPlatforms(
       // A `level` csak itt kell: az állvány/konzol döntés a pálya TELJES geometriájából
       // származik (van-e alatta talaj, van-e alatta másik lap), nem a lap saját adatából.
       createTownPlatformVisual(scene, def, level ? platformHasLegs(def, level) : false);
+      continue;
+    }
+
+    if (skin === 'church') {
+      createChurchPlatformVisual(scene, def);
       continue;
     }
 
@@ -263,4 +309,34 @@ function createTownPlatformVisual(
   ] as const) {
     scene.add.image(x, top, texture).setOrigin(0, 0).setDepth(TERRAIN_DEPTH);
   }
+}
+
+/**
+ * A church lebegő platform: egyetlen tileSprite-nyi kőblokk-sor, **végzáró és láb NÉLKÜL**.
+ *
+ * Ez a három skin közül a legegyszerűbb, és nem hanyagságból:
+ *
+ *  - **végzáró nem kell** — a 32×32-es blokk éle MAGA a rajzolt falazat-perem (a mért
+ *    oszlop-eltérés a blokkhatáron 167, a blokkon belül 18), tehát a lap két vége ugyanúgy
+ *    zár, mint a belseje. A Level 1/2 végzárói ott a lap SIMA vágását takarták el;
+ *  - **láb nem kell** — a csomag `example_2/3`-ja a blokkokat szabadon lebegve rakja ki, és
+ *    a Level 3 minden lapja galéria a szabad tér fölött, nem egy talajon álló állvány.
+ *
+ * A rajz a `platformTop()`-tól INDUL és 32 px magas, míg a fizikai lap 16 — az alsó 16 px
+ * tehát a lap alatt lóg. Ez szándékos: a blokk így tömbnek látszik, nem papírlapnak, és a
+ * járható felszín a világos cap tetején van.
+ */
+function createChurchPlatformVisual(scene: Phaser.Scene, def: PlatformDef): void {
+  const left = platformLeft(def);
+
+  scene.add
+    .tileSprite(
+      left,
+      platformTop(def),
+      platformRight(def) - left,
+      CHURCH_BLOCK_TILE_HEIGHT,
+      CHURCH_TILE_TEXTURES.PLATFORM_BLOCK
+    )
+    .setOrigin(0, 0)
+    .setDepth(TERRAIN_DEPTH);
 }

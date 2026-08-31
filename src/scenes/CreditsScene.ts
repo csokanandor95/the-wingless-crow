@@ -24,9 +24,11 @@ const SECTION_FONT_SIZE = '13px';
 const PROGRESS_REGISTRY_KEYS = [
   'bossDefeated',
   'kingDefeated',
+  'beastMasterDefeated',
   'demonDefeated',
   'checkpoint',
   'level2Checkpoint',
+  'level3Checkpoint',
 ] as const;
 
 interface CreditLine {

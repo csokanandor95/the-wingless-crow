@@ -793,6 +793,44 @@ Nem cél precíz platformer fizika létrehozása, mint például Celeste-ben.
 
 ---
 
+## Boss 3 (mini-boss) – The Beast Master *(2026-08-31)*
+
+A `Level 3 – The Beast Dungeon` záró harca, a Mad King és a végső ellenfél KÖZÖTT. Fix
+képernyős aréna (`Boss3Scene`), a Boss 2 szerkezetével: párbeszéd → cím-kártya → harc.
+
+**Ugyanaz a lény, mint az Enemy 3 (Beast), csak nagyobb** — ugyanaz a `goatman.png` lap
+`SCALE = 2`-vel, tehát a látvány ~60×100 px (a player 28×46). **NINCS fázisa** (user-döntés):
+a harc ritmusát nem fázisváltás adja, hanem a FALKA.
+
+| | érték | miért |
+|---|---|---|
+| `MAX_HP` | 180 | mini-boss: a Beast (50) fölött, a Wing-Breaker (240) alatt |
+| `ATTACK_RANGE` / `CHARGE_HIT_RANGE` | 74 | a MÉRT forrás-nyúlások × SCALE + a player fél teste |
+| `ATTACK_WINDUP_MS` | 520 | **LEVEZETETT** — lásd lentebb |
+| `CHARGE_SPEED` / `CHARGE_MAX_MS` | 380 / 1800 | 684 px út: átszeli a 800 px-es arénát |
+| `MOVE_SPEED` | 110 | SZÁNDÉKOSAN lassabb a Beastnél (130): nagyobb, nehezebb test |
+
+**A windup fairness-levezetése** (a Mad King módszere). A kétszeres mérettel a hatótáv
+44 → 74 nőtt, tehát a Beast 390 ms-a itt már NEM lenne elég. Pontblank helyzetből
+(`24 + 14 = 38 px`) a kikerüléshez 84 px-re kell jutni:
+
+- hátralépés (46 px @ 200 px/s) → 230 ms
+- álló ugrás (√(84²−38²) = 75 px emelkedés) → 174 ms
+- \+ emberi reakcióidő → 250 ms
+
+A padlót a LASSABB válasz adja: **480 ms**. Ezért 520 — így **MINDKÉT válasz** működik, nem
+csak az ugrás. Unit teszt őrzi.
+
+**A FALKA** (user-döntés): HP-küszöbhöz kötött, egyszeri esemény, nem fázis.
+**66 %-nál egy CrowHarvester, 33 %-nál egy Gravecaller.** A boss nem hozza létre őket, csak
+`beast-master-summon` eventet emittál — a démon idézésének delegálási mintája, tehát ÚJ
+lény-osztály nem kellett.
+
+**A falnak rohanó roham a harc fő punish-ablaka** (`STAGGER_MS = 1400`, a Mad King
+`SLAM_RECOVERY_MS`-ének szerepe): a levezetés szerint elég két kardcsapásra és a kilépésre.
+
+---
+
 # 14. Pályák
 
 A végleges játékhoz például 3–5 rövid pálya készülhet.
@@ -978,6 +1016,39 @@ Romos kastély.
 > spike, reaper) csak mennyiségi ismétlés lenne. Ha később mégis kell, a `Level2Layout.ts`
 > adatmodulja 1:1-ben lemásolható egy `Level3Layout.ts`-be, és a király ajtaja elé
 > beilleszthető.
+
+### Level 3 – The Beast Dungeon *(2026-08-31, user-döntés — a fenti helyére)*
+
+**A harmadik pálya MÉGIS elkészült, de NEM a „Throne of the Damned" tartalmával.** A fenti
+kihagyás indoka az volt, hogy egy harmadik pálya a meglévő elemekből csak *mennyiségi*
+ismétlés lenne — és pontosan ez változott meg: időközben elkészült az **Enemy 3 (Beast)**,
+ami egy ÚJ nyomásformát hoz (elkötelezett, telegrafált roham). A Level 3 erre épül, nem a
+meglévők ismétlésére.
+
+Gótikus templom-kripta belső (**GothicVania Church**, Luis Zuno), **4200 px** — érdemben
+rövidebb a Level 1-nél (6000) és a Level 2-nél (7200), cserébe SŰRŰBB: 14 ellenfél.
+
+**A pálya tézise:** *a Beast a sík padlón támad, ami elől fel lehet ugrani a galériákra — de
+ott Gravecallerek tüzelnek.*
+
+Ehhez egy ÚJ design-eszköz kellett, a **MENNYEZET**. A Beast rohamát eddig „oldalra lépéssel
+vagy átugrással" lehetett kikerülni; egy dungeon-folyosóban viszont az oldalra lépés nem
+létezik (a roham MAGA a folyosó), a menekülés pedig nem működik (roham 320 px/s vs. player
+200). **Marad az ugrás** — ettől lesz a galéria alja gameplay-elem, nem díszlet.
+
+A galéria magassága (`GALLERY_RISE = +110`) három, egymástól független kényszer metszete:
+felugorható (≤ 117), alatta átsétálható (≥ 62), de alatta NEM ugorható (< 218).
+
+Hat „karám", öt 120 px-es gödörrel elválasztva; a gödör nem kihívás, hanem a karám FALA (az
+`enemyChaseBounds()` a perem előtt megállítja a Beastet). Szakaszok:
+
+  A előcsarnok · B első karám (Beast #1) · C galéria-futam (tüskék a lap-hézagok alatt) ·
+  D kettős karám (Beast #2, MINDKÉT menekülő-lapon caster) · E kripta-folyosó (levegővétel +
+  tüskemező, itt a köztes checkpoint) · F a kapu (Beast #3, a legszűkebb karám)
+
+**Nincs létra, mozgó platform és lengő kasza** — rövid pálya, az identitása a Beast és a
+mennyezet, nem a traverzálás. (Kasza konkrétan nem is lehetne: egy penge a karám fölött pont
+a menekülő-ugrásba kényszerítené a playert.)
 
 ### Final Level – The Broken Gate
 

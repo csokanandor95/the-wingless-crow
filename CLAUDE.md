@@ -427,6 +427,69 @@ belépő → harc ] → NarrationScene → (végső boss, köv. iteráció)`.
   hogy visszajusson. Most a legyőzött király után az ajtó KÖZVETLENÜL a végső arénába visz,
   átvezető nélkül (a Level 1 azonos döntése).
 
+**LEVEL 3 – THE BEAST DUNGEON + BOSS 3 – THE BEAST MASTER KÉSZ (2026-08-31).** A lánc
+BŐVÜLT, nem lezárult: `... → Boss 2 (Mad King) → átvezető → **Level 3** → (ajtó, E) →
+átvezető → **Boss 3 (Beast Master)** → átvezető → FinalBossScene → ending → credits`.
+Új modulok: `levels/Level3Layout.ts`, `levels/ChurchTileset.ts`, `levels/LevelEnemies.ts`,
+`scenes/Level3Scene.ts`, `scenes/Boss3Scene.ts`, `bosses/BeastMaster.ts`,
+`bosses/BeastMasterAnimations.ts`.
+
+- **ELTÉR a korábbi `Project_plan.md`-döntéstől (a dokumentum frissítve):** a Level 3-at
+  2026-08-30-án KIVETTÜK, azzal az indokkal, hogy „a meglévő elemekből csak mennyiségi
+  ismétlés lenne". **Pontosan ez változott meg**: időközben elkészült az Enemy 3 (Beast), ami
+  egy ÚJ nyomásformát hoz. A pálya erre épül, nem a meglévők ismétlésére. A téma is más:
+  nem „Throne of the Damned" (az a Boss 2 arénája maradt), hanem gótikus templom-kripta.
+- **A pálya tézise:** *a Beast a sík padlón támad, ami elől fel lehet ugrani a galériákra —
+  de ott Gravecallerek tüzelnek.* Minden szám ezt az egy hurkot szolgálja.
+- **ÚJ DESIGN-ESZKÖZ: a MENNYEZET.** A Beast rohamát eddig „oldalra lépéssel vagy
+  átugrással" lehetett kikerülni. Egy dungeon-folyosóban viszont az oldalra lépés nem létezik
+  (a roham MAGA a folyosó), és elfutni sem lehet (`CHARGE_SPEED` 320 > `MOVE_SPEED` 200) —
+  **marad az ugrás**. Ettől lesz a galéria alja gameplay-elem, nem díszlet.
+- **`GALLERY_RISE = +110` HÁROM független kényszer metszete:** felugorható
+  (≤ `MAX_SAFE_RISE` 117), alatta átsétálható (≥ `MIN_WALK_UNDER_RISE` 62), de alatta NEM
+  ugorható (< `MIN_JUMP_CLEARANCE_RISE` 218). Ha bármelyik sérül, a pálya elveszti a tézisét.
+- **A Gravecaller-szeparáció LEVEZETETT, nem hangolt:** a caster a saját lapján állót
+  eltalálja (a bolt-sáv `[T−31, T−15]` a test `[T−46, T]`-jén belül), a padlón állót viszont
+  sem el nem találja, sem **ÉSZRE nem veszi** (105 px > `VERTICAL_DETECTION_RANGE` 80).
+- **4200 px, 14 ellenfél** (3 Beast + 6 Gravecaller + 5 CrowHarvester) — rövidebb ÉS sűrűbb,
+  mint a Level 2 (7200 px, 15 lény). Hat karám, öt 120 px-es gödörrel; a gödör nem kihívás,
+  hanem a karám FALA (az `enemyChaseBounds()` a perem előtt megállítja a Beastet).
+- **Nincs létra, mozgó platform, lengő kasza.** A kasza konkrétan nem is lehetne: egy penge a
+  karám fölött pont a menekülő-ugrásba kényszerítené a playert.
+- **A háttér LAPOS SZÍN, parallax NÉLKÜL** — és ez MÉRÉS, nem ízlés. Lásd a 28. tanulságot.
+- Zene: `assets/audio/eclipsed-desolation.mp3` (pálya) és `dread-march.mp3` (boss), mindkettő
+  az AlkaKrab csomag eddig kihasználatlan loopja → **nem nyitott új jogi tételt**.
+- **A `Level3Scene` ajtaja a `beastMasterDefeated` flagtől függ**, a Level 1/2 mintájára: a
+  legyőzött Master után KÖZVETLENÜL a végső arénába visz, átvezető nélkül.
+
+**A BEAST MASTER (Boss 3)** ugyanaz a `goatman.png` lap `SCALE = 2`-vel; a `Beast` state
+machine-je boss-léptékben, **fázis NÉLKÜL** (user-döntés).
+- **A windup 390 → 520, és ez LEVEZETETT**: a kétszeres mérettel a hatótáv 44 → 74 nőtt,
+  tehát pontblank helyzetből (38 px) a kikerüléshez 84 px kell — hátralépéssel 230 ms,
+  ugrással 174 ms, plusz 250 ms reakcióidő. A padlót a LASSABB válasz adja (480), ezért 520.
+  **Így MINDKÉT válasz működik, nem csak az ugrás** — unit teszt őrzi.
+- **A FALKA** (user-döntés): `66 % → 1 CrowHarvester`, `33 % → 1 Gravecaller`. Egyszeri,
+  küszöbönként pontosan egyszer. A boss csak `beast-master-summon` eventet emittál (a démon
+  idézésének mintája) — **új lény-osztály NEM kellett**.
+- **Külön `STAGGER` állapot** (a `Beast`-nél nincs): a falnak rohanó roham megtorpanása a
+  harc fő punish-ablaka, `STAGGER_MS = 1400` — levezetve két kardcsapásra és a kilépésre.
+- **Az aréna háttere SCENE-BEN ÖSSZERAKOTT**, nem egyetlen festmény — ez az egyetlen ilyen a
+  négy arénából. A másik háromhoz kész festmény állt rendelkezésre; a church csomag viszont
+  csempékből és fal-panelekből építkezik, tehát egy 800×450-es kép pont azt a rétegzést
+  duplikálná, amit a pálya amúgy is használ.
+- **Az aréna `GROUND_TOP`-ja (369) LEVEZETETT**: a párbeszéd-panel a felszín ALATT ül és
+  `Dialogue.PANEL_RESERVE_PX`-et (75) foglal → `369 + 75 = 444 ≤ 450`. **Ez a szám magyarázza
+  visszamenőleg a Boss 2 és a végső aréna 369-ét is** — ott a festményből mértük, de a
+  kényszer ugyanez volt.
+
+**`levels/LevelEnemies.ts` — a `Level2Scene` „Level 3-nál újranézzük" adósságának RÉSZLEGES
+törlesztése (user-döntés).** A scene-VÁZ továbbra is másolat (arra nincs unit teszt), de a
+`Level1Scene`-ben és a `Level2Scene`-ben SZÓ SZERINT azonos enemy-blokk (spawnolás,
+respawn-reset, frissítés, a Gravecallerek boltjai) kikerült egy közös osztályba.
+**Mellékhaszon:** a `Level1Scene` eddig NÉMÁN CrowHarvestert szült volna egy oda felvett
+`type: 'beast'` sorra, és ezt csak egy unit teszt zárta ki — ez a tiltás (és a tesztje) most
+okafogyottá vált, mindkét pálya minden típust ismer.
+
 **ENDING + CREDITS KÉSZ.** A lezárás **csak szöveg, fekete háttéren** (user-döntés): a
 `NarrationScene` VÁLTOZTATÁS NÉLKÜL, a `FinalBossScene` `ENDING_NARRATION` tömbjével. Utána a
 **`CreditsScene`** — „THANKS FOR PLAYING" + lassan felfelé görgő szerzői lista, `Space`
@@ -497,7 +560,7 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a három Boss** le van fedve a Project_plan.md §23 bontása szerint (**24 fájl, 677 teszt** — ebből 10 az animáció-/háttér-/VFX-vezérlést, 2 a **pálya-geometriát** (Level 1 + Level 2), 1 a **mozgó platformot**, 1 a **hazardokat**, 1 a **párbeszéd-rendszert**, 1 pedig a **végső boss idézett lidérceit** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a NÉGY Boss** le van fedve a Project_plan.md §23 bontása szerint (**27 fájl, 791 teszt** — ebből 11 az animáció-/háttér-/VFX-vezérlést, 3 a **pálya-geometriát** (Level 1–3), 1 a **mozgó platformot**, 1 a **hazardokat**, 1 a **párbeszéd-rendszert**, 1 pedig a **végső boss idézett lidérceit** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -534,6 +597,11 @@ the-wingless-crow/
 │   │   ├── veil-of-eternal-nightfall.mp3
 │   │   │                         # Boss 2 (Mad King) theme. UGYANAZ az AlkaKrab csomag:
 │   │   │                         # `6. Veil of Eternal Nightfall (Loop)`
+│   │   ├── eclipsed-desolation.mp3
+│   │   │                         # Level 3 ambient. UGYANAZ az AlkaKrab csomag:
+│   │   │                         # `3. Eclipsed Desolation (Loop)`
+│   │   ├── dread-march.mp3       # Boss 3 (Beast Master) theme. UGYANAZ az AlkaKrab csomag:
+│   │   │                         # `5. Dread March (Loop)`
 │   │   ├── library-of-veles.mp3  # Level 1 ambient (Free Dark Fantasy Music) — licenc TISZTÁZANDÓ
 │   │   └── sfx/                  # Free Fantasy SFX Pack (TomMusic), WAV — licenc TISZTÁZANDÓ
 │   │       ├── sword-attack-2.wav      # player kardsuhintás (a sorszám a kapocs a csomaghoz)
@@ -697,6 +765,11 @@ the-wingless-crow/
 │       ├── dialogue.test.ts     # a párbeszéd pure magja + a léptetés (nyíl vs. automatikus)
 │       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown, SFX)
 │       ├── level1Layout.test.ts # a Level 1 geometria invariánsai (elérhetőség-BFS, gapek, enemy-bounds, spike-ok)
+│       ├── beastMaster.test.ts  # §23 Boss scope, Boss 3 (mini): HP, roham, STAGGER, FALKA
+│       │                        # + FAIRNESS-invariánsok (a windup MINDKÉT választ engedi)
+│       ├── beastMasterAnimations.test.ts # a SCALE-ből levezetett geometria + anim-kulcs ütközés
+│       ├── level3Layout.test.ts # a Level 3 geometriája + KÉT ÚJ invariáns-család:
+│       │                        # roham-kikerülhetőség (mennyezet) és galéria-szeparáció
 │       ├── level2Layout.test.ts # ugyanaz a Level 2-re + ugrás-plafon, mozgó platform, létrák,
 │       │                        # állvány/konzol (platformHasLegs), házak és propok elhelyezése
 │       ├── movingPlatform.test.ts # a mozgásprofil (pure), a rider-szállítás és a fa-látvány szinkronja
@@ -726,7 +799,10 @@ the-wingless-crow/
 │   │   ├── Level2Layout.ts       # ugyanaz a Level 2-re (7200px, 9 szakasz) + a díszlet-adat
 │   │   ├── LevelTileset.ts       # Level 1 (cathedral) csempe-méretek/forrás-rectek + a depth-rend
 │   │   ├── GothicTownTileset.ts  # Level 2 (gothic-town) csempe-geometria + BUILDING_DEPTH
-│   │   ├── LevelTerrain.ts       # talaj + platform építés, HÁROM skinnel (cathedral/gothic-town/placeholder)
+│   │   ├── Level3Layout.ts       # ugyanaz a Level 3-ra (4200px, 6 „karám") + a MENNYEZET-invariáns
+│   │   ├── ChurchTileset.ts      # Level 3 (church) csempe-geometria, a boltív + az aréna padlóvonala
+│   │   ├── LevelTerrain.ts       # talaj + platform építés, NÉGY skinnel (cathedral/gothic-town/church/placeholder)
+│   │   ├── LevelEnemies.ts       # KÖZÖS enemy-spawn/reset/update + a Gravecallerek boltjai
 │   │   └── LevelDecor.ts         # propok (createDecorProps) és háttér-házak (createBackdropBuildings)
 │   ├── platforms/
 │   │   └── MovingPlatform.ts     # Level 2 mozgó lap: pure mozgásprofil + kézi rider-szállítás
@@ -744,6 +820,8 @@ the-wingless-crow/
 │   │   ├── NarrationScene.ts     # adatvezérelt szöveges átvezető (typewriter), újrahasználható
 │   │   ├── Level2Scene.ts        # 7200px pálya; a geometria a levels/Level2Layout.ts-ből jön
 │   │   ├── Boss2Scene.ts         # 800x450 fix aréna: párbeszéd -> belépő -> harc
+│   │   ├── Level3Scene.ts        # 4200px pálya; LAPOS háttér (nincs parallax), church skin
+│   │   ├── Boss3Scene.ts         # 800x450 fix aréna, SCENE-BEN ÖSSZERAKOTT háttérrel
 │   │   ├── FinalBossScene.ts     # 800x450 fix aréna: párbeszéd -> belépő -> harc + lidércek
 │   │   └── CreditsScene.ts       # "Thanks for playing" + szerzők; a végén ÚJ JÁTÉK tiszta registryvel
 │   ├── player/
@@ -762,7 +840,9 @@ the-wingless-crow/
 │   │   ├── GraftedWingBreakerAnimations.ts # sheet geometria, anim kulcsok, időzítések forrása
 │   │   ├── MadKing.ts            # Boss 2, két fázis, slash / leap-slam / lunge (tisztán közelharci)
 │   │   ├── MadKingAnimations.ts  # sheet geometria, anim kulcsok, időzítés ÉS a leap ballisztikája
-│   │   ├── AncientDemon.ts       # Boss 3 (végső), két fázis, kombó / nova / villanás / idézés
+│   │   ├── BeastMaster.ts        # Boss 3 (mini), a Beast SCALE 2-vel, fázis NÉLKÜL + falka
+│   │   ├── BeastMasterAnimations.ts # a BeastAnimations-ből LEVEZETVE; saját anim-kulcsok
+│   │   ├── AncientDemon.ts       # VÉGSŐ boss, két fázis, kombó / nova / villanás / idézés
 │   │   ├── AncientDemonAnimations.ts # sheet geometria + a hatótávok/időzítések FORRÁSA
 │   │   ├── ShadeMinion.ts        # a Phase 2-ben idézett árnyék-lidérc (lebeg, kontakt-sebzés)
 │   │   └── ShadeMinionAnimations.ts  # 50x50-as geometria (KÜLÖN modul: más frame-méret)
@@ -2153,6 +2233,20 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
     tagjainak van saját cooldownjuk, a kombó továbbra is a leggyakoribb támadás marad.
     **Ez a 2. tanulság rokona:** ott a prioritási sor élén álló támadás monopolizált, itt a
     reaktív ág éheztet ki mindent — mindkét esetben egy „mindig igaz" feltétel a hibás.
+28. **ÁTLÁTSZATLAN, keretes háttér-panel elé NE tegyél csempézett réteget.** A GothicVania
+    Church `backgrounds.png`-jének öt panelje TELJESEN átlátszatlan, és mind a négy szélükön
+    `rgb(39,38,56)` a keretük. Ez elsőre hátránynak tűnik, valójában ajándék: **lapos, pont
+    ilyen színű háttér előtt varrat nélkül beleolvadnak**, tehát a Level 3-nak nem kell
+    parallax rétege — a világ-koordinátás panelek MAGUK a fal.
+    Kipróbáltam a fordítottját is (a mért módon mindkét irányban varratmentes `wall-brick`
+    csempe a teljes háttéren), és a render egyértelmű: **a panelek látható sötét
+    téglalapként ülnek a téglafal előtt.** A keret színe (39,38,56) és a tégla átlaga
+    (28,27,63) között ugyan csak ~11 egység a különbség, de a tégla MINTÁS — egy sima folt
+    azonnal „javítatlan textúrának" olvas.
+    **Általánosítva:** mielőtt egy réteget beteszel egy díszlet MÖGÉ, nézd meg, hogy a díszlet
+    átlátszó-e ott, ahol nincs rajta rajz. Ha nem az, a réteg nem mögé kerül, hanem KERETET
+    rajzol köré. *(A Level 1/2 sziluettjei alpha-kivágottak, ezért ott a kérdés fel sem merült
+    — ez a csomag más felépítésű.)*
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
@@ -2298,6 +2392,17 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   kapocs a forráshoz, a `BootScene` importjainál lévő komment mellett. *(A csomag zenéje
   külön feltétellel jön — „as long as you give appropriate credit" —, de abból semmit nem
   használunk.)*
+- **NYITOTT JOGI TÉTEL (ÚJ) — a Level 3 TELJES látványa** (`assets/tiles/church/`,
+  `assets/props/church/`). Forrás: **GothicVania Church** (Luis Zuno / @ansimuz),
+  `2D helper/level/gothicvania church files`. A csomagban van licenc-dokumentum, de
+  **`public-license.pdf`, és a szövegét NEM sikerült kinyerni** (CID-kódolt betűkészlet,
+  hiányos ToUnicode CMap, és nincs `pdftoppm` a gépen — pontosan ugyanaz a helyzet, mint az
+  AlkaKrab licenc-PDF-jével).
+  **Ez a tétel a többinél JOBB helyzetben van:** a szerző, a sorozat (`GothicVania`) és maga a
+  FÁJLNÉV (`public-license`) alapján majdnem biztosan ugyanaz a public domain licenc, mint a
+  `GothicVania Town` `public-license.txt`-jéé — amiből a Level 2 terrainje és mindkét pálya
+  propjai jönnek. **A szöveget viszont a publikálás előtt el KELL olvasni**, és a
+  `Credits.txt`-be fel kell venni (`https://opengameart.org/content/gothicvania-church`).
 - **A Level 1 terrainjének licence RENDBEN VAN** (`assets/tiles/cathedral/`): a forráscsomag
   (`2D helper/level/PixelPlatformerSet1v.1.1`, Szadi art) `public-license.txt`-je *"License
   for Everyone. Public domain and free to use, personal or commercial. Credit is not required
@@ -2342,20 +2447,23 @@ Ami a választott irányból még hátravan:
    „Enemy 3 — Beast" szakaszt fentebb. A Level 2 utolsó CrowHarvestere (`H-crow-2`) lett
    lecserélve rá, tehát a pálya egy ÚJ mechanikával zárul a Mad King előtt.
 
-**A választott irányból tehát MINDEN kész — az opcionális Beasttel együtt.** Ami a játék
+**A választott irányból MINDEN kész — az opcionális Beasttel együtt —, és 2026-08-31-én
+BŐVÜLT a lánc egy negyedik játszható blokkal (Level 3 + Beast Master).** Ami a játék
 egészéből hátravan:
 
 - **A `CreditsScene` TARTALMA** (user: későbbi iteráció) — és ugyanott a nyitott
-  licenc-tételek lezárása.
-- **Phase 9 – Lore:** HAT placeholder szöveg cseréje (lásd lentebb).
-- **Phase 8 maradéka:** a Level 2 SFX-ei, a hazard-/lövedék-/létra-/ajtó-placeholderek, az
-  `ui/` modul (valódi HUD).
+  licenc-tételek lezárása. **A church csomag PDF-licence új tétel**, lásd lentebb.
+- **Phase 9 – Lore:** immár **NYOLC** placeholder szöveg cseréje (a Level 3 ajtó-átvezetője
+  és a Beast Master párbeszéde + győzelmi narrációja jött hozzá).
+- **Phase 8 maradéka:** a Level 2 **és a Level 3** SFX-ei, a hazard-/lövedék-placeholderek,
+  a Level 2 létra/ajtó grafikája, az `ui/` modul (valódi HUD).
 
 Hasznos, hogy a Gravecaller iterációja **általánosította a scene enemy-kezelését**: a
 `LevelEnemy` interfész + a `type` mező az `ENEMY_SPAWNS`-ban — és ez a Beastnél **be is
-vált**: az integráció tényleg egy tömb + egy `spawnEnemies()` ág volt. Egy dolog nem volt
-ingyen: a `Level1Scene` nem ismeri az új típust, ezért ott egy unit teszt zárja ki a néma
-visszaesést CrowHarvesterre (lásd az „Enemy 3 — Beast" szakasz végét).
+vált**: az integráció tényleg egy tömb + egy `spawnEnemies()` ág volt.
+*A Level 3-mal ez a szál LEZÁRULT: a spawnolás kikerült a közös `levels/LevelEnemies.ts`-be,
+tehát mindhárom pálya minden típust ismer, és a „Level 1 nem ismeri a Beastet" tiltás (meg a
+tesztje) okafogyottá vált.*
 
 ---
 

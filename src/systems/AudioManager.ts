@@ -22,6 +22,16 @@ export const MUSIC_KEYS = {
   LEVEL1_THEME: 'level1-theme',
   /** A Level 2 sávja `1. Whispers of the Abyss (Loop)` lett (AlkaKrab, ugyanaz a csomag). */
   LEVEL2_THEME: 'level2-theme',
+  /**
+   * Level 3 – The Beast Dungeon. `3. Eclipsed Desolation (Loop)`, UGYANABBÓL az AlkaKrab
+   * csomagból, mint a másik négy sáv — tehát nem nyitott új jogi tételt.
+   */
+  LEVEL3_THEME: 'level3-theme',
+  /**
+   * Boss 3 – The Beast Master arénája. `5. Dread March (Loop)`, szintén AlkaKrab. A cím a
+   * lény karakterét adja vissza: nehéz, elkötelezett roham, nem varázslás.
+   */
+  BOSS3_THEME: 'boss3-theme',
 } as const;
 
 export const SFX_KEYS = {

@@ -2,21 +2,10 @@ import Phaser from 'phaser';
 import Player, { LadderContact } from '../player/Player';
 import PlayerController from '../player/PlayerController';
 import Fireball from '../combat/Projectile';
-import CrowHarvester from '../enemies/CrowHarvester';
-import Gravecaller, {
-  PROJECTILE_DAMAGE as GRAVECALLER_PROJECTILE_DAMAGE,
-  PROJECTILE_SIZE as GRAVECALLER_PROJECTILE_SIZE,
-  PROJECTILE_SPEED as GRAVECALLER_PROJECTILE_SPEED,
-} from '../enemies/Gravecaller';
-import Beast from '../enemies/Beast';
 import CheckpointSystem from '../systems/CheckpointSystem';
 import LevelCheckpoint from '../systems/LevelCheckpoint';
 import AudioManager, {
-  BEAST_DEATH_VOLUME,
   bindPlayerSfx,
-  DEATH_SFX_DETUNE_RANGE,
-  GRAVECALLER_DEATH_VOLUME,
-  HARVESTER_DEATH_VOLUME,
   LEVEL2_MUSIC_FADE_IN_MS,
   LEVEL_MUSIC_VOLUME,
   MUSIC_KEYS,
@@ -29,6 +18,7 @@ import SwingingReaper, { REAPER_DAMAGE } from '../hazards/SwingingReaper';
 import ParallaxBackground, { LEVEL2_BACKGROUND_LAYERS } from '../systems/ParallaxBackground';
 import { createGroundSegments, createPlatforms } from '../levels/LevelTerrain';
 import createDecorProps, { createBackdropBuildings } from '../levels/LevelDecor';
+import LevelEnemies from '../levels/LevelEnemies';
 import {
   BACKDROP_BUILDINGS,
   CHECKPOINTS,
@@ -52,9 +42,6 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
   checkpointRespawnY,
-  enemyChaseBounds,
-  enemySpawnOffset,
-  enemyType,
   platformById,
   platformTop,
   surfaceSpan,
@@ -101,15 +88,15 @@ const CHECKPOINT_REGISTRY_KEY = 'level2Checkpoint';
 const BOSS_SCENE_KEY = 'Boss2Scene';
 
 /**
- * A LEGYŐZÖTT király után az ajtó már nem a trónterembe, hanem a végső arénába visz —
+ * A LEGYŐZÖTT király után az ajtó már nem a trónterembe, hanem a KÖVETKEZŐ PÁLYÁRA visz —
  * pontosan úgy, ahogy a Level 1 ajtaja a `bossDefeated` után a Level 2-re (lásd
- * Level1Scene.activateCheckpointAndTransition). Enélkül a végső bosstól kikapva a playert
- * ide tesszük vissza, és újra végig kellene vernie a Mad Kinget, hogy visszajusson.
+ * Level1Scene.activateCheckpointAndTransition). Enélkül a Level 3-ból visszatérve a playernek
+ * újra végig kellene vernie a Mad Kinget, hogy továbbjusson.
  *
  * Az átvezető ilyenkor KIMARAD (a Level 1 azonos döntése): a `LEVEL2_END_NARRATION` a
  * trónterembe ÉRKEZÉSRŐL szól, ami másodjára már nem igaz — és a player úgyis látta.
  */
-const FINAL_SCENE_KEY = 'FinalBossScene';
+const NEXT_LEVEL_SCENE_KEY = 'Level3Scene';
 
 /**
  * Placeholder lore-átvezető a Level 2 és a király arénája között — a végleges szöveget a
@@ -139,13 +126,6 @@ const BACKGROUND_COLOR = '#854a62';
  * kicsúszna a zónából, és nem tudna visszamászni.
  */
 const LADDER_ZONE_HEAD_ROOM = 32;
-
-/** Amit a scene EGY enemytől elvár, típustól függetlenül (a `Level1Scene` mintája). */
-interface LevelEnemy extends Damageable {
-  readonly y: number;
-  getMaxHP(): number;
-  update(player: Player): void;
-}
 
 /** Egy létra fizikai zónája és a hozzá tartozó „sín", amit a player megkap. */
 interface LadderInstance {
@@ -183,11 +163,11 @@ export default class Level2Scene extends Phaser.Scene {
   private fallDeathTriggered = false;
 
   private fireballs: Fireball[] = [];
-  private enemyProjectiles: Fireball[] = [];
-  private enemies: CrowHarvester[] = [];
-  private gravecallers: Gravecaller[] = [];
-  /** Enemy 3. A pályán EGY példány áll (`H-beast-1`), de a kezelése típusszinten általános. */
-  private beasts: Beast[] = [];
+  /**
+   * Az enemyk spawnolása / respawnja / frissítése + a Gravecallerek boltjai. A `create()`-ben
+   * jön létre, tehát a tömbjei scene-restartkor automatikusan frissek (CLAUDE.md 3. tanulság).
+   */
+  private levelEnemies!: LevelEnemies;
 
   constructor() {
     super('Level2Scene');
@@ -198,10 +178,6 @@ export default class Level2Scene extends Phaser.Scene {
     // scene-restart ugyanazon a példányon hívja újra a create()-et, ezért itt explicit ki
     // kell üríteni őket (CLAUDE.md 3. tanulság).
     this.fireballs = [];
-    this.enemyProjectiles = [];
-    this.enemies = [];
-    this.gravecallers = [];
-    this.beasts = [];
     this.ladders = [];
     this.movingPlatforms = [];
     this.reapers = [];
@@ -276,21 +252,17 @@ export default class Level2Scene extends Phaser.Scene {
     this.physics.add.collider(this.player, ground);
     this.physics.add.collider(this.player, platforms);
 
-    this.spawnEnemies();
+    this.levelEnemies = new LevelEnemies(this, ENEMY_SPAWNS, LEVEL2_GEOMETRY, this.audio);
+    this.levelEnemies.spawn();
 
     // FIGYELEM: ezek a colliderek az enemy-tömbök REFERENCIÁJÁRA kötődnek, és a Phaser minden
-    // physics stepben újraiterálja a tartalmukat. Ezért tudja a resetEnemies() helyben
+    // physics stepben újraiterálja a tartalmukat. Ezért tudja a LevelEnemies.reset() helyben
     // (splice + push) kicserélni a lakóikat — és ezért TILOS a tömböket új tömbre cserélni
     // (CLAUDE.md 2. tanulság).
     //
     // Mindhárom enemy-fajta ugyanazt a négy regisztrációt kapja: a handlerek csak a
     // Damageable felületet használják, tehát típusfüggetlenek.
-    const enemyGroups: Phaser.Physics.Arcade.Sprite[][] = [
-      this.enemies,
-      this.gravecallers,
-      this.beasts,
-    ];
-    for (const group of enemyGroups) {
+    for (const group of this.levelEnemies.groups()) {
       this.physics.add.collider(group, ground);
       this.physics.add.collider(group, platforms);
       this.physics.add.overlap(
@@ -312,14 +284,14 @@ export default class Level2Scene extends Phaser.Scene {
     bindPlayerSfx(this.player, this.audio);
 
     this.physics.add.overlap(
-      this.enemyProjectiles,
+      this.levelEnemies.projectiles,
       this.player,
       this.handleEnemyProjectileHitPlayer,
       undefined,
       this
     );
 
-    for (const projectiles of [this.fireballs, this.enemyProjectiles]) {
+    for (const projectiles of [this.fireballs, this.levelEnemies.projectiles]) {
       for (const surface of [ground, platforms]) {
         this.physics.add.collider(projectiles, surface, (projectileObj) => {
           const projectile = projectileObj as Fireball;
@@ -337,7 +309,7 @@ export default class Level2Scene extends Phaser.Scene {
 
     this.interactKey = this.input.keyboard!.addKey('E');
     this.doorPromptText = this.add
-      .text(400, 400, this.registry.get('kingDefeated') ? 'E: Tovább — The Broken Gate' : 'E: Belépés', {
+      .text(400, 400, this.registry.get('kingDefeated') ? 'E: Tovább — The Beast Dungeon' : 'E: Belépés', {
         fontFamily: 'monospace',
         fontSize: '16px',
         color: '#ffffff',
@@ -408,100 +380,13 @@ export default class Level2Scene extends Phaser.Scene {
     }
   }
 
-  /**
-   * A séta-körzet (`patrolMinX/MaxX`) és az ÜLDÖZÉSI határ két külön dolog: az előbbi az
-   * `ENEMY_SPAWNS` adata, az utóbbit az `enemyChaseBounds()` VEZETI LE a felület pereméből és
-   * a spike-mezőkből.
-   */
-  private spawnEnemies(): void {
-    for (const def of ENEMY_SPAWNS) {
-      const surface = surfaceSpan(def.surfaceId);
-      const chase = enemyChaseBounds(def);
-      const bounds = {
-        patrolMinX: def.patrolMinX,
-        patrolMaxX: def.patrolMaxX,
-        chaseMinX: chase.min,
-        chaseMaxX: chase.max,
-      };
-      const spawnY = surface.top - enemySpawnOffset(def);
-
-      if (enemyType(def) === 'gravecaller') {
-        const caster = new Gravecaller(this, def.x, spawnY, bounds);
-
-        caster.on('gravecaller-projectile', (x: number, y: number, direction: number) => {
-          this.enemyProjectiles.push(
-            new Fireball(this, x, y, direction, {
-              texture: 'gravecaller-projectile-placeholder',
-              damage: GRAVECALLER_PROJECTILE_DAMAGE,
-              speed: GRAVECALLER_PROJECTILE_SPEED,
-              size: GRAVECALLER_PROJECTILE_SIZE,
-            })
-          );
-          this.audio.playSfx(SFX_KEYS.GRAVECALLER_CAST);
-        });
-
-        // A haláltusa a `die()`-ból jön, NEM a `destroy()`-ból — így az alábbi
-        // resetEnemies() (ami minden respawnnál mind a 14 lényt megsemmisíti) néma marad.
-        caster.on('gravecaller-death', () =>
-          this.audio.playSfx(SFX_KEYS.GRAVECALLER_DEATH, {
-            volume: GRAVECALLER_DEATH_VOLUME,
-            detuneRange: DEATH_SFX_DETUNE_RANGE,
-          })
-        );
-
-        this.gravecallers.push(caster);
-        continue;
-      }
-
-      if (enemyType(def) === 'beast') {
-        const beast = new Beast(this, def.x, spawnY, bounds);
-
-        // A közelharci csapás a KÖZÖS `ENEMY_SWING` hangot kapja (mint a CrowHarvester és a
-        // bossok) — a ±120 cent detune-szórás miatt a sorozat így sem válik gépiessé.
-        beast.on('beast-attack', () => this.audio.playSfx(SFX_KEYS.ENEMY_SWING));
-        // A rohamnak SZÁNDÉKOSAN nincs hangja: a csomagokban nincs hozzá illő, és a
-        // Wing-Breaker charge-a is néma. A telegraph vizuális (piros tint + megtámasztott póz).
-        beast.on('beast-death', () =>
-          this.audio.playSfx(SFX_KEYS.BEAST_DEATH, {
-            volume: BEAST_DEATH_VOLUME,
-            detuneRange: DEATH_SFX_DETUNE_RANGE,
-          })
-        );
-
-        this.beasts.push(beast);
-        continue;
-      }
-
-      const enemy = new CrowHarvester(this, def.x, spawnY, bounds);
-      enemy.on('harvester-attack', () => this.audio.playSfx(SFX_KEYS.ENEMY_SWING));
-      enemy.on('harvester-death', () =>
-        this.audio.playSfx(SFX_KEYS.HARVESTER_DEATH, {
-          volume: HARVESTER_DEATH_VOLUME,
-          detuneRange: DEATH_SFX_DETUNE_RANGE,
-        })
-      );
-      this.enemies.push(enemy);
-    }
-  }
-
-  /** A tömb IDENTITÁSA nem változhat: splice + push, sosem új tömb (CLAUDE.md 2. tanulság). */
-  private resetEnemies(): void {
-    for (const group of [this.enemies, this.gravecallers, this.beasts]) {
-      for (const enemy of group) {
-        enemy.destroy();
-      }
-      group.splice(0, group.length);
-    }
-    this.spawnEnemies();
-  }
-
+  /** A player tűzgolyói + a Gravecallerek boltjai — mindkettő helyben ürül. */
   private clearFireballs(): void {
-    for (const projectiles of [this.fireballs, this.enemyProjectiles]) {
-      for (const projectile of projectiles) {
-        projectile.destroy();
-      }
-      projectiles.splice(0, projectiles.length);
+    for (const projectile of this.fireballs) {
+      projectile.destroy();
     }
+    this.fireballs.splice(0, this.fireballs.length);
+    this.levelEnemies.clearProjectiles();
   }
 
   update(_time: number, delta: number): void {
@@ -519,11 +404,9 @@ export default class Level2Scene extends Phaser.Scene {
       `HP: ${this.player.getHP()}/${this.player.getMaxHP()} | ${this.player.playerState}`
     );
 
-    this.updateEnemies(this.enemies);
-    this.updateEnemies(this.gravecallers);
-    this.updateEnemies(this.beasts);
+    this.levelEnemies.update(this.player);
 
-    for (const projectiles of [this.fireballs, this.enemyProjectiles]) {
+    for (const projectiles of [this.fireballs, this.levelEnemies.projectiles]) {
       for (let i = projectiles.length - 1; i >= 0; i--) {
         if (!projectiles[i].active) projectiles.splice(i, 1);
       }
@@ -554,7 +437,7 @@ export default class Level2Scene extends Phaser.Scene {
       this.time.delayedCall(RESPAWN_DELAY_MS, () => {
         const { x, y } = this.checkpoint.getRespawnPoint();
         this.clearFireballs();
-        this.resetEnemies();
+        this.levelEnemies.reset();
         this.player.respawn(x, y);
         this.respawnScheduled = false;
         this.fallDeathTriggered = false;
@@ -639,18 +522,6 @@ export default class Level2Scene extends Phaser.Scene {
     return null;
   }
 
-  private updateEnemies(enemies: LevelEnemy[]): void {
-    for (const enemy of enemies) {
-      // Biztosíték: a patrol-határok ezt elvileg kizárják, de egy szakadékba került enemy
-      // enélkül némán "patrolozna" a világ alján, a képernyőn kívül.
-      if (!enemy.isDead() && enemy.y > FALL_DEATH_Y) {
-        enemy.takeDamage(enemy.getMaxHP());
-        continue;
-      }
-      enemy.update(this.player);
-    }
-  }
-
   /** A köztes checkpointok ÉRINTÉSRE aktiválódnak — nem versenyeznek az ajtó promptjával. */
   private checkCheckpointContact(): void {
     if (this.player.isDead()) return;
@@ -692,7 +563,7 @@ export default class Level2Scene extends Phaser.Scene {
 
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       if (kingDefeated) {
-        this.scene.start(FINAL_SCENE_KEY);
+        this.scene.start(NEXT_LEVEL_SCENE_KEY);
         return;
       }
 

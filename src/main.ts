@@ -5,6 +5,8 @@ import BossScene from './scenes/BossScene';
 import NarrationScene from './scenes/NarrationScene';
 import Level2Scene from './scenes/Level2Scene';
 import Boss2Scene from './scenes/Boss2Scene';
+import Level3Scene from './scenes/Level3Scene';
+import Boss3Scene from './scenes/Boss3Scene';
 import FinalBossScene from './scenes/FinalBossScene';
 import CreditsScene from './scenes/CreditsScene';
 import { GRAVITY_Y } from './config/physics';
@@ -28,8 +30,10 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  // A FinalBossScene REGISZTRÁLÁSA élesíti a Boss2Scene győzelmi ágát is: az addig a
-  // Level 2-re tett vissza, mert a scene még nem létezett (finalSceneExists()).
+  // A lánc sorrendben: Level 1 -> Boss 1 -> Level 2 -> Boss 2 -> Level 3 -> Boss 3 ->
+  // Final -> ending -> credits. A regisztráció ÉLESÍTI a korábbi scene-ek feltételes
+  // ágait: a Boss2Scene győzelme a Level3Scene-t keresi, a Level3Scene ajtaja a
+  // Boss3Scene-t, a Boss3Scene győzelme pedig a FinalBossScene-t.
   scene: [
     BootScene,
     Level1Scene,
@@ -37,6 +41,8 @@ const config: Phaser.Types.Core.GameConfig = {
     NarrationScene,
     Level2Scene,
     Boss2Scene,
+    Level3Scene,
+    Boss3Scene,
     FinalBossScene,
     CreditsScene,
   ],
