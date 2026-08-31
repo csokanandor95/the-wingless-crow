@@ -72,6 +72,10 @@ import { REAPER_HIT_RADIUS } from '../../src/hazards/SwingingReaper';
 import { MOVE_SPEED } from '../../src/player/Player';
 import { ATTACK_RANGE as HARVESTER_ATTACK_RANGE } from '../../src/enemies/CrowHarvester';
 import {
+  CHARGE_MAX_MS as BEAST_CHARGE_MAX_MS,
+  CHARGE_SPEED as BEAST_CHARGE_SPEED,
+} from '../../src/enemies/Beast';
+import {
   DETECTION_RANGE as GRAVECALLER_DETECTION_RANGE,
   PROJECTILE_SIZE as GRAVECALLER_PROJECTILE_SIZE,
   PROJECTILE_SPAWN_OFFSET_Y as GRAVECALLER_PROJECTILE_OFFSET_Y,
@@ -904,14 +908,39 @@ describe('ENEMY_SPAWNS', () => {
     }
   });
 
-  it('9 CrowHarvester + 6 Gravecaller', () => {
+  it('8 CrowHarvester + 6 Gravecaller + 1 Beast', () => {
     // A doksi 10 + 4-et írt; a hangoló kör KÉT casterrel bővítette (a `B-pillar` őre) és
     // eggyel átsorolta (a `G` 2. cellájában a második crow -> caster), hogy a szűk cellában
-    // NE két azonos szerep álljon egymás mellett.
+    // NE két azonos szerep álljon egymás mellett. Az Enemy 3 iterációja pedig az UTOLSÓ
+    // crow-t (`H-crow-2`) cserélte Beastre — lásd `H-beast-1`.
     const crows = ENEMY_SPAWNS.filter((e) => enemyType(e) === 'crow-harvester');
     const casters = ENEMY_SPAWNS.filter((e) => enemyType(e) === 'gravecaller');
-    expect(crows).toHaveLength(9);
+    const beasts = ENEMY_SPAWNS.filter((e) => enemyType(e) === 'beast');
+    expect(crows).toHaveLength(8);
     expect(casters).toHaveLength(6);
+    expect(beasts).toHaveLength(1);
+  });
+
+  it('a Beast a pálya UTOLSÓ ellenfele, és van hol nekifutnia', () => {
+    // Két állítás, ami a Beast elhelyezésének a LÉNYEGE:
+    //  1. a legnagyobb x-en áll — a pálya egy új mechanikával zárul a boss-ajtó előtt;
+    //  2. az üldözési (= roham-) folyosója elfér a teljes rohamúttal. Enélkül a Beast a
+    //     rohamot azonnal a peremen fejezné be, és a fő támadása dísszé válna.
+    const beast = ENEMY_SPAWNS.find((e) => enemyType(e) === 'beast');
+    expect(beast).toBeDefined();
+    if (!beast) return;
+
+    for (const other of ENEMY_SPAWNS) {
+      if (other.id === beast.id) continue;
+      expect(other.x, `${other.id} a Beast MÖGÖTT van`).toBeLessThan(beast.x);
+    }
+
+    const chase = enemyChaseBounds(beast);
+    const chargeDistance = (BEAST_CHARGE_SPEED * BEAST_CHARGE_MAX_MS) / 1000;
+    expect(
+      chase.max - chase.min,
+      'a roham-folyosó rövidebb a teljes rohamútnál'
+    ).toBeGreaterThan(chargeDistance);
   });
 
   it('EGYETLEN enemy sem áll mozgó platformon', () => {

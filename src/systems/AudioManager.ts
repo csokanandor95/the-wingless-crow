@@ -62,6 +62,11 @@ export const SFX_KEYS = {
   /** A Gravecaller halála — hosszabb, „elnyújtottabb" haláltusa. */
   GRAVECALLER_DEATH: 'sfx-gravecaller-death',
   /**
+   * A Beast halála. UGYANABBÓL a csomagból, mint a másik két lény-hang, de a legnagyobb
+   * testű ellenfélhez illő, mély üvöltés — a `die()`-ból, sosem a `destroy()`-ból.
+   */
+  BEAST_DEATH: 'sfx-beast-death',
+  /**
    * A Mad King ugró becsapódása, a FÖLDET ÉRÉS pillanatában. A fight legnehezebb
    * ütése, ezért kap saját, nehéz hangot a közös ENEMY_SWING helyett.
    */
@@ -121,6 +126,7 @@ export const DEFAULT_SFX_DETUNE_RANGE = 120;
  * | ugrás               | 0.080        |  60 %               | 1.00 * |
  * | CrowHarvester halál | 0.362        | 100 %               | 0.40   |
  * | Gravecaller halál   | 0.256        | 100 %               | 0.56   |
+ * | Beast halál         | 0.751        | 100 %               | 0.19   |
  * | player halál        | 0.699        | 130 %               | 0.27   |
  * | király becsapódás   | 0.559        | 130 %               | 0.33   |
  *
@@ -137,6 +143,12 @@ export const PLAYER_JUMP_VOLUME = 1;
 export const PLAYER_DEATH_VOLUME = 0.27;
 export const HARVESTER_DEATH_VOLUME = 0.4;
 export const GRAVECALLER_DEATH_VOLUME = 0.56;
+/**
+ * A forrás (`fatmanbossDeath.wav`) a csomag EGYIK LEGHANGOSABB fájlja (csúcs 0.751), ezért
+ * kap a többi lény-halálnál jóval kisebb szorzót — az EFFEKTÍV hangereje ugyanaz.
+ * A repóban lévő fájl a forrás 0–1,55 s-a (+ 60 ms fade); a vágás a csúcsot nem érintette.
+ */
+export const BEAST_DEATH_VOLUME = 0.19;
 export const KING_SLAM_VOLUME = 0.33;
 
 /**

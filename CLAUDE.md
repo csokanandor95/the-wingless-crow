@@ -497,7 +497,7 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**) + **mind a három Boss** le van fedve a Project_plan.md §23 bontása szerint (**22 fájl, 619 teszt** — ebből 9 az animáció-/háttér-/VFX-vezérlést, 2 a **pálya-geometriát** (Level 1 + Level 2), 1 a **mozgó platformot**, 1 a **hazardokat**, 1 a **párbeszéd-rendszert**, 1 pedig a **végső boss idézett lidérceit** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a három Boss** le van fedve a Project_plan.md §23 bontása szerint (**24 fájl, 677 teszt** — ebből 10 az animáció-/háttér-/VFX-vezérlést, 2 a **pálya-geometriát** (Level 1 + Level 2), 1 a **mozgó platformot**, 1 a **hazardokat**, 1 a **párbeszéd-rendszert**, 1 pedig a **végső boss idézett lidérceit** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -549,7 +549,12 @@ the-wingless-crow/
 │   │                                   # Chain: annak a végén külön csörgő utórezgés ül
 │   │       ├── rock-wall-1.wav         # Mad King becsapódás (Spells/) — 2 mp-es dörej
 │   │       ├── necro-hurt.wav          # CrowHarvester halál \ Monster Growls Attack and
-│   │       ├── necro-death-2.wav       # Gravecaller halál   / Deaths V.1 — licenc TISZTÁZANDÓ
+│   │       ├── necro-death-2.wav       # Gravecaller halál   | Deaths V.1 — licenc TISZTÁZANDÓ
+│   │       ├── fatman-death.wav        # Beast halál         / SZÁRMAZTATOTT: a forrás
+│   │                                   # `fatmanbossDeath.wav` 2,879 s, és KÉT részből áll
+│   │                                   # (haláltusa 0–1,45 s, majd ~0,3 s csend után egy
+│   │                                   # külön utórész). Itt a 0–1,55 s + 60 ms fade van.
+│   │                                   # A csúcs (0.751) a vágástól NEM változott
 │   │       └── death-groan-17.wav      # player halál. SZÁRMAZTATOTT: a forrás
 │   │                                   # `17. Death Groan (Male).wav` KÉT külön felvételt
 │   │                                   # tartalmaz (50-330ms és 575-950ms, közte csend);
@@ -622,6 +627,13 @@ the-wingless-crow/
 │       │   └── license.txt       # 2D_SL_Knight_v1.0 licenc, a repo dokumentálja a jogi státuszt
 │       ├── crow-harvester/       # Enemy 1 sprite
 │       │   └── enemy04_sheet.png # 1792x64 = 28 db 64x64-es frame. NINCS mellette licenc (lásd lentebb)
+│       ├── beast/               # Enemy 3 sprite. NINCS licenc, és a Credits.txt-ben SEM
+│       │   │                     # szerepel — új nyitott jogi tétel (lásd lentebb).
+│       │   └── goatman.png       # 384x512 = 6x8 db 64x64-es frame (48 cella, 41 rajzolt).
+│       │                         # VÁLTOZATLAN másolat, EREDETI fájlnéven: ez az egyetlen
+│       │                         # kapocs a forráshoz. A csomagban VAN dedikált,
+│       │                         # fejlehajtott roham-animáció (f24-33) — ezért jó egy
+│       │                         # chargerhez. Death animáció NINCS
 │       ├── gravecaller/          # Enemy 2 sprite (Necromancer csomag) — NINCS licenc (lásd lentebb).
 │       │   │                     # ÖT külön sheet, MIND 96x96-os frame-mel, eredeti fájlnéven.
 │       │   ├── spr_NecromancerIdle_strip50.png    # 4800x96 = 50 frame
@@ -673,6 +685,8 @@ the-wingless-crow/
 │       ├── combat.test.ts       # §23 Combat scope (ATTACK_CONFIGS, Player attack, Fireball + ProjectileOptions)
 │       ├── crowHarvester.test.ts # §23 Enemy scope (CrowHarvester HP/damage/death/state transitions)
 │       ├── gravecaller.test.ts  # §23 Enemy scope (Gravecaller — vertikális kapu, kite, cast->reposition)
+│       ├── beast.test.ts        # §23 Enemy scope, Enemy 3 (roham, a CHASE hátráló ága,
+│       │                        # perem-leállás) + FAIRNESS-invariánsok
 │       ├── boss.test.ts         # §23 Boss scope (HP, phase transition, slash/projectile/spell/charge, death)
 │       ├── madKing.test.ts      # §23 Boss scope, Boss 2 (HP, fázis, slash/leap/lunge, death)
 │       ├── ancientDemon.test.ts # §23 Boss scope, Boss 3 (HP, fázis, kombó/nova/villanás/idézés,
@@ -689,6 +703,8 @@ the-wingless-crow/
 │       ├── hazards.test.ts      # HazardDamageGate + SpikeField geometria + SwingingReaper lengés
 │       ├── playerAnimations.test.ts       # state->anim leképezés + a Player animáció-vezérlése
 │       ├── crowHarvesterAnimations.test.ts # state->anim + a facing-kompenzáció regressziós tesztje
+│       ├── beastAnimations.test.ts # a LEVEZETETT geometria/hatótávok, a roham két fázisának
+│       │                        # animációja, és hogy a találat NEM írja felül a telegraph-ot
 │       ├── gravecallerAnimations.test.ts   # state->anim, facing, LEVEZETETT geometria/cast-időzítés
 │       ├── bossAnimations.test.ts         # state->anim, facing-kompenzáció SCALE-lel, levezetett konstansok
 │       ├── madKingAnimations.test.ts      # state->anim, facing, ÉS a leap ballisztikájának levezetése
@@ -738,7 +754,9 @@ the-wingless-crow/
 │   │   ├── CrowHarvester.ts      # Enemy 1, state machine + CrowHarvesterConfig (patrol határok)
 │   │   ├── CrowHarvesterAnimations.ts # sheet geometria, anim kulcsok, facing-kompenzáció, animKeyForState()
 │   │   ├── Gravecaller.ts        # Enemy 2 (távolsági), MAINTAIN_DISTANCE / CAST / REPOSITION
-│   │   └── GravecallerAnimations.ts   # 5 textúra egy 96x96-os geometriával, a cast-időzítés forrása
+│   │   ├── GravecallerAnimations.ts   # 5 textúra egy 96x96-os geometriával, a cast-időzítés forrása
+│   │   ├── Beast.ts              # Enemy 3 (charger), CHARGE_WINDUP / CHARGE + a CHASE hátráló ága
+│   │   └── BeastAnimations.ts    # 64x64-es geometria, a MÉRT hatótávok és időzítések forrása
 │   ├── bosses/
 │   │   ├── GraftedWingBreaker.ts # Boss 1, két fázis, slash / projectile / spell / charge
 │   │   ├── GraftedWingBreakerAnimations.ts # sheet geometria, anim kulcsok, időzítések forrása
@@ -761,7 +779,7 @@ the-wingless-crow/
 │       └── DamageSystem.ts       # Damageable interface + PhysicsOverlapObject típus-alias
 ```
 
-Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `enemies/Archer.ts`, `enemies/Beast.ts`, `systems/GameState.ts`, és az `assets/` alatt az `effects/` mappa. Az `ui/` mappában megvan a `TutorialHint.ts` és a `Dialogue.ts`, de a **valódi HUD** és a **Menu** még hátravan.
+Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `enemies/Archer.ts`, `systems/GameState.ts`, és az `assets/` alatt az `effects/` mappa. *(Az `Archer.ts` szerepét a `Gravecaller.ts`, a tervezett `Beast.ts`-ét pedig a `Beast.ts` tölti be — utóbbi 2026-08-31 óta KÉSZ.)* Az `ui/` mappában megvan a `TutorialHint.ts` és a `Dialogue.ts`, de a **valódi HUD** és a **Menu** még hátravan.
 
 > **A tervezett `EndingScene.ts` szerepét TÉNYLEG a `NarrationScene` töltötte be** (a korábbi
 > jóslat bevált): a játék záró narrációja ugyanaz az adatvezérelt scene, változtatás nélkül,
@@ -976,6 +994,134 @@ sérti meg, amit Lazarus őriz. Ugyanaz a névadási elv, mint a `Hollow → Cro
   ALATT megy el. **User-döntés, hogy ez így marad** (a szigorítás megváltoztatná az `E2`
   caster feelingjét). A javítás iránya, ha valaha előkerül, lentebb a nyitott
   polish-tételek között van.
+
+### Enemy 3 — Beast (`src/enemies/Beast.ts`, `BeastAnimations.ts`)
+
+A `Project_plan.md` 11. pontjának utolsó, **eredetileg opcionális** lénye: *„gyorsabb,
+agresszívebb"*, `PATROL → DETECT → CHARGE → ATTACK → COOLDOWN`. A pályán EGY példány áll, a
+Level 2 legvégén (`H-beast-1`, a boss-ajtó előtti párkányon) — a korábbi `H-crow-2`
+CrowHarvester helyén.
+
+- **Miért pont oda:** a Level 2 addig tisztán „közelharci sétáló + álló lövő" párosra épül.
+  A Beast egy harmadik nyomásformát hoz — **elkötelezett, telegrafált roham**, ami elől ki
+  kell térni —, tehát a pálya egy ÚJ mechanikával zárul, közvetlenül a Mad King előtt.
+- **A terv doboz-listája VÁLTOZATLANUL érvényes**, nincs benne új állapot: a `CHASE` a
+  „DETECT" utáni közelítő állapot, a roham két fázisa (`CHARGE_WINDUP` + `CHARGE`) pedig a
+  `CHARGE` doboz kifejtése.
+
+**A ROHAM AZ ELSŐDLEGES TÁMADÁS, a közelharc csak közvetlen közelben** (user-kérés). Ez nem
+adódik magától, és ez a lény legfontosabb tervezési döntése:
+
+- A naiv „mindig közelíts" viselkedés pont az ellenkezőjét adná: az első roham után a Beast a
+  player MELLETT áll, onnan a `CHARGE_MIN_RANGE` (180) elérhetetlen, tehát örökre közelharci
+  gépezetté válna. **Ez a 27. tanulság rokona** — egy „mindig igaz" feltétel kiéhezteti a fő
+  támadást.
+- Ezért kapott a `CHASE` egy **pozicionáló ágat** (`applyChasePositioning()`), pontosan a
+  `Gravecaller.applySpacing()` mintájára: ha a roham KÉSZ, de a player túl közel van, a Beast
+  **HÁTRÁL**, hogy nekifutást nyerjen. Ebből egy olvasható ritmus áll össze:
+  **roham → közelharc → hátrálás → roham**.
+- **Hátrálni csak akkor hátrál, ha a roham tényleg elsülhetne**: cooldown alatt, vagy egy
+  másik szinten álló playernél (ahová úgysem rohamozna) egyszerűen közelít és közelharcol.
+  Enélkül 2,6 mp-ig menekülne a player elől. Regressziós teszt őrzi.
+- **Sarokba szorítható:** a `chaseMinX/MaxX` peremén a hátrálás megáll (`velocity 0`), és a
+  lény közelharcra vált — nem válik bábuvá. Szó szerint a Gravecaller döntése („sarokba
+  szorítva viszont tüzel").
+
+**A roham részletei:**
+- Az **irány a windup ELEJÉN rögzül**, a roham EGYENES VONALÚ (a Wing-Breaker és a Mad King
+  közös elve) — pont ettől kerülhető ki oldalra lépéssel vagy átugrással, tehát a 800 ms-os
+  telegraph tényleges információt hordoz.
+- **Piros telegraph-tint** (`0xff2222`), a projekt bevett „jön a roham" jele.
+- `hasHitThisCharge` → rohamonként legfeljebb EGY sebzés. Visszalökés nincs (a projektben
+  egyetlen enemy-találat sem lök vissza, és egy párkány szélén az kikerülhetetlen halált
+  okozna).
+- **A rohamot a felület PEREME is megállítja, nem csak a fal — ez a Beast valódi eltérése a
+  bossoktól.** Azok arénája fallal zárt, ezért ott a `body.blocked` elég; egy 448 px-es
+  párkányon álló Beast viszont enélkül leszaladna. A megtorpanás látványát a HIT frame-ek
+  adják (a Mad King `Take-Hit`-jének szerepe).
+- A `CHARGE_RECOVERY_MS` SZÁNDÉKOSAN azonos a `HIT_ANIM_MS`-szel (180): a `COOLDOWN` a
+  támadás-animációra képződik le, tehát ha a megtorpanás hosszabb lenne a
+  stagger-animációnál, a Beast a maradék időben buzogányt lendítene a levegőbe. A valódi
+  punish-ablak nem ez, hanem a 2,6 mp-es `CHARGE_COOLDOWN_MS` — alatta a lény mozoghat és
+  közelharcolhat, csak rohamozni nem tud.
+
+**A közelharci windup (390 ms) MÉRT érték**, a Mad King fairness-módszerével. Pontblank
+helyzetből (`HALF_BODY_WIDTH` 12 + a player fél teste 14 = 26 px) a kikerüléshez
+`ATTACK_RANGE + 10 = 54 px` kell, tehát 28 px-t kell nyerni:
+
+| válasz | idő |
+|---|---|
+| hátralépés (`MOVE_SPEED` 200) | 140 ms |
+| álló ugrás (47 px emelkedés; a találat 2D távolságot néz) | 102 ms |
+| + emberi reakcióidő | 250 ms |
+
+Vagyis 390 ms mellett **MINDKÉT válasz** működik, nem csak az ugrás. **Lejjebb véve a
+hátralépés kiesne** — unit teszt őrzi.
+
+**Számok** (mind exportált, hogy a tesztek ne égessenek be nyers értéket):
+`MAX_HP` 50 · `ATTACK_DAMAGE` 10 · `CHARGE_DAMAGE` 15 · `PATROL_SPEED` 55 ·
+`CHASE_SPEED` 130 (> CrowHarvester 100) · `BACKOFF_SPEED` 90 · `CHARGE_SPEED` 320 ·
+`CHARGE_MIN_RANGE` 180 · `CHARGE_MAX_MS` 900 (= 288 px út) · `CHARGE_COOLDOWN_MS` 2600 ·
+`ATTACK_COOLDOWN_MS` 700 · `DETECTION_RANGE` 260 · `LOSE_RANGE` 360 ·
+`VERTICAL_DETECTION_RANGE` 50.
+
+**Sprite + animációk:** egyetlen 384×512-es lap (`goatman.png`), **6 oszlop × 8 sor,
+64×64-es frame** (48 cella, ebből 41 rajzolt). A rácsot a teljesen átlátszó sor-/oszlop-
+futamok igazolják; a frame-tartományokat alpha-bounding boxokkal és színosztályozással
+azonosítottam, nem találgatással.
+
+| animáció | frame-ek | tartalom |
+|---|---|---|
+| IDLE | `0–4` | álló póz, buzogány a vállnál |
+| ATTACK | `6–11` | `f6–8` windup · **`f9` a csapás fehér íve** · `f10–11` kikövetkezés |
+| RUN / WALK | `12–21` | felegyenesedett futás — UGYANAZ a 10 frame két tempóban |
+| CHARGE | `24–33` | **fejlehajtott, szarvakkal előre rohanás**, buzogány hátul csüng |
+| HURT | `36–37` | hátracsapódó test, fej hátravetve |
+| BRACE | `42–44` | leengedett buzogány, megtámasztott állás → a roham telegraph-ja |
+
+- **A csomagban VAN dedikált roham-animáció**, és pont ezért jó választás egy chargerhez: a
+  Wing-Breakernél egy MEGTARTOTT pózt + afterimage-csíkot kellett használni, itt a gore-futás
+  valódi rajzolt mozdulat. **A vezető él a SZARV** (a `CHARGE` frame-eken a jobb szélső
+  oszlopok, x 56–62, sötétkék szarv-színűek; a világos acél buzogányfej ilyenkor hátul, alul
+  van) — ezért a `CHARGE_HIT_RANGE` is a szarvak mért nyúlásából jön. **Ezzel elkerüli a
+  Wing-Breaker nyitott polish-tételét** („a charge sebzése a boss TESTÉHEZ kötött, miközben a
+  kasza 60 px-szel előtte jár").
+- **NINCS death animáció** → a CrowHarvester bevált receptje (hit frame + `alpha: 0` tween +
+  6 px süllyedés).
+- **A hit-frame-ekbe NINCS beleégetve fehér villanás** — szemben a CrowHarvesterrel és a
+  Gravecallerrel, ahol pont ez tette feleslegessé a tintet. A `f36–37` itt csak
+  testtartás-változás, ezért a Beast a BOSSOK mintáját követi: 100 ms-os fehér
+  `TintModes.FILL` villanás. A roham alatt a PÓZ marad (az animációt az `updateAnimation()`
+  védi), a villanás viszont ott is szól — a `clearTintState()` pedig utána VISSZATESZI a
+  piros telegraph-ot, különben egy jól időzített találat pont a legfontosabb pillanatban
+  törölné le a player egyetlen figyelmeztetését (a Mad King azonos döntése). Unit teszt őrzi,
+  a tint MÓDJÁVAL együtt (14. tanulság).
+- **`SCALE = 1`, skálázás nélkül:** a rajzolt figura ~30×50 px (a player 28×46), tehát így is
+  a pálya legnagyobb sima ellenfele; egy nem-egész skálázás pixel arton csak rontana.
+- **A talp MINDEN animáción a frame y=64-nél van, árnyék nélkül** — ezért egyetlen
+  talp-offset elég, animációnként nem csúszik. `FEET_OFFSET_Y = BODY_HEIGHT / 2` (22), és
+  ebből jön a layout `BEAST_SPAWN_OFFSET`-je (23).
+- **A test PONT a frame közepén ül** (az álló láb-sáv mért közepe 31,5, a body 20..44 →
+  közepe 32), tehát az `applyFacing()` itt matematikailag no-op — mint a Mad Kingnél. Mégis a
+  megosztott `systems/SpriteFacing.ts`-en megy (16. tanulság).
+- **AZ EGYETLEN ÉRTELMEZÉSI DÖNTÉS:** hogy `f36–37` a HURT és `f42–44` a roham-brace, nem
+  fordítva. Az `f36–37`-en a test hátracsapódik és a fej hátravetődik (találat-recoil), az
+  `f42–44` leengedett buzogányú, megtámasztott állás. Ha kézi teszten rosszul olvas, a csere
+  egy soros — vagy a windup a `CHARGE` első frame-jének (`f24`, már lehajtott fej)
+  megtartására váltható.
+
+**A `H-beast-1` elhelyezése ellenőrzött, nem örökölt.** A patrol-számok a korábbi
+`H-crow-2`-től változatlanok (6890–6990), és ez kiszámolt: a Beast félszélessége 12 (a crow-é
+10), de a `H-ledge` (6724–7172) peremétől 154, illetve 170 px-re marad, a `H-ladder-1`
+kijáratától (6790) pedig 88 px-re — tehát a 80 px-es `LADDER_EXIT_CLEARANCE` továbbra is
+teljesül. Az üldözési (= roham-) folyosó `[6748, 7148]` = **400 px**, bőven a 288 px-es
+rohamút fölött; unit teszt őrzi.
+
+**FIGYELEM — a Level 1 NEM támogatja a Beastet.** A `Level1Scene.spawnEnemies()` csak a
+`gravecaller` ágat ismeri, tehát egy oda felvett `type: 'beast'` **NÉMÁN CrowHarvestert
+szülne** (se a `tsc`, se a build nem szólna). Ezt egy unit teszt zárja ki
+(`level1Layout.test.ts`), nem inert kód: ha a Level 1 valaha Beastet kap, ELŐSZÖR a scene-t
+kell bővíteni a `Level2Scene` mintájára.
 
 ### Level1Scene (`src/scenes/Level1Scene.ts` + `src/levels/Level1Layout.ts`)
 
@@ -1726,6 +1872,7 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   | `PLAYER_DEATH` | `death-groan-17` | a `die()`-ból (a zuhanás-halált is beleértve) |
   | `HARVESTER_DEATH` | `necro-hurt` | a CrowHarvester `die()`-jából |
   | `GRAVECALLER_DEATH` | `necro-death-2` | a Gravecaller `die()`-jából |
+  | `BEAST_DEATH` | `fatman-death` | a Beast `die()`-jából; a legnagyobb testű lény mély üvöltése |
   | `KING_SLAM` | `rock-wall-1` | a Mad King ugrása, a FÖLDET ÉRÉS pillanatában |
 - **A PLAYER LÉPÉSE A PROJEKT EGYETLEN ISMÉTLŐDŐ SFX-e.** Minden más hang diszkrét eseményre
   szól; ez a `Player.updateFootsteps()` kadenciájára ismétlődik, amíg a player fut.
@@ -1972,7 +2119,7 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
     `Gravecaller` `destroy()` override-ja a state-et KÖZVETLENÜL `DEAD`-re állítja, `die()`
     hívása NÉLKÜL (lásd a 18. tanulságot) — a scene-ek `resetEnemies()`-e pedig a player
     MINDEN halálakor az összes lényt megsemmisíti. A `destroy()`-ból emittálva tehát minden
-    egyes respawn egy 9 (Level 1), illetve 14 (Level 2) hangos haláltusa-kórussal indulna.
+    egyes respawn egy 9 (Level 1), illetve 15 (Level 2) hangos haláltusa-kórussal indulna.
     Ez kézi teszten alattomos: könnyű a „sok enemy van a pályán" számlájára írni. Mindkét
     enemy-tesztben van rá explicit regressziós eset.
 25. **Egy hangfájl formátumát MÉRD, ne feltételezd — a WAV `fmt ` chunk mezősorrendje
@@ -2034,6 +2181,18 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   gyűjti, és a projekt végén másolja be őket — ezért nem került licenc fájl a
   `assets/backgrounds/ruined-city/` mellé, a forráscsomagot a `BootScene` importjainál
   lévő komment köti vissza.
+- **NYITOTT JOGI TÉTEL (ÚJ) — a Beast (Enemy 3) sprite-ja.** A `goatman.png` a
+  `2D helper/enemy/` **gyökerében** állt, csomag és licencfájl nélkül, és a
+  `2D helper/Credits.txt`-ben **sem szerepel** — ugyanaz a kategória, mint a
+  `Bossbackground_1.png` vagy a `17. Death Groan (Male).wav`. A forrást nem sikerült
+  azonosítani: a 13 színű palettája **nem egyezik** a Necromancerével (Gravecaller), tehát
+  nem az `oco.itch.io` csomagból való. Ezért maradt meg az **eredeti fájlnév**
+  (`assets/sprites/beast/goatman.png`): ez az egyetlen kapocs a forráshoz. **A repo
+  nyilvánossá tétele / GitHub Pages deploy ELŐTT tisztázni kell, és a `Credits.txt`-be fel
+  kell venni.**
+  *(A Beast HALÁL-HANGJA ezzel szemben NEM nyit új tételt: a `fatmanbossDeath.wav` ugyanabból
+  a „Monster Growls Attack and Deaths V.1" csomagból jön, ami a `necro-hurt` /
+  `necro-death-2` miatt már nyitott tételként dokumentált — egy sor fedi mindhármat.)*
 - **NYITOTT JOGI TÉTEL (ÚJ):** a Gravecaller assethez (`assets/sprites/gravecaller/`) sem
   került licenc a repóba — a forráscsomagban (`2D helper/enemy/Necromancer`) **egyáltalán
   nincs licenc/readme fájl**, és a `2D helper/Credits.txt`-ben **sem szerepel**. Ugyanaz a
@@ -2157,7 +2316,7 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   szerint az egy szétfoszló BECSAPÓDÁS — 30→4 px —, nem loopolható repülő bolt, ezért
   maradt a placeholder; valódi asset az `assets/effects/` iterációban.)*
 - A Level 2 **létrája (`ladder-placeholder`) és boss-ajtaja (`door-placeholder`)** még kódból generált: a GothicVania Town csomagban nincs létra, a cathedral `door-gate` geometriája (`DOOR_APERTURE`, `DOOR_THRESHOLD_PX`) pedig ahhoz a konkrét PNG-hez van mérve. Olcsó részleges javítás a Level 1 `tile-ladder`-ének újrahasználata (már be van töltve)
-- **FIGYELEM: a `BootScene.START_SCENE` jelenleg `'FinalBossScene'`** — DEBUG érték, hogy a démon harca közvetlenül tesztelhető legyen. **Commit előtt vissza `'Level1Scene'`-re.** Fejlesztéshez bármelyik pálya/aréna kulcsára átírható (`'Boss2Scene'`, `'FinalBossScene'`, ...), hogy az adott szakasz a lánc végigjátszása nélkül tesztelhető legyen
+- A `BootScene.START_SCENE` jelenleg a NORMÁL `'Level1Scene'` értéken áll. Fejlesztéshez bármelyik pálya/aréna kulcsára átírható (`'Level2Scene'`, `'Boss2Scene'`, `'FinalBossScene'`, ...), hogy az adott szakasz a lánc végigjátszása nélkül tesztelhető legyen — **de commit előtt mindig vissza `'Level1Scene'`-re**
 - **HAT placeholder lore-szöveg** van a kódban, mind a Phase 9 – Lore-ban cserélendő (mindegyik egy tömb-szerkesztés): a `BossScene.BOSS_VICTORY_NARRATION`, a `Level2Scene.LEVEL2_END_NARRATION`, a `Boss2Scene` `KING_DIALOGUE`-ja és `KING_VICTORY_NARRATION`-ja, valamint a `FinalBossScene` `DEMON_DIALOGUE`-ja és `ENDING_NARRATION`-ja (utóbbi a JÁTÉK ZÁRÓ SZÖVEGE). A `CreditsScene` `CREDITS` listája szintén placeholder, de az nem lore, hanem attribúció
 - A `BootScene` "Betöltés..." szövege + progress-sávja nyers `add.text` / `Graphics` — a `ui/` modulba költözik, amint több asset (sprite-ok) is betöltendő lesz
 - `main.ts`-ben `arcade.debug` — jelenleg **`false`**. `true`-ra állítva kirajzolja a physics
@@ -2171,7 +2330,7 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 Ami a választott irányból még hátravan:
 
 1. **Level 2 – The Crowless Quarter.** A geometria (`Level2Layout.ts`, 7200 px, 9 szakasz,
-   mozgó platformok, hazardok, 10 CrowHarvester + 4 Gravecaller) és a LÁTVÁNY is KÉSZ.
+   mozgó platformok, hazardok, 8 CrowHarvester + 6 Gravecaller + 1 Beast) és a LÁTVÁNY is KÉSZ.
    A **zene is KÉSZ** (`Shadowforge Convergence`, AlkaKrab — lásd az Audio szakaszt).
    Hátravan: **SFX**, és a hazard-/lövedék-/létra-/ajtó-placeholderek cseréje.
 2. ~~**Boss 2.**~~ **KÉSZ** — *The Mad King*, lásd fentebb. Zene még nincs (user adja hozzá).
@@ -2179,11 +2338,12 @@ Ami a választott irányból még hátravan:
    Crows*, lásd fentebb. Vele jött az **ending** és a **`CreditsScene`**, tehát
    **A LÁNC BEZÁRULT**: `Level 1 → Boss 1 → Level 2 → Boss 2 → Final Boss → ending →
    credits`.
-4. **Enemy 3 – Beast** (opcionális, a terv szerint is): gyorsabb, agresszívebb.
-   `PATROL → DETECT → CHARGE → ATTACK → COOLDOWN`.
+4. ~~**Enemy 3 – Beast** (opcionális, a terv szerint is)~~ **KÉSZ (2026-08-31)** — lásd az
+   „Enemy 3 — Beast" szakaszt fentebb. A Level 2 utolsó CrowHarvestere (`H-crow-2`) lett
+   lecserélve rá, tehát a pálya egy ÚJ mechanikával zárul a Mad King előtt.
 
-**A választott irányból tehát MINDEN kész, ami nem opcionális.** Ami a játék egészéből
-hátravan:
+**A választott irányból tehát MINDEN kész — az opcionális Beasttel együtt.** Ami a játék
+egészéből hátravan:
 
 - **A `CreditsScene` TARTALMA** (user: későbbi iteráció) — és ugyanott a nyitott
   licenc-tételek lezárása.
@@ -2192,8 +2352,10 @@ hátravan:
   `ui/` modul (valódi HUD).
 
 Hasznos, hogy a Gravecaller iterációja **általánosította a scene enemy-kezelését**: a
-`LevelEnemy` interfész + a `type` mező az `ENEMY_SPAWNS`-ban, tehát a Beast (vagy egy új
-lény a Level 2-n) egy tömb + egy `spawnEnemies()` ág.
+`LevelEnemy` interfész + a `type` mező az `ENEMY_SPAWNS`-ban — és ez a Beastnél **be is
+vált**: az integráció tényleg egy tömb + egy `spawnEnemies()` ág volt. Egy dolog nem volt
+ingyen: a `Level1Scene` nem ismeri az új típust, ezért ott egy unit teszt zárja ki a néma
+visszaesést CrowHarvesterre (lásd az „Enemy 3 — Beast" szakasz végét).
 
 ---
 

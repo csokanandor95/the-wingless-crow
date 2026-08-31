@@ -17,6 +17,11 @@ import {
   GRAVECALLER_TEXTURES,
 } from '../enemies/GravecallerAnimations';
 import {
+  createBeastAnimations,
+  FRAME_SIZE as BEAST_FRAME_SIZE,
+  TEXTURE_KEY as BEAST_TEXTURE_KEY,
+} from '../enemies/BeastAnimations';
+import {
   createMadKingAnimations,
   FRAME_HEIGHT as KING_FRAME_HEIGHT,
   FRAME_WIDTH as KING_FRAME_WIDTH,
@@ -106,6 +111,12 @@ import playerJumpUrl from '../../assets/audio/sfx/stone-jump.wav';
 // sheet importja foglalja lentebb.)
 import harvesterDeathSfxUrl from '../../assets/audio/sfx/necro-hurt.wav';
 import gravecallerDeathSfxUrl from '../../assets/audio/sfx/necro-death-2.wav';
+// A Beast (Enemy 3) haláltusája UGYANEBBŐL a csomagból (`fatmanbossDeath.wav`), tehát nem
+// nyit új jogi tételt. SZÁRMAZTATOTT asset: a forrás 2,879 s hosszú, és KÉT részből áll — a
+// valódi haláltusa 0–1,45 s-ig tart, majd ~0,3 s csend után egy külön, halkabb utórész
+// következik. A repóban a fájl a forrás 0–1,55 s-a + 60 ms fade-out (a `death-groan-17`
+// receptje). A csúcs (0.751) a vágástól nem változott, tehát a BEAST_DEATH_VOLUME is áll.
+import beastDeathSfxUrl from '../../assets/audio/sfx/fatman-death.wav';
 // A Mad King ugró becsapódása: UGYANAZ a TomMusic csomag (`Spells/Rock Wall 1.wav`), tehát
 // nem nyit új jogi tételt. A kardsuhintásnál nehezebb, 2 mp-es dörej — a fight legnagyobb
 // ütése. A fájlnévben megtartott csomagbeli név a kapocs a forráshoz.
@@ -128,6 +139,12 @@ import knightClimbUrl from '../../assets/sprites/knight/Climb.png';
 import knightCastUrl from '../../assets/sprites/knight/Health.png';
 // CrowHarvester (Enemy 1): egyetlen 1792x64-es csík, 28 db 64x64-es frame.
 import crowHarvesterSheetUrl from '../../assets/sprites/crow-harvester/enemy04_sheet.png';
+// Beast (Enemy 3): egyetlen 384x512-es lap = 6x8 db 64x64-es frame (48 cella, 41 rajzolt).
+// A fájl a `2D helper/enemy/` GYÖKERÉBEN állt, csomag és licenc nélkül, és a
+// `2D helper/Credits.txt`-ben sem szerepel — nyitott jogi tétel, publikálás előtt
+// tisztázandó (lásd CLAUDE.md). Ezért maradt meg az EREDETI fájlnév: ez az egyetlen kapocs
+// a forráshoz. A frame-tartományokat lásd a BeastAnimations.ts fejlécében.
+import beastSheetUrl from '../../assets/sprites/beast/goatman.png';
 // Gravecaller (Enemy 2): a "Necromancer" csomag, ÖT külön sheet, mind 96x96-os frame-ekkel.
 // NINCS mellette licenc, és a `2D helper/Credits.txt`-ben sem szerepel — nyitott jogi tétel,
 // publikálás előtt tisztázandó (lásd CLAUDE.md). Ezért maradtak meg az EREDETI fájlnevek:
@@ -292,7 +309,7 @@ const LOADING_BAR_HEIGHT = 14;
  * fejlesztés közben ez a leggyorsabb út az új szakaszokhoz. **Commit előtt mindig állítsd
  * vissza `'Level1Scene'`-re.**
  */
-const START_SCENE = 'FinalBossScene';
+const START_SCENE = 'Level2Scene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a
@@ -346,6 +363,7 @@ const SFX_SOUNDS: Array<{ key: string; url: string }> = [
   { key: SFX_KEYS.PLAYER_DEATH, url: playerDeathUrl },
   { key: SFX_KEYS.HARVESTER_DEATH, url: harvesterDeathSfxUrl },
   { key: SFX_KEYS.GRAVECALLER_DEATH, url: gravecallerDeathSfxUrl },
+  { key: SFX_KEYS.BEAST_DEATH, url: beastDeathSfxUrl },
   { key: SFX_KEYS.KING_SLAM, url: kingSlamUrl },
 ];
 
@@ -474,6 +492,13 @@ export default class BootScene extends Phaser.Scene {
       frameHeight: HARVESTER_FRAME_SIZE,
     });
 
+    // A goatman lap 6 oszlop x 8 sor; a Phaser a frame-eket sorfolytonosan indexeli, tehát a
+    // BeastAnimations frame-számai közvetlenül használhatók.
+    this.load.spritesheet(BEAST_TEXTURE_KEY, beastSheetUrl, {
+      frameWidth: BEAST_FRAME_SIZE,
+      frameHeight: BEAST_FRAME_SIZE,
+    });
+
     for (const sheet of GRAVECALLER_SHEETS) {
       this.load.spritesheet(sheet.key, sheet.url, {
         frameWidth: GRAVECALLER_FRAME_SIZE,
@@ -529,6 +554,7 @@ export default class BootScene extends Phaser.Scene {
     createPlayerAnimations(this);
     createCrowHarvesterAnimations(this);
     createGravecallerAnimations(this);
+    createBeastAnimations(this);
     createGraftedWingBreakerAnimations(this);
     createMadKingAnimations(this);
     createAncientDemonAnimations(this);

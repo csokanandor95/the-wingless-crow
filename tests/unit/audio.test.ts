@@ -19,6 +19,9 @@ import AudioManager, {
   LEVEL2_MUSIC_FADE_IN_MS,
   FOOTSTEP_VOLUME,
   PLAYER_DEATH_VOLUME,
+  HARVESTER_DEATH_VOLUME,
+  GRAVECALLER_DEATH_VOLUME,
+  BEAST_DEATH_VOLUME,
   DEATH_SFX_DETUNE_RANGE,
 } from '../../src/systems/AudioManager';
 import {
@@ -118,6 +121,9 @@ describe('AudioManager', () => {
       SWORD_SWING: 0.287,
       FOOTSTEP: 0.214,
       PLAYER_DEATH: 0.699,
+      HARVESTER_DEATH: 0.362,
+      GRAVECALLER_DEATH: 0.256,
+      BEAST_DEATH: 0.751,
     } as const;
     const swordLoudness = PEAK.SWORD_SWING * DEFAULT_SFX_VOLUME;
 
@@ -128,6 +134,24 @@ describe('AudioManager', () => {
 
     it('a player halála a kardsuhintásnál hangsúlyosabb', () => {
       expect(PEAK.PLAYER_DEATH * PLAYER_DEATH_VOLUME).toBeGreaterThan(swordLoudness);
+    });
+
+    // A HÁROM enemy-haláltusa három KÜLÖNBÖZŐ fájlból jön, amiknek a csúcsa 0.256 és 0.751
+    // között szór (majdnem 10 dB) — a szerepük viszont azonos. Ezért ugyanarra az effektív
+    // hangosságra kell kalibrálni őket, különben a Beast (a leghangosabb forrás) elnyomná a
+    // másik kettőt egy csoportos harcban.
+    it('mindhárom enemy-haláltusa AZONOS effektív hangosságon szól', () => {
+      const loudness = [
+        PEAK.HARVESTER_DEATH * HARVESTER_DEATH_VOLUME,
+        PEAK.GRAVECALLER_DEATH * GRAVECALLER_DEATH_VOLUME,
+        PEAK.BEAST_DEATH * BEAST_DEATH_VOLUME,
+      ];
+
+      for (const value of loudness) {
+        // A cél a kardsuhintás szintje (100 %), ±10 % tűréssel.
+        expect(value).toBeGreaterThan(swordLoudness * 0.9);
+        expect(value).toBeLessThan(swordLoudness * 1.1);
+      }
     });
 
     // A detune-szórás ISMÉTLŐDŐ hangok gépiessége ellen való; egy halál egyszeri, drámai

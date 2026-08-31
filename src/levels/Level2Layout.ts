@@ -627,9 +627,18 @@ export const ENEMY_SPAWNS: EnemySpawnDef[] = [
   // A létrán NEM lehet támadni (dokumentált, tudatos korlát), ezért a `H-crow-1`-et a létra
   // ELŐTT le kell rendezni — ettől "kapuőr" a szakasz.
   { id: 'H-crow-1', x: 6630, surfaceId: 'G4', patrolMinX: 6560, patrolMaxX: 6700 },
-  // A párkányon, de a létra KIJÁRATÁTÓL (6790) 100 px-re: a felmászó playert ne érje
-  // kikerülhetetlen csapás abban a pillanatban, amikor még a létrán áll.
-  { id: 'H-crow-2', x: 6940, surfaceId: 'H-ledge', patrolMinX: 6890, patrolMaxX: 6990 },
+  // A pálya UTOLSÓ ellenfele, és az EGYETLEN Beast (Enemy 3) a projektben — közvetlenül a
+  // boss-ajtó előtt. Tudatos csúcspont: a Level 2 addig „közelharci sétáló + álló lövő"
+  // párosra épül, itt viszont egy telegrafált ROHAM elől kell kitérni, tehát a pálya egy új
+  // mechanikával zárul, mielőtt a Mad King következne.
+  //
+  // A patrol-számok a korábbi `H-crow-2`-től VÁLTOZATLANOK, és ez ellenőrzött, nem véletlen:
+  //   - a Beast félszélessége 12 (a crow-é 10), de a `H-ledge` (6724–7172) peremétől így is
+  //     154, illetve 170 px-re marad;
+  //   - a `H-ladder-1` kijáratától (6790) mért távolság 6890 - 12 - 6790 = 88 px, tehát a
+  //     80 px-es `LADDER_EXIT_CLEARANCE` továbbra is teljesül.
+  // Az üldözési (és roham-) folyosó [6748, 7148] = 400 px, bőven a 288 px-es roham-út fölött.
+  { id: 'H-beast-1', x: 6940, surfaceId: 'H-ledge', patrolMinX: 6890, patrolMaxX: 6990, type: 'beast' },
 ];
 
 /**

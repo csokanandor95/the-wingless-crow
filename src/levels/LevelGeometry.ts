@@ -9,6 +9,10 @@ import {
   BODY_WIDTH as GRAVECALLER_BODY_WIDTH,
   FEET_OFFSET_Y as GRAVECALLER_FEET_OFFSET_Y,
 } from '../enemies/GravecallerAnimations';
+import {
+  BODY_WIDTH as BEAST_BODY_WIDTH,
+  FEET_OFFSET_Y as BEAST_FEET_OFFSET_Y,
+} from '../enemies/BeastAnimations';
 import { GROUND_TILE_HEIGHT, PLATFORM_TILE_HEIGHT } from './LevelTileset';
 
 /**
@@ -67,6 +71,9 @@ export const HARVESTER_SPAWN_OFFSET = 24;
  */
 export const GRAVECALLER_SPAWN_OFFSET = GRAVECALLER_FEET_OFFSET_Y + 1; // 20
 
+/** Ugyanaz a Beastre, ugyanabból a levezetésből (a talpa a `sprite.y + 22`-nél van). */
+export const BEAST_SPAWN_OFFSET = BEAST_FEET_OFFSET_Y + 1; // 23
+
 /**
  * A TESTEK mérete — nem csak a középpontokkal kell tervezni. Az ugrás-számítások és a
  * patrol-határok is ezekre támaszkodnak: egy szakadékot a player TESTÉNEK kell átérnie, és
@@ -82,9 +89,12 @@ export {
   PLAYER_BODY_HEIGHT,
   HARVESTER_BODY_WIDTH,
   GRAVECALLER_BODY_WIDTH,
+  BEAST_BODY_WIDTH,
 };
 export const HARVESTER_HALF_BODY_WIDTH = HARVESTER_BODY_WIDTH / 2;
 export const GRAVECALLER_HALF_BODY_WIDTH = GRAVECALLER_BODY_WIDTH / 2;
+/** A Beast a legszélesebb lény (24 vs. 20) — ezért kell típusonként külön félszélesség. */
+export const BEAST_HALF_BODY_WIDTH = BEAST_BODY_WIDTH / 2; // 12
 
 // --- Ugrás-plafon (LEVEZETETT, nem hangolt) ---------------------------------
 // Minden szakadék-szélesség és platform-emelkedés ezekhez van méretezve. Ha a Player
@@ -527,7 +537,7 @@ export const EDGE_INSET = 24;
  * Melyik lény spawnol. Elhagyva `crow-harvester` — így egy új típus bevezetése nem érinti a
  * meglévő spawn-sorokat.
  */
-export type EnemyType = 'crow-harvester' | 'gravecaller';
+export type EnemyType = 'crow-harvester' | 'gravecaller' | 'beast';
 
 export interface EnemySpawnDef {
   id: string;
@@ -548,12 +558,28 @@ export const enemyType = (def: EnemySpawnDef): EnemyType => def.type ?? 'crow-ha
  * sem lóghat le a felületről). Típusfüggő, hogy egy jövőbeli, szélesebb lény ne csendben
  * örökölje a CrowHarvester számát.
  */
-export const enemyHalfBodyWidth = (def: EnemySpawnDef): number =>
-  enemyType(def) === 'gravecaller' ? GRAVECALLER_HALF_BODY_WIDTH : HARVESTER_HALF_BODY_WIDTH;
+export function enemyHalfBodyWidth(def: EnemySpawnDef): number {
+  switch (enemyType(def)) {
+    case 'gravecaller':
+      return GRAVECALLER_HALF_BODY_WIDTH;
+    case 'beast':
+      return BEAST_HALF_BODY_WIDTH;
+    default:
+      return HARVESTER_HALF_BODY_WIDTH;
+  }
+}
 
 /** A spawn Y a felület felszínéből: a lény talpa (majdnem) pontosan a felszínre kerül. */
-export const enemySpawnOffset = (def: EnemySpawnDef): number =>
-  enemyType(def) === 'gravecaller' ? GRAVECALLER_SPAWN_OFFSET : HARVESTER_SPAWN_OFFSET;
+export function enemySpawnOffset(def: EnemySpawnDef): number {
+  switch (enemyType(def)) {
+    case 'gravecaller':
+      return GRAVECALLER_SPAWN_OFFSET;
+    case 'beast':
+      return BEAST_SPAWN_OFFSET;
+    default:
+      return HARVESTER_SPAWN_OFFSET;
+  }
+}
 
 /**
  * Az enemy ÜLDÖZÉSI határa: meddig követheti a playert anélkül, hogy leesne vagy hazardba

@@ -483,7 +483,9 @@ REPOSITION
 
 ## Enemy 3 – Beast
 
-Opcionális.
+**MEGVALÓSÍTVA** (`src/enemies/Beast.ts`, `BeastAnimations.ts`). Az eredetileg opcionális
+lény elkészült; a Level 2 UTOLSÓ ellenfele (`H-beast-1`, a boss-ajtó előtti párkányon),
+a korábbi `H-crow-2` CrowHarvester helyén.
 
 Gyorsabb, agresszívebb ellenfél.
 
@@ -500,6 +502,38 @@ COOLDOWN
 ```
 
 Nem cél komplex, adaptív AI létrehozása.
+
+**A megvalósítás követi a fenti diagramot** — nincs benne új doboz. A `CHASE` a „DETECT"
+utáni közelítő állapot, a roham két fázisa (`CHARGE_WINDUP` + `CHARGE`) pedig a `CHARGE`
+doboz kifejtése.
+
+**A ROHAM AZ ELSŐDLEGES TÁMADÁS**, a közelharc csak közvetlen közelben (user-kérés). Ehhez
+kellett egy nem-nyilvánvaló kiegészítés, ami nem külön állapot, hanem a `CHASE` egyik ága:
+ha a roham KÉSZ, de a player túl közel van, a Beast **HÁTRÁL**, hogy nekifutást nyerjen.
+Enélkül az első roham után a lény a player MELLETT áll, onnan a `CHARGE_MIN_RANGE`
+elérhetetlen, tehát örökre közelharci gépezetté válna. A `chaseMinX/MaxX` peremén a hátrálás
+megáll, tehát a Beast **sarokba szorítható** — ilyenkor közelharcra vált (a Gravecaller
+azonos döntése: „sarokba szorítva viszont tüzel").
+
+| | érték | megjegyzés |
+|---|---|---|
+| HP | 50 | 5 kardcsapás — a pálya legkeményebb sima ellenfele |
+| közelharc | 10 sebzés, 44 hatótáv | a hatótáv a buzogány MÉRT nyúlásából + a player fél teste |
+| roham | 15 sebzés, 320 px/s, 900 ms | 800 ms piros telegraph; az irány a windup ELEJÉN rögzül |
+| sebesség | patrol 55 · üldözés 130 · hátrálás 90 | az üldözés a player 200-a ALATT marad |
+
+**A közelharci windup (390 ms) MÉRT érték**, a Mad King fairness-módszerével: pontblank
+helyzetből a kikerüléshez 28 px-t kell nyerni, ami hátralépéssel 140 ms, ugrással 102 ms —
+plusz 250 ms reakcióidő. Vagyis MINDKÉT válasz működik, nem csak az ugrás.
+
+**A rohamot a felület PEREME is megállítja**, nem csak a fal. Ez a Beast valódi eltérése a
+bossoktól: azok arénája fallal zárt, egy párkányon álló Beast viszont enélkül leszaladna.
+
+**Asset:** `goatman.png` — 384×512, 6×8 db 64×64-es frame. A csomagban VAN dedikált,
+fejlehajtott, szarvakkal előre rohanó animáció (10 frame), tehát a roham valódi rajzolt
+mozdulat — szemben a Wing-Breaker charge-ával, ahol egy megtartott pózt kellett használni.
+Death animáció NINCS (a CrowHarvester fade-receptje). **Licenc: nyitott jogi tétel**, lásd
+a `CLAUDE.md`-t.
 
 ---
 
@@ -1624,14 +1658,22 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 >    `bossDefeated`-et nézi. Enélkül a végső bosstól kikapva a playert ide tesszük vissza,
 >    és újra végig kellene vernie a Mad Kinget. Most a legyőzött király után az ajtó
 >    KÖZVETLENÜL a végső arénába visz (átvezető nélkül, a Level 1 azonos döntése).
-> 5. **Enemy 3 – Beast** — opcionális, a 11. pont szerint is.
+> 5. ~~**Enemy 3 – Beast** — opcionális, a 11. pont szerint is.~~ **KÉSZ (2026-08-31).**
+>    A Level 2 UTOLSÓ CrowHarvestere (`H-crow-2`, a boss-ajtó előtti párkányon) lett
+>    lecserélve rá — a pálya így egy ÚJ mechanikával (telegrafált roham elől kitérés)
+>    zárul, közvetlenül a Mad King előtt. Részletek a 11. pontban.
+>
+>    **A választott irányból ezzel MINDEN elkészült, az opcionális tétellel együtt.**
 >
 > **A `Level 3 – The Throne of the Damned` KIMARADT külön pályaként** (14. pont) — a
 > trónterem a Boss 2 arénája lett.
 >
 > A Gravecaller iterációja **általánosította a scene enemy-kezelését** (`LevelEnemy`
-> strukturális interfész + `type` mező az `ENEMY_SPAWNS`-ban), tehát a Beast vagy egy új
-> Level 2-es lény már csak egy tömb + egy `spawnEnemies()` ág.
+> strukturális interfész + `type` mező az `ENEMY_SPAWNS`-ban), és ez a Beastnél BE IS VÁLT:
+> az integráció tényleg egy tömb + egy `spawnEnemies()` ág volt. **Egy dolog nem volt ingyen:**
+> a `Level1Scene.spawnEnemies()` csak a `gravecaller` ágat ismeri, tehát egy Level 1-re
+> felvett `type: 'beast'` NÉMÁN CrowHarvestert szülne. Ezt egy unit teszt zárja ki
+> (`level1Layout.test.ts`), nem inert kód.
 
 ## Phase 9 – Lore
 

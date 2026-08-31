@@ -8,9 +8,11 @@ import Gravecaller, {
   PROJECTILE_SIZE as GRAVECALLER_PROJECTILE_SIZE,
   PROJECTILE_SPEED as GRAVECALLER_PROJECTILE_SPEED,
 } from '../enemies/Gravecaller';
+import Beast from '../enemies/Beast';
 import CheckpointSystem from '../systems/CheckpointSystem';
 import LevelCheckpoint from '../systems/LevelCheckpoint';
 import AudioManager, {
+  BEAST_DEATH_VOLUME,
   bindPlayerSfx,
   DEATH_SFX_DETUNE_RANGE,
   GRAVECALLER_DEATH_VOLUME,
@@ -184,6 +186,8 @@ export default class Level2Scene extends Phaser.Scene {
   private enemyProjectiles: Fireball[] = [];
   private enemies: CrowHarvester[] = [];
   private gravecallers: Gravecaller[] = [];
+  /** Enemy 3. A pályán EGY példány áll (`H-beast-1`), de a kezelése típusszinten általános. */
+  private beasts: Beast[] = [];
 
   constructor() {
     super('Level2Scene');
@@ -197,6 +201,7 @@ export default class Level2Scene extends Phaser.Scene {
     this.enemyProjectiles = [];
     this.enemies = [];
     this.gravecallers = [];
+    this.beasts = [];
     this.ladders = [];
     this.movingPlatforms = [];
     this.reapers = [];
@@ -278,9 +283,13 @@ export default class Level2Scene extends Phaser.Scene {
     // (splice + push) kicserélni a lakóikat — és ezért TILOS a tömböket új tömbre cserélni
     // (CLAUDE.md 2. tanulság).
     //
-    // A két enemy-fajta ugyanazt a négy regisztrációt kapja: a handlerek csak a Damageable
-    // felületet használják, tehát típusfüggetlenek.
-    const enemyGroups: Phaser.Physics.Arcade.Sprite[][] = [this.enemies, this.gravecallers];
+    // Mindhárom enemy-fajta ugyanazt a négy regisztrációt kapja: a handlerek csak a
+    // Damageable felületet használják, tehát típusfüggetlenek.
+    const enemyGroups: Phaser.Physics.Arcade.Sprite[][] = [
+      this.enemies,
+      this.gravecallers,
+      this.beasts,
+    ];
     for (const group of enemyGroups) {
       this.physics.add.collider(group, ground);
       this.physics.add.collider(group, platforms);
@@ -444,6 +453,25 @@ export default class Level2Scene extends Phaser.Scene {
         continue;
       }
 
+      if (enemyType(def) === 'beast') {
+        const beast = new Beast(this, def.x, spawnY, bounds);
+
+        // A közelharci csapás a KÖZÖS `ENEMY_SWING` hangot kapja (mint a CrowHarvester és a
+        // bossok) — a ±120 cent detune-szórás miatt a sorozat így sem válik gépiessé.
+        beast.on('beast-attack', () => this.audio.playSfx(SFX_KEYS.ENEMY_SWING));
+        // A rohamnak SZÁNDÉKOSAN nincs hangja: a csomagokban nincs hozzá illő, és a
+        // Wing-Breaker charge-a is néma. A telegraph vizuális (piros tint + megtámasztott póz).
+        beast.on('beast-death', () =>
+          this.audio.playSfx(SFX_KEYS.BEAST_DEATH, {
+            volume: BEAST_DEATH_VOLUME,
+            detuneRange: DEATH_SFX_DETUNE_RANGE,
+          })
+        );
+
+        this.beasts.push(beast);
+        continue;
+      }
+
       const enemy = new CrowHarvester(this, def.x, spawnY, bounds);
       enemy.on('harvester-attack', () => this.audio.playSfx(SFX_KEYS.ENEMY_SWING));
       enemy.on('harvester-death', () =>
@@ -458,7 +486,7 @@ export default class Level2Scene extends Phaser.Scene {
 
   /** A tömb IDENTITÁSA nem változhat: splice + push, sosem új tömb (CLAUDE.md 2. tanulság). */
   private resetEnemies(): void {
-    for (const group of [this.enemies, this.gravecallers]) {
+    for (const group of [this.enemies, this.gravecallers, this.beasts]) {
       for (const enemy of group) {
         enemy.destroy();
       }
@@ -493,6 +521,7 @@ export default class Level2Scene extends Phaser.Scene {
 
     this.updateEnemies(this.enemies);
     this.updateEnemies(this.gravecallers);
+    this.updateEnemies(this.beasts);
 
     for (const projectiles of [this.fireballs, this.enemyProjectiles]) {
       for (let i = projectiles.length - 1; i >= 0; i--) {

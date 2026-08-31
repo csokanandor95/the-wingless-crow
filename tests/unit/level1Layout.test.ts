@@ -298,6 +298,17 @@ describe('ENEMY_SPAWNS', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it('a Level 1-en NINCS Beast (a scene spawnEnemies()-e nem ismeri)', () => {
+    // Az `EnemyType` game-szintű, a `Level1Scene.spawnEnemies()` viszont csak a
+    // `gravecaller` ágat kezeli, minden mást CrowHarvesterként hoz létre. Egy ide felvett
+    // `type: 'beast'` tehát NÉMÁN CrowHarvestert szülne — se a tsc, se a build nem szólna.
+    // Ha a Level 1 valaha Beastet kap, ELŐSZÖR a scene-t kell bővíteni (a Level2Scene
+    // mintájára), és csak utána törölni ezt a tesztet.
+    for (const enemy of ENEMY_SPAWNS) {
+      expect(enemyType(enemy), `${enemy.id}`).not.toBe('beast');
+    }
+  });
+
   it('minden enemy a saját felületén spawnol, a patrol-tartományán belül', () => {
     for (const enemy of ENEMY_SPAWNS) {
       expect(enemy.patrolMaxX, `${enemy.id}`).toBeGreaterThan(enemy.patrolMinX);
