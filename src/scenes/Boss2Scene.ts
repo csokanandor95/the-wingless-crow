@@ -24,14 +24,16 @@ const ARENA_WIDTH = 800;
 const ARENA_HEIGHT = 450;
 
 /**
- * A rajzolt trónterem-padló felső pereme. MÉRT érték, nem hangolt: a forráskép
- * (`2D helper/level/Second boss background.png`, 1672x941) megvilágított padlóéle a
- * 771-773. sorban van, ami a 800x450-re kicsinyített képen a 369. sorra esik (a
- * lekicsinyített PNG-n visszamérve: a fényesség-csúcs y=369, a leesés y=370-371).
+ * A rajzolt trónterem-dobogó elülső pereme. MÉRT érték, nem hangolt: a forráskép
+ * (`2D helper/level/Mad King background.png`, 1641x959) megvilágított kőpadló-sávja a
+ * 770-794. sorban van, a 795-797. sorban pedig éles leesés következik (-4,6 / -7,1 / -3,9)
+ * — a fényesség-csúcs tehát a 793-794. sor. A BootScene-ben leírt kivágás (0,36 -> 1641x923)
+ * ezt pontosan a 369. sorra viszi: a 800x450-es PNG-n visszamérve a csúcs y=369, alatta
+ * y=370-372-nél 27,1 -> 15,0-re esik a fényesség.
  *
- * A Boss 1-nél a képet KIVÁGNI kellett, mert ott a GROUND_TOP (418) már adott volt. Itt új
- * scene, tehát a padlóvonalat a KÉPHEZ igazítjuk: a festmény így vágás nélkül, teljes
- * egészében megmarad. Ha a háttér valaha újragenerálódik, ezt EGYÜTT kell újramérni.
+ * A Boss 1-nél a képet szintén KIVÁGNI kell (ott a GROUND_TOP-ból jön a kivágás szélessége);
+ * itt a kivágás magassága adódik ugyanebből. Ha a háttér valaha újragenerálódik, ezt EGYÜTT
+ * kell újramérni.
  */
 const GROUND_TOP = 369;
 const GROUND_CENTER_Y = GROUND_TOP + 16; // ground-placeholder 64x32, origin 0.5
@@ -52,7 +54,7 @@ const KING_SPAWN_Y = GROUND_TOP - KING_FEET_OFFSET_Y;
  */
 
 /** A festmény legfelső sorának átlagszíne — hogy egy letterbox se villantson feketét. */
-const BACKGROUND_COLOR = '#0e0c17';
+const BACKGROUND_COLOR = '#0b0a18';
 
 const BOSS_NAME = 'The Mad King';
 const BOSS_SUBTITLE = 'aki nem engedte el';

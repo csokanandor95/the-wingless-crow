@@ -218,16 +218,26 @@ import bgSkyUrl from '../../assets/backgrounds/ruined-city/01-sky.png';
 import bgMountainsUrl from '../../assets/backgrounds/ruined-city/02-mountains.png';
 import bgRuinsUrl from '../../assets/backgrounds/ruined-city/03-ruins.png';
 // Boss aréna háttere: egyetlen álló, teljes képernyős kép. SZÁRMAZTATOTT asset — a forrás
-// a `2D helper/level/Bossbackground_1.png` (1672x941), amiből egy 1467x825-ös kivágás
-// (bal-felső sarok: 103, 0) lett 800x450-re kicsinyítve. A kivágás nem esztétikai döntés:
-// ez teszi a rajzolt padlóélt PONTOSAN a BossScene GROUND_TOP-jára (418). Lásd CLAUDE.md.
+// a `2D helper/level/Bossbackground_1.png` (1672x941), amiből egy 1663x935-ös kivágás
+// (bal-felső sarok: 4, 0) lett 800x450-re kicsinyítve. A kivágás nem esztétikai döntés:
+// ez teszi a rajzolt padlóélt (a forrás 767. sora) PONTOSAN a BossScene GROUND_TOP-jára.
+//
+// A kép ÚJRAGENERÁLÓDOTT, amikor a BossScene GROUND_TOP-ja 418 -> 369 lett (hogy a
+// párbeszéd-panel a padló ALÁ férjen, mint a másik három arénában). A képlet a
+// CLAUDE.md-ből: cropW = FLOOR_SRC_Y * 800 / GROUND_TOP = 767 * 800 / 369 = 1663, és
+// cropH = 1663 * 450 / 800 = 935. Ez a KORÁBBINÁL KEVESEBB vágás (a régi 1467x825 volt,
+// oldalanként 103 px-et dobva), tehát a festmény szélső romos ívei visszakerültek.
 import bossArenaUrl from '../../assets/backgrounds/cathedral/boss-arena.png';
-// Boss 2 aréna háttere: romos gótikus trónterem. SZÁRMAZTATOTT asset — a forrás a
-// `2D helper/level/Second boss background.png` (1672x941), amiből egy sima 800x450-es
-// KICSINYÍTÉS lett, KIVÁGÁS NÉLKÜL. A boss 1-nél azért kellett vágni, mert ott a GROUND_TOP
-// (418) már adott volt; itt új scene, tehát a padlóvonalat igazítottuk a képhez
-// (Boss2Scene.GROUND_TOP = 369). A forrás licenc nélkül érkezett — nyitott jogi tétel
-// (lásd CLAUDE.md), mint a Bossbackground_1.png esetében.
+// Boss 2 aréna háttere: romos gótikus trónterem, a lépcső előtt a KIRÁLYNÉ KOPORSÓJÁVAL —
+// pontosan az, amiről a KING_DIALOGUE szól. SZÁRMAZTATOTT asset: a forrás a
+// `2D helper/level/Mad King background.png` (1641x959), amiből egy 1641x923-as kivágás
+// (bal-felső sarok: 0, 36) lett 800x450-re kicsinyítve.
+//
+// A kivágás KÖTELEZŐ, nem ízlés: a forrás aspektusa 1.7112, a célé 1.7778, tehát egy sima
+// átméretezés függőlegesen 3,9 %-ot torzítana. A 36 sornyi levágás a kép legfelső, sötét
+// mennyezet-sávját éri (mért átlagfényesség 9,3-10,5), és pont ez teszi a rajzolt dobogó-
+// peremet (a forrás 793. sora) a Boss2Scene.GROUND_TOP-jára (369). A forrás licenc nélkül
+// érkezett — nyitott jogi tétel (lásd CLAUDE.md), mint a másik három boss-háttér esetében.
 import boss2ArenaUrl from '../../assets/backgrounds/throne-room/boss2-arena.png';
 // Final boss aréna háttere: a "The Broken Gate" romos katedrális-trónterme. SZÁRMAZTATOTT
 // asset — a forrás a `2D helper/level/Final boss background.png` (1672x941), amiből sima
@@ -342,7 +352,7 @@ const LOADING_BAR_HEIGHT = 14;
  * fejlesztés közben ez a leggyorsabb út az új szakaszokhoz. **Commit előtt mindig állítsd
  * vissza `'Level1Scene'`-re.**
  */
-const START_SCENE = 'Level3Scene';
+const START_SCENE = 'BossScene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a

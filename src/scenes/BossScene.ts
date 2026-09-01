@@ -20,6 +20,7 @@ import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 import AudioManager, { bindPlayerSfx, MUSIC_KEYS, SFX_KEYS } from '../systems/AudioManager';
 import AfterImageTrail from '../systems/AfterImageTrail';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
+import Dialogue, { type DialogueLine } from '../ui/Dialogue';
 
 // Boss aréna (Project_plan.md 15. pont): fix, egy képernyős pálya — nincs kameragörgetés,
 // így a boss, a player és a HP-bar mindig egyszerre látszik, és a charge/projectile
@@ -27,8 +28,19 @@ import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 const ARENA_WIDTH = 800;
 const ARENA_HEIGHT = 450;
 
-const GROUND_CENTER_Y = 434;
-const GROUND_TOP = 418; // ground-placeholder 64x32, origin 0.5 -> 434 - 16
+/**
+ * A rajzolt katedrális-padló felső pereme. **418 volt, és 369 lett** (2026-09-01), amikor az
+ * aréna párbeszédet kapott: a `ui/Dialogue` panelje a járható felszín ALÁ ül és
+ * `PANEL_RESERVE_PX` (75) px-t foglal, tehát `GROUND_TOP + 75 <= 450` a kényszer —
+ * 418-cal a panel kilógott volna a képből.
+ *
+ * Ezzel MIND A NÉGY párbeszédes aréna padlóvonala 369. A háttér ehhez ÚJRAGENERÁLÓDOTT
+ * (a képlet a BootScene importjánál); a padlóél a 800x450-es PNG-n visszamérve a 370. sorban
+ * csúcsosodik ki (118,4), a felfutás a 369.-ben kezdődik — pontosan úgy, ahogy a régi,
+ * 418-as változatban is egy sorral a GROUND_TOP alatt volt.
+ */
+const GROUND_TOP = 369;
+const GROUND_CENTER_Y = GROUND_TOP + 16; // ground-placeholder 64x32, origin 0.5
 
 // Az aréna szélén, hogy a boss (aki jobb oldalt spawnol) és a player között legyen távolság.
 const PLAYER_SPAWN_X = 80;
@@ -60,6 +72,21 @@ const VICTORY_DELAY_MS = 1400;
 const DEFEAT_DELAY_MS = 1400;
 const FADE_MS = 700;
 
+/**
+ * Placeholder lore-párbeszéd: a végleges szöveget a Phase 9 – Lore írja meg, a csere ennek a
+ * tömbnek a szerkesztése. A tartalom a Project_plan.md 12. pontját követi (a Wing-Breaker a
+ * varjak fogvatartója, a testéhez varrt szárnyakkal), és előrevetíti a királyt: a tűt ő adta.
+ *
+ * A sorok SZÁNDÉKOSAN rövidek: a panel 2 sorra tördel, ennél hosszabb szöveg kilógna belőle.
+ * NÉGY sor — a többi bossnál hat —, mert ez a játék ELSŐ harca: itt még nincs mit felidézni.
+ */
+const WING_BREAKER_DIALOGUE: DialogueLine[] = [
+  { speaker: 'A SZÁRNYTÖRŐ', text: 'Szárnyatlan. Végre. A tieid itt lógnak a hátamon.' },
+  { speaker: 'LAZARUS', text: 'Azok nem a te szárnyaid. Levarrtad őket, mert magadnak nem nőtt.' },
+  { speaker: 'A SZÁRNYTÖRŐ', text: 'A király adta a tűt. Én csak begyűjtöm, ami a kapun kirepül.' },
+  { speaker: 'LAZARUS', text: 'Akkor tedd le. Vagy leszedem rólad.' },
+];
+
 // Placeholder lore-szöveg: a végleges narrációt a Phase 9 – Lore írja meg,
 // a csere ennek a tömbnek a szerkesztése.
 const BOSS_VICTORY_NARRATION = [
@@ -71,10 +98,16 @@ const BOSS_VICTORY_NARRATION = [
 
 export default class BossScene extends Phaser.Scene {
   private player!: Player;
-  private controller!: PlayerController;
+  /**
+   * SZÁNDÉKOSAN csak a párbeszéd UTÁN jön létre. A PlayerController konstruktora regisztrálja
+   * a J/F billentyű- és pointer-listenereket, tehát nem elég az update()-jét kihagyni: a
+   * player a dialógus alatt így nem mozoghat, nem támadhat és nem varázsolhat.
+   */
+  private controller: PlayerController | null = null;
   private boss!: GraftedWingBreaker;
   private audio!: AudioManager;
   private chargeTrail!: AfterImageTrail;
+  private dialogue: Dialogue | null = null;
 
   private playerHpText!: Phaser.GameObjects.Text;
   private bossHpBar!: Phaser.GameObjects.Graphics;
@@ -96,6 +129,8 @@ export default class BossScene extends Phaser.Scene {
     // példányon hívja újra a create()-et. Lásd CLAUDE.md "Fontos technikai tanulságok" 3.
     this.fireballs = [];
     this.bossProjectiles = [];
+    this.controller = null;
+    this.dialogue = null;
     this.fightStarted = false;
     this.outcomeScheduled = false;
 
@@ -134,9 +169,31 @@ export default class BossScene extends Phaser.Scene {
     this.registerCombatOverlaps(ground);
     this.registerBossEvents();
 
-    this.controller = new PlayerController(this, this.player);
     this.createHud();
-    this.startEntrance();
+    this.startDialogue();
+  }
+
+  /**
+   * A párbeszéd a boss entrance ELSŐ fele: a boss DORMANT, tehát nem mozog és nem is
+   * sebezhető, a player pedig kontroller nélkül áll. A jobbra-nyíl gyorsítja a szöveget;
+   * a párbeszéd magától is végigmegy. (A Boss2Scene / Boss3Scene / FinalBossScene mintája.)
+   *
+   * Vereség után a scene-be visszalépve a párbeszéd ÚJRA lefut, `skipDialogue` NINCS —
+   * szemben a FinalBossScene-nel, ahová egy 7200 px-es pálya végéről vezetett az út. Ide a
+   * Level 1 ajtajától néhány lépés, és a nyílat nyomva tartva négy sor pillanatok alatt
+   * lepörög.
+   */
+  private startDialogue(): void {
+    this.dialogue = new Dialogue(
+      this,
+      WING_BREAKER_DIALOGUE,
+      { groundTop: GROUND_TOP, viewportWidth: ARENA_WIDTH },
+      () => this.startEntrance()
+    );
+
+    // A KeyboardPlugin a scene leállásakor magától leiratkoztat, ezért itt nincs kézi
+    // takarítás (a NarrationScene / Boss2Scene azonos mintája).
+    this.input.keyboard?.on('keydown-RIGHT', () => this.dialogue?.advance());
   }
 
   /**
@@ -320,11 +377,16 @@ export default class BossScene extends Phaser.Scene {
   private beginFight(): void {
     this.fightStarted = true;
     this.bossNameText.setVisible(true);
+    // A player IRÁNYÍTÁSA is csak most nyílik meg — lásd a `controller` mező kommentjét.
+    this.controller = new PlayerController(this, this.player);
     this.boss.activate();
   }
 
-  update(): void {
-    this.controller.update();
+  update(_time: number, delta: number): void {
+    // A dialógus a scene delta-idejéből ketyeg (nem saját timerből) — így a mag pure marad.
+    if (this.dialogue && !this.dialogue.isFinished()) this.dialogue.update(delta);
+
+    this.controller?.update();
 
     if (this.fightStarted) {
       this.boss.update(this.player);

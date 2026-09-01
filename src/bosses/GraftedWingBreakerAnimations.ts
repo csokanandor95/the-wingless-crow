@@ -90,7 +90,20 @@ export type BossAction = 'SLASH' | 'PROJECTILE' | 'SPELL' | 'CHARGE';
 
 const IDLE_FRAMES = { start: 0, end: 7 };
 const WALK_FRAMES = { start: 8, end: 15 };
-const ATTACK_FRAMES = { start: 16, end: 25 };
+/**
+ * A kardcsapás frame-listája (a sheet f16-25 tartománya). NEM sima range: a WINDUP-kockák
+ * ISMÉTELVE vannak, hogy a lecsapás (SLASH_STRIKE_FRAME) pontosan SLASH_WINDUP_MS-nél
+ * kerüljön képre — ugyanaz a fogás, mint a CrowHarvesterAnimations.ATTACK_FRAMES-énél és a
+ * MadKingAnimations.SLASH_FRAMES-énél.
+ *
+ * Miért ismétlés és nem hosszabb ATTACK_SLOT_MS? Mert a slot-idő emelése a csapás UTÁNI
+ * kikövetkezést is lelassítaná — a windup nyúlik meg, nem a teljes mozdulat. A záró három
+ * `19` az „összehúzódott, mindjárt lecsap" póz megtartása.
+ */
+export const SLASH_FRAMES = [16, 16, 17, 17, 18, 18, 19, 19, 19, 20, 21, 22, 23, 24, 25];
+/** A fehér ív frame-je: itt oldódik fel a sebzés (és innen jön a BLADE_REACH_PX mérése). */
+export const SLASH_STRIKE_FRAME = 20;
+
 const HURT_FRAMES = { start: 26, end: 28 };
 const DEATH_FRAMES = { start: 29, end: 38 };
 const CAST_FRAMES = { start: 39, end: 47 };
@@ -112,11 +125,32 @@ export const DASH_FRAME = 20;
 // animáció és a sebzés pillanata ne tudjon elcsúszni egymástól.
 
 /** Egy slash-frame hossza. */
-const ATTACK_SLOT_MS = 100;
-/** Az f20 (a csapás) a tartomány 4. slotja után kerül képre. */
-const ATTACK_SLOTS_BEFORE_STRIKE = 4;
-/** A támadás kezdetétől a csapásig: a GraftedWingBreaker SLASH_STARTUP_MS-e ebből jön. */
-export const SLASH_WINDUP_MS = ATTACK_SLOTS_BEFORE_STRIKE * ATTACK_SLOT_MS; // 400
+export const ATTACK_SLOT_MS = 100;
+
+/**
+ * A támadás kezdetétől a csapásig: a GraftedWingBreaker SLASH_STARTUP_MS-e ebből jön.
+ * SZÁMÍTOTT érték — a SLASH_FRAMES átírása magával viszi.
+ *
+ * **Miért pont ennyi (MÉRÉS, nem ízlés).** A korábbi 400 ms pontosan annyi volt, amennyi
+ * alatt a player beér és üt egyet, tehát a boss csapása GARANTÁLTAN eltalálta — a player a
+ * saját támadása alatt végig lockolva van (`Player.isLocked()`), se mozogni, se ugrani nem
+ * tud. A user kérése: legyen idő EGY kardcsapásra, majd elfutni VAGY elugrani. A hurok, a
+ * player exportált konstansaiból (a Beast elve: a padlót a LASSABB válasz adja):
+ *
+ *   belépés a boss hatótávjából (SLASH_RANGE 138) a sajátunkéba (91 px)   235 ms
+ *   kardcsapás, teljes ATTACK-lock (startupDelayMs 150 + activeDurationMs 180)  330 ms
+ *   menekülés 91 -> SLASH_RANGE + 10 (148) tiszta FUTÁSSAL (MOVE_SPEED 200)     285 ms
+ *   ugyanez tiszta UGRÁSSAL (hypot(91, h) > 148 -> h > 116.7)                   315 ms
+ *   ------------------------------------------------------------------------------------
+ *   = 880 ms a lassabb ággal  ->  9 slot * 100 ms = 900 ms, ~20 ms tartalékkal
+ *
+ * VÁLLALT KORLÁT: pontblank ölelkezésből (46 px) + 250 ms reakcióidővel a tiszta futás
+ * (510 ms) NEM fér bele — onnan ugrás + hátralépés kombó visz ki (280 ms). Az ezt is lefedő
+ * 1100 ms user-döntéssel elvetve: lomhává tenné a bosst (2 s-os slash-ciklus).
+ * A tesztek: tests/unit/boss.test.ts „Fairness-invariánsok".
+ */
+export const SLASH_WINDUP_MS =
+  SLASH_FRAMES.indexOf(SLASH_STRIKE_FRAME) * ATTACK_SLOT_MS; // 900
 
 /** Az f45 (az energia csúcsa) a cast 6. slotja után van — ekkor születik a lövedék/spell. */
 const CAST_SLOTS_BEFORE_RELEASE = 6;
@@ -227,7 +261,7 @@ export function createGraftedWingBreakerAnimations(scene: Phaser.Scene): void {
   // SLASH_WINDUP_MS-nél, az f45 (az energia csúcsa) CAST_RELEASE_MS-nél.
   define(
     WING_BREAKER_ANIMS.SLASH,
-    scene.anims.generateFrameNumbers(TEXTURE_KEY, ATTACK_FRAMES),
+    scene.anims.generateFrameNumbers(TEXTURE_KEY, { frames: SLASH_FRAMES }),
     1000 / ATTACK_SLOT_MS,
     0
   );

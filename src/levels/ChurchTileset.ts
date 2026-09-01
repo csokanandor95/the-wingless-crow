@@ -142,8 +142,9 @@ export const ARENA_HEIGHT = 450;
  * kényszer teszi a Boss 2 és a végső aréna padlóvonalát is 369-re; ott a háttérfestményből
  * MÉRTÜK, itt a szerkesztett háttér miatt szabadon választható, tehát a panel dönt.
  *
- * A 369 a plafon alatt marad 6 px-szel, és ezzel a három párbeszédes aréna padlóvonala
- * azonos — a player minden bossnál ugyanabban a magasságban áll.
+ * A 369 a plafon alatt marad 6 px-szel, és ezzel MIND A NÉGY párbeszédes aréna padlóvonala
+ * azonos — a player minden bossnál ugyanabban a magasságban áll. (A `BossScene` 2026-09-01-en
+ * csatlakozott: 418-ról 369-re került, amikor párbeszédet kapott.)
  */
 export const ARENA_GROUND_TOP = 369;
 

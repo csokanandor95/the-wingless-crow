@@ -1106,6 +1106,17 @@ A boss belépése és a zene fontos része a játékélménynek.
 > - **Zene:** a boss theme és az átvezető zenéje a Phase 8 – Atmosphere része; a kódban
 >   jelenleg csak dokumentált beakasztási pontok (`TODO (Phase 8)`) vannak.
 
+> **Kiegészítés (2026-09-01) — a Boss 1 belépője is KÉT részes lett.** A Wing-Breaker harca
+> is **párbeszéddel** nyit (`WING_BREAKER_DIALOGUE`, 4 sor — a többi bossnál 6, mert ez a
+> játék ELSŐ harca: itt még nincs mit felidézni), pontosan a Boss 2 szerkezetében:
+> `create() → párbeszéd → cím-kártya + zene → harc`. **MIND A NÉGY boss belépője azonos.**
+>
+> Ennek egy geometriai ára volt: a `ui/Dialogue` panelje a járható felszín ALATT ül és 75 px-t
+> foglal, tehát `GROUND_TOP + 75 ≤ 450`. A `BossScene` padlóvonala ezért **418 → 369** lett
+> (ugyanoda, ahol a másik három aréna van), és a háttere ehhez ÚJRAGENERÁLÓDOTT a lentebb
+> leírt `cropW = FLOOR_SRC_Y * 800 / GROUND_TOP` képlettel — ami mellékesen KEVESEBBET vág a
+> festményből, mint a korábbi verzió.
+
 > **Kiegészítés (2026-08-30) — a Boss 2 arénája (`Boss2Scene`):**
 >
 > Ugyanaz a fix 800×450-es felépítés, üres padlóval. Két érdemi eltérés:
@@ -1114,11 +1125,14 @@ A boss belépése és a zene fontos része a játékélménynek.
 >   alatt is (nem mozog, nem sebezhető), a player pedig TELJESEN befagyasztva — a
 >   `PlayerController` csak a harc kezdetekor jön létre, mert a konstruktora regisztrálja a
 >   támadás-billentyűket.
-> - **A `GROUND_TOP` a KÉPHEZ igazodik (369), nem fordítva.** A Boss 1-nél a padlóvonal (418)
->   már adott volt, ezért ott a festményt kellett kivágni; itt új scene, tehát a rajzolt
->   padlóélt mértük meg, és a talajt tettük oda — a trónterem így vágás nélkül megmarad.
->   **Ez a recept a végső arénára is alkalmazható** (a `Final boss background.png` ugyanaz
->   az 1672×941).
+> - **A `GROUND_TOP` a KÉPHEZ igazodik (369), nem fordítva.** Ez a scene mérte ki elsőként a
+>   padlóvonalat a festményből, és a többi aréna ehhez igazodott — visszamenőleg a Boss 1 is
+>   (2026-09-01, lásd fentebb). **Ez a recept a végső arénára is alkalmazható volt** (a
+>   `Final boss background.png` ugyanaz az 1672×941).
+> - **A háttér 2026-09-01 óta a `Mad King background.png`** (user-döntés): ugyanaz a romos
+>   gótikus trónterem, de a lépcső előtt ott áll a **KIRÁLYNÉ KOPORSÓJA** — pontosan az,
+>   amiről a párbeszéd szól („Alszik. Csak addig alszik…"). A `GROUND_TOP` NEM változott vele;
+>   a kivágás igazodott a képhez (a rajzolt dobogó-perem a forrás 793. sora).
 >
 > A vereség/győzelem lánca a Boss 1-ével azonos: vereség → `Level2Scene` a saját
 > checkpointjára; győzelem → `kingDefeated` registry-flag + `NarrationScene`. Az átvezető
@@ -1216,9 +1230,9 @@ Az ending lehet rövid, 30–60 másodperces.
 > iterációban"). A lista a `2D helper/Credits.txt` gyűjtéséből indul; ez egyben az a hely,
 > ahol a még nyitott licenc-tételeket le kell zárni a publikálás előtt.
 
-A szöveg maga placeholder — a végleges lore a Phase 9 dolga (négy helyett most **öt**
+A szöveg maga placeholder — a végleges lore a Phase 9 dolga (négy helyett most **hat**
 placeholder lore-szöveg van a kódban: a két boss-győzelmi narráció, a Level 2 átvezetője,
-a Boss 2 párbeszéde, valamint a Boss 3 párbeszéde + endingje).
+a Boss 1 és a Boss 2 párbeszéde, valamint a Boss 3 párbeszéde + endingje).
 
 ---
 

@@ -63,9 +63,12 @@ const PANEL_GAP_ABOVE = 3;
 const PANEL_HEIGHT = 72;
 
 /**
- * Mennyi helyet foglal a panel a `groundTop` ALATT. Ez a szám az, amiért mind a három
+ * Mennyi helyet foglal a panel a `groundTop` ALATT. Ez a szám az, amiért mind a NÉGY
  * párbeszédes aréna padlóvonala 369-en van: `369 + 75 = 444 <= 450` (a viewport magassága).
  * Egy új aréna `GROUND_TOP`-jának ezt kell teljesítenie, különben a panel kilóg a képből.
+ *
+ * A `BossScene` (Boss 1) volt az egyetlen kivétel, 418-cal — ott a padlóvonalat kellett
+ * 369-re vinni (és a hátteret újragenerálni), amikor 2026-09-01-en párbeszédet kapott.
  */
 export const PANEL_RESERVE_PX = PANEL_GAP_ABOVE + PANEL_HEIGHT; // 75
 const PANEL_PADDING = 9;

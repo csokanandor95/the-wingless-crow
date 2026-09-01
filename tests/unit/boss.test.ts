@@ -30,9 +30,23 @@ import GraftedWingBreaker, {
   SPELL_CAST_MS,
   SPELL_DAMAGE,
   SPELL_HIT_HALF_WIDTH,
+  SLASH_TELEGRAPH_TINT,
+  CHARGE_TELEGRAPH_TINT,
+  HIT_FLASH_MS,
 } from '../../src/bosses/GraftedWingBreaker';
-import { SPELL_IMPACT_MS } from '../../src/bosses/GraftedWingBreakerAnimations';
-import Player, { MAX_HP as PLAYER_MAX_HP } from '../../src/player/Player';
+import {
+  ATTACK_SLOT_MS,
+  HALF_WIDTH,
+  SPELL_IMPACT_MS,
+} from '../../src/bosses/GraftedWingBreakerAnimations';
+import Player, {
+  MAX_HP as PLAYER_MAX_HP,
+  MOVE_SPEED,
+  JUMP_VELOCITY,
+} from '../../src/player/Player';
+import { BODY_WIDTH as PLAYER_BODY_WIDTH } from '../../src/player/PlayerAnimations';
+import { ATTACK_CONFIGS, AttackType } from '../../src/combat/Attack';
+import { GRAVITY_Y } from '../../src/config/physics';
 import {
   createMockScene,
   getBody,
@@ -211,6 +225,118 @@ describe('GraftedWingBreaker (Boss)', () => {
 
       runner.run(SLASH_STARTUP_MS);
       expect(onSlash).toHaveBeenCalledTimes(1);
+    });
+
+    it('a windup alatt ARANY telegraph van, a csapás pillanatában eltűnik', () => {
+      const runner = createDelayedCallRunner(scene);
+      const tinted = boss as unknown as { tintColor: number | null };
+      const player = createPlayerAt(scene, BOSS_X + SLASH_RANGE - 10, BOSS_Y);
+
+      boss.update(player);
+      expect(tinted.tintColor).toBe(SLASH_TELEGRAPH_TINT);
+
+      runner.run(SLASH_STARTUP_MS);
+      expect(tinted.tintColor).toBeNull();
+    });
+
+    it('egy TALÁLAT a windup alatt NEM törli a telegraph-ot', () => {
+      // Runner (nem stepper): a windup alatt KÉT callback van ütemezve — a csapás
+      // (SLASH_STARTUP_MS) és a hit-villanás (HIT_FLASH_MS) —, és pont az utóbbit kell
+      // elsütni, miközben a támadás MÉG FUT. A stepper regisztrációs sorrendben haladna,
+      // tehát a csapást lőné el.
+      const runner = createDelayedCallRunner(scene);
+      const tinted = boss as unknown as { tintColor: number | null };
+      const player = createPlayerAt(scene, BOSS_X + SLASH_RANGE - 10, BOSS_Y);
+
+      boss.update(player);
+      boss.takeDamage(10);
+      expect(tinted.tintColor).toBe(0xffffff);
+
+      // A villanás lejártakor az ARANY telegraph tér vissza, nem a tint nélküli alapállapot:
+      // enélkül egy jól időzített találat pont a legfontosabb pillanatban vakítaná el a playert.
+      runner.run(HIT_FLASH_MS);
+      expect(tinted.tintColor).toBe(SLASH_TELEGRAPH_TINT);
+    });
+
+    it('a két telegraph SZÍNE elválik — más választ kíván', () => {
+      // arany = jön a kardcsapás -> üss egyet és térj ki;  piros = jön a roham -> ki az útból.
+      expect(SLASH_TELEGRAPH_TINT).not.toBe(CHARGE_TELEGRAPH_TINT);
+    });
+  });
+
+  // A user kézi tesztje szerint „amint közel érek hozzá, rögtön megsebez a karddal". Az
+  // alábbi állítások a javítás követelményét rögzítik LEVEZETVE, a player exportált
+  // konstansaiból — nem beégetett számokból. Ha valaki visszagyorsítja a windupot, ezek
+  // buknak, nem a következő kézi végigjátszás.
+  describe('Fairness-invariánsok (a kézi teszt visszajelzéséből)', () => {
+    /** A resolveSlashHit() ekkora toleranciával számol a hatótáv fölött. */
+    const HIT_TOLERANCE = 10;
+    /** Emberi reakcióidő, ha nem a player kezdeményezi a közeledést. */
+    const REACTION_MS = 250;
+
+    const sword = ATTACK_CONFIGS[AttackType.SWORD];
+
+    /**
+     * Ilyen messziről éri el a player kardja a boss TESTÉT: az ív vége a saját középpontjától
+     * (hitboxOffsetX + hitboxWidth / 2) plusz a boss félszélessége.
+     */
+    const PLAYER_STRIKE_DISTANCE =
+      sword.hitboxOffsetX + sword.hitboxWidth / 2 + HALF_WIDTH; // 91
+    /** Pontblank: a két test félszélessége — ennyire kerülnek egymáshoz ölelkezve. */
+    const CONTACT_DISTANCE = HALF_WIDTH + PLAYER_BODY_WIDTH / 2; // 46
+
+    /** Bejutás a boss hatótávjából (SLASH_RANGE) a sajátunkéba. */
+    const APPROACH_MS = ((SLASH_RANGE - PLAYER_STRIKE_DISTANCE) / MOVE_SPEED) * 1000;
+    /** EGY kardcsapás: a player VÉGIG lockolva van (isLocked() ATTACK-ra), nem tud kitérni. */
+    const ONE_HIT_MS = sword.startupDelayMs + sword.activeDurationMs;
+
+    /** Az ugrás magassága t másodperccel a felugrás után. */
+    const jumpHeightAt = (t: number): number =>
+      Math.max(0, -JUMP_VELOCITY * t - 0.5 * GRAVITY_Y * t * t);
+
+    /**
+     * Mennyi idő alatt jut ki a player a csapás hatóköréből a megadott távolságról?
+     * A `resolveSlashHit()` 2D távolságot néz, tehát az ugrás magassága IS beleszámít.
+     */
+    const escapeMs = (
+      fromDistance: number,
+      opts: { retreat?: boolean; jump?: boolean }
+    ): number => {
+      for (let t = 0; t < 2; t += 0.005) {
+        const dx = fromDistance + (opts.retreat ? MOVE_SPEED * t : 0);
+        const dy = opts.jump ? jumpHeightAt(t) : 0;
+        if (Math.hypot(dx, dy) > SLASH_RANGE + HIT_TOLERANCE) return t * 1000;
+      }
+      return Infinity;
+    };
+
+    /** A user kérése: bejutni, ütni EGYET, majd elfutni VAGY elugrani. */
+    const loopMs = (opts: { retreat?: boolean; jump?: boolean }): number =>
+      APPROACH_MS + ONE_HIT_MS + escapeMs(PLAYER_STRIKE_DISTANCE, opts);
+
+    it('a windupba befér: bejutás + EGY kardcsapás + menekülés FUTÁSSAL', () => {
+      // A korábbi 400 ms-mal ez BUKOTT: annyi idő alatt a player épp csak beér és üt egyet,
+      // a csapás pedig még az ATTACK-lock alatt találja el — pontosan ez a regresszió.
+      expect(SLASH_STARTUP_MS).toBeGreaterThanOrEqual(loopMs({ retreat: true }));
+    });
+
+    it('a windupba befér ugyanez ÁLLÓ UGRÁSSAL is', () => {
+      // Mindkét válasznak működnie kell, nem csak a gyorsabbnak (a Beast elve: a padlót a
+      // LASSABB válasz adja).
+      expect(SLASH_STARTUP_MS).toBeGreaterThanOrEqual(loopMs({ jump: true }));
+    });
+
+    it('a windup nem hosszabb a szükségesnél — a boss nem válhat bábuvá', () => {
+      const slowest = Math.max(loopMs({ retreat: true }), loopMs({ jump: true }));
+      expect(SLASH_STARTUP_MS).toBeLessThanOrEqual(slowest + ATTACK_SLOT_MS);
+    });
+
+    it('pontblank helyzetből ugrás + hátralépés komboval még ki lehet jutni', () => {
+      // A VÁLLALT KORLÁT: ha a boss besétál a playerbe, a tiszta futás már nem elég (510 ms),
+      // a kombó viszont igen. Az ezt is lefedő 1100 ms-os windupot a user elvetette.
+      expect(SLASH_STARTUP_MS).toBeGreaterThanOrEqual(
+        REACTION_MS + ONE_HIT_MS + escapeMs(CONTACT_DISTANCE, { retreat: true, jump: true })
+      );
     });
   });
 

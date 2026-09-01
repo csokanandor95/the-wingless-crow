@@ -24,11 +24,14 @@ import GraftedWingBreaker, {
 } from '../../src/bosses/GraftedWingBreaker';
 import {
   animKeyForState,
+  ATTACK_SLOT_MS,
   BLADE_REACH_PX,
   BODY_WIDTH,
   CAST_RELEASE_MS,
   FRAME_WIDTH,
   SCALE,
+  SLASH_FRAMES,
+  SLASH_STRIKE_FRAME,
   SLASH_WINDUP_MS,
   WING_BREAKER_ANIMS,
 } from '../../src/bosses/GraftedWingBreakerAnimations';
@@ -135,6 +138,19 @@ describe('levezetett konstansok', () => {
   it('a támadás-időzítések az animációból jönnek, nem beégetett számok', () => {
     expect(SLASH_STARTUP_MS).toBe(SLASH_WINDUP_MS);
     expect(PROJECTILE_STARTUP_MS).toBe(CAST_RELEASE_MS);
+  });
+
+  it('a SLASH_WINDUP_MS a frame-listából származik, a csapás frame-jének indexéből', () => {
+    // A windup a windup-kockák ISMÉTLÉSÉBŐL hosszabbodik, nem a slot-idő emeléséből — így a
+    // csapás UTÁNI kikövetkezés tempója változatlan marad. Ha valaki átírja a listát, a
+    // gameplay-időzítés magától követi; ha viszont a strike-frame kiesne belőle, itt bukik.
+    expect(SLASH_FRAMES).toContain(SLASH_STRIKE_FRAME);
+    expect(SLASH_WINDUP_MS).toBe(SLASH_FRAMES.indexOf(SLASH_STRIKE_FRAME) * ATTACK_SLOT_MS);
+    // A csapás előtti szakasz CSAK windup-kockákból áll (f16-19), a strike utáni rész pedig
+    // szigorúan növekvő — különben a mozdulat nem olvasna "felhúz ... CSATT"-ként.
+    const strikeIndex = SLASH_FRAMES.indexOf(SLASH_STRIKE_FRAME);
+    expect(SLASH_FRAMES.slice(0, strikeIndex).every((f) => f >= 16 && f < SLASH_STRIKE_FRAME))
+      .toBe(true);
   });
 });
 

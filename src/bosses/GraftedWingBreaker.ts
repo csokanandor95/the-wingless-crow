@@ -64,8 +64,12 @@ export const MOVE_SPEED_P2 = 120;
  */
 export const SLASH_RANGE = BLADE_REACH_PX * SCALE; // 138
 export const SLASH_DAMAGE = 18;
-/** Az ANIMÁCIÓBÓL: pont akkor sebez, amikor a kasza íve (f20) képre kerül. */
-export const SLASH_STARTUP_MS = SLASH_WINDUP_MS;
+/**
+ * Az ANIMÁCIÓBÓL: pont akkor sebez, amikor a kasza íve (f20) képre kerül.
+ * A hosszának (900 ms) MÉRT oka van — a levezetés a
+ * GraftedWingBreakerAnimations.SLASH_WINDUP_MS kommentjében van.
+ */
+export const SLASH_STARTUP_MS = SLASH_WINDUP_MS; // 900
 
 export const PROJECTILE_MIN_RANGE = 160;
 /** Az ANIMÁCIÓBÓL: a lövedék a cast energia-csúcsán (f45) születik. */
@@ -128,9 +132,16 @@ export const DIRECTION_DEADZONE = 6;
 export const ATTACK_ROTATION = ['PROJECTILE', 'SPELL', 'CHARGE'] as const;
 type RotatedAttack = (typeof ATTACK_ROTATION)[number];
 
-const HIT_FLASH_MS = 100;
+export const HIT_FLASH_MS = 100;
 const HIT_FLASH_TINT = 0xffffff;
-const CHARGE_TELEGRAPH_TINT = 0xff2222;
+
+/**
+ * KÉT telegraph-szín, szándékosan elválasztva (a Mad King azonos értékeivel — a jelentésük
+ * bosson átívelő): ARANY = jön a kardcsapás -> UGORJ vagy FUSS; PIROS = jön a roham ->
+ * TÉRJ KI oldalra. A clearTintState() MINDKETTŐT visszateszi a hit-villanás után.
+ */
+export const SLASH_TELEGRAPH_TINT = 0xffd070;
+export const CHARGE_TELEGRAPH_TINT = 0xff2222;
 
 export default class GraftedWingBreaker
   extends Phaser.Physics.Arcade.Sprite
@@ -338,12 +349,19 @@ export default class GraftedWingBreaker
     this.lastAction = 'SLASH';
     this.bossState = BossState.SLASH;
     this.setVelocityX(0);
-    // A korábbi sárga windup-tint elmaradt: a telegraph most maga az animáció
-    // (a hátrahúzott, majd lecsapó kasza).
+    // Arany villanás a hátrahúzott kasza MELLÉ: a 900 ms-os windup így nemcsak elég hosszú a
+    // válaszhoz, hanem félreérthetetlenül jelzi is, hogy most kell ütni egyet és kitérni.
+    // (Korábban itt szándékosan NEM volt tint — a 400 ms-os windupnál viszont az animáció
+    // önmagában sem adott elég időt, lásd a SLASH_WINDUP_MS levezetését.)
+    this.applyTint(SLASH_TELEGRAPH_TINT);
     this.restartAnimation();
 
     this.scene.time.delayedCall(SLASH_STARTUP_MS, () => {
       if (this.bossState === BossState.DEAD) return;
+      // A telegraph a CSAPÁS pillanatában tűnik el, nem előbb. `resetTint()` és nem
+      // `clearTintState()`: az állapot ekkor még SLASH, tehát utóbbi pont visszatenné az
+      // aranyat (ugyanaz a fogás, mint az endCharge()-ban a pirossal).
+      this.resetTint();
       // A csapás hangja a lecsapás PILLANATÁBAN szól (f20), nem a kasza hátrahúzásakor —
       // ugyanaz a delegálási minta, mint a lövedéknél: a scene játssza le.
       this.emit('boss-slash');
@@ -555,8 +573,9 @@ export default class GraftedWingBreaker
   }
 
   /**
-   * A charge piros telegraph-ját NEM szabad letörölni egy hit-villanással: a player abból
-   * olvassa ki, hogy jön a roham. Ezért a visszaállítás állapotfüggő.
+   * A telegraph-okat NEM szabad letörölni egy hit-villanással: a player azokból olvassa ki,
+   * hogy mi jön és mit kell tennie. Ezért a visszaállítás állapotfüggő — enélkül egy jól
+   * időzített találat pont a legfontosabb pillanatban vakítaná el a playert.
    */
   private clearTintState(): void {
     if (
@@ -564,6 +583,11 @@ export default class GraftedWingBreaker
       this.bossState === BossState.CHARGE
     ) {
       this.applyTint(CHARGE_TELEGRAPH_TINT);
+      return;
+    }
+
+    if (this.bossState === BossState.SLASH) {
+      this.applyTint(SLASH_TELEGRAPH_TINT);
       return;
     }
 
