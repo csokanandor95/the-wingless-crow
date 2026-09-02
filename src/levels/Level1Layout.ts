@@ -384,7 +384,13 @@ export const TUTORIAL_HINTS: TutorialHintDef[] = [
   // képen — a harc ebbe az ablakba esik. Korábban 1000 volt, ami az akkori `B-1`-hez tartozott;
   // az enemy áthelyezésével EGYÜTT kellett jobbra tolni, különben a súgó jóval a harc előtt
   // lejárna (user-kérés). A `level1Layout.test.ts` mindkét végét őrzi.
-  { id: 'combat', triggerX: 1560, text: 'J / bal klikk  — kard      F  — tűzgolyó' },
+  // Két sorra tördelve: a három támadás egy sorban már túlnyúlna a 800 px-es képernyőn
+  // (a `TutorialHint` 15px-es monospace-szel, középre igazítva rajzol).
+  {
+    id: 'combat',
+    triggerX: 1560,
+    text: 'J / bal klikk  — kard      F  — tűzgolyó\nK / jobb klikk  — nagy csapás (3 kardtalálat tölti)',
+  },
 ];
 
 // --- Hangulati propok -------------------------------------------------------

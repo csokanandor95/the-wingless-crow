@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import Player from '../player/Player';
 import PlayerController from '../player/PlayerController';
+import CombatHud from '../ui/CombatHud';
 import Fireball from '../combat/Projectile';
 import MadKing, { KingState } from '../bosses/MadKing';
 import {
@@ -120,7 +121,7 @@ export default class Boss2Scene extends Phaser.Scene {
   private lungeTrail!: AfterImageTrail;
   private dialogue: Dialogue | null = null;
 
-  private playerHpText!: Phaser.GameObjects.Text;
+  private combatHud!: CombatHud;
   private kingHpBar!: Phaser.GameObjects.Graphics;
   private kingNameText!: Phaser.GameObjects.Text;
 
@@ -336,10 +337,7 @@ export default class Boss2Scene extends Phaser.Scene {
   }
 
   private createHud(): void {
-    this.playerHpText = this.add
-      .text(10, 10, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' })
-      .setScrollFactor(0)
-      .setDepth(100);
+    this.combatHud = new CombatHud(this);
 
     this.kingNameText = this.add
       .text(ARENA_WIDTH / 2, HP_BAR_Y - 14, BOSS_NAME, {
@@ -375,9 +373,7 @@ export default class Boss2Scene extends Phaser.Scene {
       if (!this.fireballs[i].active) this.fireballs.splice(i, 1);
     }
 
-    this.playerHpText.setText(
-      `HP: ${this.player.getHP()}/${this.player.getMaxHP()} | ${this.player.playerState}`
-    );
+    this.combatHud.update(this.player);
     this.drawKingHealthBar();
 
     if (this.outcomeScheduled) return;

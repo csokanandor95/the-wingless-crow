@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import Player from '../player/Player';
 import PlayerController from '../player/PlayerController';
+import CombatHud from '../ui/CombatHud';
 import Fireball from '../combat/Projectile';
 import CrowHarvester from '../enemies/CrowHarvester';
 import Gravecaller, {
@@ -129,7 +130,7 @@ export default class Boss3Scene extends Phaser.Scene {
   private chargeTrail!: AfterImageTrail;
   private dialogue: Dialogue | null = null;
 
-  private playerHpText!: Phaser.GameObjects.Text;
+  private combatHud!: CombatHud;
   private masterHpBar!: Phaser.GameObjects.Graphics;
   private masterNameText!: Phaser.GameObjects.Text;
 
@@ -397,7 +398,7 @@ export default class Boss3Scene extends Phaser.Scene {
     this.master.on('beast-master-summon', (type: SummonType) => {
       this.spawnSummon(type);
       // A hívás hangja: ugyanaz a varázslat-becsapódás, amit a démon idézése is használ.
-      this.audio.playSfx(SFX_KEYS.BOSS_SPELL_IMPACT);
+      this.audio.playSfx(SFX_KEYS.SPELL_IMPACT);
       this.cameras.main.shake(300, 0.008);
     });
   }
@@ -501,10 +502,7 @@ export default class Boss3Scene extends Phaser.Scene {
   }
 
   private createHud(): void {
-    this.playerHpText = this.add
-      .text(10, 10, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' })
-      .setScrollFactor(0)
-      .setDepth(100);
+    this.combatHud = new CombatHud(this);
 
     this.masterNameText = this.add
       .text(ARENA_WIDTH / 2, HP_BAR_Y - 14, BOSS_NAME, {
@@ -542,9 +540,7 @@ export default class Boss3Scene extends Phaser.Scene {
       }
     }
 
-    this.playerHpText.setText(
-      `HP: ${this.player.getHP()}/${this.player.getMaxHP()} | ${this.player.playerState}`
-    );
+    this.combatHud.update(this.player);
     this.drawMasterHealthBar();
 
     if (this.outcomeScheduled) return;

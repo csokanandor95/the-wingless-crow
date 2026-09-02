@@ -200,6 +200,54 @@ export function createMockImage(
 }
 
 /**
+ * Az `add.sprite()` minimális mása a `Player` heavy-echójához: a `MockImage` felülete
+ * kiegészítve azzal a hárommal, amit egy ANIMÁLT, VÁGOTT és ki-be kapcsolható sprite kíván.
+ *
+ * A `cropArgs` és a `playedKeys` szándékosan visszaolvasható: a teszt így tudja
+ * ellenőrizni, hogy a lovag testét tényleg levágtuk a második hullámról, és hogy az echo a
+ * heavy SAJÁT (lassabb) animációját játssza, nem az alapcsapásét.
+ */
+export interface MockSprite extends MockImage {
+  visible: boolean;
+  cropArgs: [number, number, number, number] | null;
+  playedKeys: string[];
+  blendMode: number;
+  setVisible(v: boolean): MockSprite;
+  setCrop(x: number, y: number, width: number, height: number): MockSprite;
+  setBlendMode(v: number): MockSprite;
+  play(key: string, ignoreIfPlaying?: boolean): MockSprite;
+}
+
+export function createMockSprite(x: number, y: number, texture: string): MockSprite {
+  // A createMockImage setterei a SAJÁT objektumukat adják vissza, az Object.assign pedig
+  // ugyanazt a példányt bővíti — a láncolás tehát végig ezen a kiterjesztett objektumon fut.
+  const sprite: MockSprite = Object.assign(createMockImage(x, y, texture, 0), {
+    visible: true,
+    cropArgs: null as [number, number, number, number] | null,
+    playedKeys: [] as string[],
+    blendMode: 0,
+    setVisible(v: boolean) {
+      sprite.visible = v;
+      return sprite;
+    },
+    setCrop(cropX: number, cropY: number, width: number, height: number) {
+      sprite.cropArgs = [cropX, cropY, width, height];
+      return sprite;
+    },
+    setBlendMode(v: number) {
+      sprite.blendMode = v;
+      return sprite;
+    },
+    play(key: string) {
+      sprite.playedKeys.push(key);
+      return sprite;
+    },
+  });
+
+  return sprite;
+}
+
+/**
  * A `Graphics` minimális mása. A SwingingReaper ezzel rajzolja újra a láncot minden
  * frame-ben; a teszt a `lineBetween` argumentumaiból olvassa vissza, hogy a lánc a
  * horgonytól a penge AKTUÁLIS pozíciójáig tart.
@@ -215,8 +263,12 @@ export interface MockGraphics {
   fillStyle: ReturnType<typeof vi.fn>;
   fillRect: ReturnType<typeof vi.fn>;
   strokeRect: ReturnType<typeof vi.fn>;
+  visible: boolean;
   setScrollFactor(v: number): MockGraphics;
   setDepth(v: number): MockGraphics;
+  // A CombatHud a Level 1 haz-parbeszede alatt elrejti magat (a panel ott a kepernyo
+  // TETEJEN van, tehat a HUD-ra lognа).
+  setVisible(v: boolean): MockGraphics;
   destroy(): void;
 }
 
@@ -234,11 +286,16 @@ export function createMockGraphics(): MockGraphics {
     strokeRect: vi.fn(
       (_x: number, _y: number, _width: number, _height: number) => undefined
     ),
+    visible: true,
     setScrollFactor() {
       return graphics;
     },
     setDepth(v) {
       graphics.depth = v;
+      return graphics;
+    },
+    setVisible(v) {
+      graphics.visible = v;
       return graphics;
     },
     destroy() {
@@ -253,10 +310,24 @@ function createMockText() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const text: any = {
     destroyed: false,
-    setPosition: vi.fn(() => text),
+    x: 0,
+    y: 0,
+    // A ui/TutorialHint ezekbol szamolja a KEREKITETT kozepre igazitast (a "remego felirat"
+    // javitasa). A teszt allitja be oket, hogy paratlan szelesseget is szimulalhasson.
+    displayWidth: 0,
+    displayHeight: 0,
+    setPosition: vi.fn((x: number, y: number) => {
+      text.x = x;
+      text.y = y;
+      return text;
+    }),
     setText: vi.fn(() => text),
     setOrigin: vi.fn(() => text),
-    setVisible: vi.fn(() => text),
+    visible: true,
+    setVisible: vi.fn((v: boolean) => {
+      text.visible = v;
+      return text;
+    }),
     // A ui/Dialogue a kamerához rögzíti és a panel fölé emeli a feliratait.
     setScrollFactor: vi.fn(() => text),
     setDepth: vi.fn(() => text),
@@ -353,6 +424,10 @@ export function createMockScene() {
       text: vi.fn(() => createMockText()),
       image: vi.fn((x: number, y: number, texture: string, frame: string | number) =>
         createMockImage(x, y, texture, frame)
+      ),
+      // A Player heavy-echója (a második kardhullám) ezen jön létre.
+      sprite: vi.fn((x: number, y: number, texture: string) =>
+        createMockSprite(x, y, texture)
       ),
       graphics: vi.fn(() => createMockGraphics()),
     },

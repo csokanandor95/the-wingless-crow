@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import Player from '../player/Player';
 import PlayerController from '../player/PlayerController';
+import CombatHud from '../ui/CombatHud';
 import Fireball from '../combat/Projectile';
 import CheckpointSystem from '../systems/CheckpointSystem';
 import LevelCheckpoint from '../systems/LevelCheckpoint';
@@ -110,7 +111,7 @@ const LEVEL3_END_NARRATION = [
 export default class Level3Scene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
-  private playerHpText!: Phaser.GameObjects.Text;
+  private combatHud!: CombatHud;
   private audio!: AudioManager;
 
   private spikes!: SpikeField;
@@ -240,9 +241,7 @@ export default class Level3Scene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.controller = new PlayerController(this, this.player);
 
-    this.playerHpText = this.add
-      .text(10, 10, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' })
-      .setScrollFactor(0);
+    this.combatHud = new CombatHud(this);
 
     this.interactKey = this.input.keyboard!.addKey('E');
     this.doorPromptText = this.add
@@ -315,9 +314,7 @@ export default class Level3Scene extends Phaser.Scene {
   update(): void {
     this.controller.update();
 
-    this.playerHpText.setText(
-      `HP: ${this.player.getHP()}/${this.player.getMaxHP()} | ${this.player.playerState}`
-    );
+    this.combatHud.update(this.player);
 
     this.levelEnemies.update(this.player);
 

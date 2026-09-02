@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import Player, { LadderContact } from '../player/Player';
 import PlayerController from '../player/PlayerController';
+import CombatHud from '../ui/CombatHud';
 import Fireball from '../combat/Projectile';
 import CheckpointSystem from '../systems/CheckpointSystem';
 import ParallaxBackground, {
@@ -73,7 +74,7 @@ const CHECKPOINT_FLASH_HOLD_MS = 1200;
 export default class Level1Scene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
-  private playerHpText!: Phaser.GameObjects.Text;
+  private combatHud!: CombatHud;
   private background!: ParallaxBackground;
   private audio!: AudioManager;
   private tutorialHint!: TutorialHint;
@@ -260,9 +261,7 @@ export default class Level1Scene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.controller = new PlayerController(this, this.player);
 
-    this.playerHpText = this.add
-      .text(10, 10, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' })
-      .setScrollFactor(0);
+    this.combatHud = new CombatHud(this);
 
     this.interactKey = this.input.keyboard!.addKey('E');
     const doorPrompt = this.registry.get('bossDefeated')
@@ -481,10 +480,9 @@ export default class Level1Scene extends Phaser.Scene {
 
     this.tutorialHint.update(this.player.x);
 
-    // Debug kijelzés (Phase 8 / ui modul cseréli le): HP + aktuális player state.
-    this.playerHpText.setText(
-      `HP: ${this.player.getHP()}/${this.player.getMaxHP()} | ${this.player.playerState}`
-    );
+    // A HP-sor MÖGÖTT a két erőforrás-mérő is frissül. A hívás a controller.update() UTÁN
+    // van, mert az lejáratja a tűzgolyó-tölteteket — különben a töltés-csík egy frame-et késne.
+    this.combatHud.update(this.player);
 
     this.levelEnemies.update(this.player);
 
@@ -638,10 +636,16 @@ export default class Level1Scene extends Phaser.Scene {
   private startHouseDialogue(): void {
     this.housePromptText.setVisible(false);
 
-    // Teljes befagyasztás. A setEnabled(false) a J/F/kattintás listenereket IS elnémítja —
+    // Teljes befagyasztás. A setEnabled(false) a J/F/K/kattintás listenereket IS elnémítja —
     // a controller.update() kihagyása önmagában nem tenné (CLAUDE.md 17. tanulság).
     this.controller.setEnabled(false);
     this.player.stopMoving();
+
+    // A HUD-ot el KELL rejteni: ez az egyetlen párbeszéd a játékban, aminek a panelje a
+    // képernyő TETEJÉN van (a pálya padlója 418, ami nem fér el a panellel) — pont a HUD
+    // helyén, ráadásul a HUD magasabb mélységen ül, tehát belelógna. A player úgyis
+    // teljesen be van fagyasztva, nincs mit leolvasni róla.
+    this.combatHud.setVisible(false);
 
     this.houseDialogue = new Dialogue(
       this,
@@ -657,6 +661,7 @@ export default class Level1Scene extends Phaser.Scene {
       () => {
         this.houseDialogue = null;
         this.controller.setEnabled(true);
+        this.combatHud.setVisible(true);
       }
     );
   }

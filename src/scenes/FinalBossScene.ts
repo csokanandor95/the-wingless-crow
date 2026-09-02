@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import Player from '../player/Player';
 import PlayerController from '../player/PlayerController';
+import CombatHud from '../ui/CombatHud';
 import Fireball from '../combat/Projectile';
 import AncientDemon from '../bosses/AncientDemon';
 import {
@@ -146,7 +147,7 @@ export default class FinalBossScene extends Phaser.Scene {
   /** A démon mögötti derengés — lásd az AURA_* konstansok kommentjét. */
   private aura!: Phaser.GameObjects.Image;
 
-  private playerHpText!: Phaser.GameObjects.Text;
+  private combatHud!: CombatHud;
   private demonHpBar!: Phaser.GameObjects.Graphics;
   private demonNameText!: Phaser.GameObjects.Text;
 
@@ -349,7 +350,7 @@ export default class FinalBossScene extends Phaser.Scene {
     // maga a kitérési ablak. Ugyanaz az elv, mint a Wing-Breaker Shadow Spelljénél — csak itt
     // az időzítést maga a démon adja eventtel, tehát nem kell scene-oldali delayedCall.
     this.demon.on('demon-nova-impact', () => {
-      this.audio.playSfx(SFX_KEYS.BOSS_SPELL_IMPACT);
+      this.audio.playSfx(SFX_KEYS.SPELL_IMPACT);
       this.cameras.main.shake(200, 0.008);
     });
 
@@ -362,7 +363,7 @@ export default class FinalBossScene extends Phaser.Scene {
     // TODO (Phase 8 – SFX): a VILLANÁS ('demon-blink-out' / 'demon-blink-in') továbbra is
     // néma. Szándékosan: egy rossz hang rosszabb, mint a csend.
     this.demon.on('demon-summon', (points: Array<{ x: number; y: number }>) => {
-      this.audio.playSfx(SFX_KEYS.BOSS_SPELL_IMPACT);
+      this.audio.playSfx(SFX_KEYS.SPELL_IMPACT);
       for (const point of points) {
         this.shades.push(new ShadeMinion(this, point.x, point.y));
       }
@@ -391,10 +392,7 @@ export default class FinalBossScene extends Phaser.Scene {
   }
 
   private createHud(): void {
-    this.playerHpText = this.add
-      .text(10, 10, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' })
-      .setScrollFactor(0)
-      .setDepth(100);
+    this.combatHud = new CombatHud(this);
 
     this.demonNameText = this.add
       .text(ARENA_WIDTH / 2, HP_BAR_Y - 14, BOSS_NAME, {
@@ -435,9 +433,7 @@ export default class FinalBossScene extends Phaser.Scene {
       if (!this.fireballs[i].active) this.fireballs.splice(i, 1);
     }
 
-    this.playerHpText.setText(
-      `HP: ${this.player.getHP()}/${this.player.getMaxHP()} | ${this.player.playerState}`
-    );
+    this.combatHud.update(this.player);
     this.drawDemonHealthBar();
 
     if (this.outcomeScheduled) return;

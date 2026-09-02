@@ -443,7 +443,7 @@ const SFX_SOUNDS: Array<{ key: string; url: string }> = [
   { key: SFX_KEYS.ENEMY_SWING, url: enemySwingUrl },
   { key: SFX_KEYS.FIREBALL_CAST, url: fireballCastUrl },
   { key: SFX_KEYS.BOSS_PROJECTILE, url: bossProjectileUrl },
-  { key: SFX_KEYS.BOSS_SPELL_IMPACT, url: bossSpellImpactUrl },
+  { key: SFX_KEYS.SPELL_IMPACT, url: bossSpellImpactUrl },
   { key: SFX_KEYS.GRAVECALLER_CAST, url: gravecallerCastUrl },
   { key: SFX_KEYS.PLAYER_FOOTSTEP, url: playerFootstepUrl },
   { key: SFX_KEYS.PLAYER_JUMP, url: playerJumpUrl },

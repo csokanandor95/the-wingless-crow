@@ -1,17 +1,33 @@
 import Phaser from 'phaser';
-import { AttackType, ATTACK_CONFIGS, AttackConfig } from '../combat/Attack';
-import { FIREBALL_CONFIG } from '../combat/Projectile';
+import {
+  AttackType,
+  ATTACK_CONFIGS,
+  AttackConfig,
+  HEAVY_CHARGE_HITS,
+  HEAVY_ECHO_OFFSET_PX,
+} from '../combat/Attack';
+import {
+  FIREBALL_CONFIG,
+  FIREBALL_MAX_CHARGES,
+  FIREBALL_RECHARGE_MS,
+} from '../combat/Projectile';
 import type { Damageable } from '../combat/DamageSystem';
 import {
   animKeyForState,
+  ARC_CROP_X,
   BODY_HEIGHT,
   BODY_OFFSET_X,
   BODY_OFFSET_Y,
   BODY_WIDTH,
   CAST_ANIM_MS,
   FOOTSTEP_INTERVAL_MS,
+  FRAME_HEIGHT,
+  FRAME_WIDTH,
+  HEAVY_WAVE_ALPHA,
+  HEAVY_WAVE_TINT,
   HURT_ANIM_MS,
   ORIGIN_Y,
+  PLAYER_ANIMS,
   PLAYER_TEXTURES,
 } from './PlayerAnimations';
 
@@ -49,6 +65,19 @@ export const CLIMB_SPEED = 130;
 /** A fireball a lovag felemelt keze magasságában szülessen, ne a sprite közepén. */
 const FIREBALL_SPAWN_OFFSET_Y = -8;
 
+/**
+ * A heavy KÉT izzó hulláma, a player középpontjához képest.
+ *
+ * A `0` az a fedőréteg, ami a lovag SAJÁT ívére kerül (a crop miatt csak az ívre, a testére
+ * nem) — ettől lobban lángra az első hullám is, nem csak a második. A
+ * `HEAVY_ECHO_OFFSET_PX` a mért sávhossz, tehát a második hullám PONTOSAN ott kezdődik, ahol
+ * az első véget ér.
+ *
+ * Ha valaha három hullámú változat kell, itt egy elem hozzáadása elég — a hitbox viszont
+ * NEM követi magától (lásd az Attack.ts levezetését).
+ */
+const HEAVY_WAVE_OFFSETS = [0, HEAVY_ECHO_OFFSET_PX];
+
 export default class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public playerState: PlayerState = PlayerState.IDLE;
 
@@ -64,6 +93,36 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   private attackHitbox: Phaser.GameObjects.Zone;
   private attackHitboxBody: Phaser.Physics.Arcade.Body;
   private hitTargetsThisAttack: Set<Phaser.GameObjects.GameObject> = new Set();
+
+  /**
+   * Az ÉPP futó (vagy legutóbbi) támadás típusa. Két helyen kell:
+   *  - az animáció-kulcs kiválasztásához (a HEAVY lassabb tempóval fut),
+   *  - a `registerHit()`-ben, hogy a heavy SAJÁT találatai ne töltsék újra a heavy-t.
+   */
+  private currentAttackType: AttackType = AttackType.SWORD;
+
+  /** Hány beérkezett alapcsapás gyűlt össze a következő heavy-hez (0..HEAVY_CHARGE_HITS). */
+  private heavyCharge = 0;
+
+  /**
+   * A HEAVY izzó hullámai: a lovag testéről levágott, egymás után sorakozó ív-másolatok.
+   * Lásd `HEAVY_WAVE_OFFSETS`.
+   */
+  private slashWaves: Phaser.GameObjects.Sprite[] = [];
+
+  /**
+   * Az elköltött tűzgolyó-töltetek visszatérési időpontjai (abszolút `scene.time.now`).
+   *
+   * A tömb MAGÁTÓL növekvő sorrendű marad — a `now` monoton, a `FIREBALL_RECHARGE_MS`
+   * pedig konstans —, ezért elég az elejéről lejárat szerint ürítgetni
+   * (`pruneFireballCharges()`). Ez adja a kért, EGYMÁSTÓL FÜGGETLEN visszatöltést:
+   * minden töltet a SAJÁT elköltésétől számítva tér vissza, nem sorban egymás után.
+   *
+   * Szándékosan NEM `delayedCall`: így a `performAttack()`/`castFireball()` időzítő-
+   * regisztrációi (és a rájuk épülő unit tesztek sorrendje) érintetlenek maradnak, a
+   * viselkedés pedig `scene.time.now` léptetésével közvetlenül tesztelhető.
+   */
+  private fireballRechargeAt: number[] = [];
 
   /** Az épp lejátszott animáció kulcsa — lásd playAnim(). */
   private currentAnimKey: string | null = null;
@@ -99,6 +158,25 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.attackHitboxBody = this.attackHitbox.body as Phaser.Physics.Arcade.Body;
     this.attackHitboxBody.setAllowGravity(false);
     this.attackHitboxBody.enable = false;
+
+    // A heavy izzó hullámai. Ugyanaz az újrahasznált-objektum minta, mint az
+    // attackHitboxnál: egyszer jönnek létre, aztán csak pozíciót és láthatóságot váltanak.
+    // A crop vágja le róluk a lovag testét — enélkül egy második lovag állna a player előtt.
+    // A `flipX`-et NEM kell kézzel tükrözni: a Phaser 4 `Frame.setCropUVs()` a mintavett
+    // sávot magától tükrözi, tehát balra fordulva a hullám a bal oldalra kerül.
+    //
+    // Depth-et nem kapnak: a player UTÁN kerülnek a display listára, tehát fölötte
+    // rajzolódnak — és a crop miatt amúgy sem fedik a testét.
+    this.slashWaves = HEAVY_WAVE_OFFSETS.map(() =>
+      scene.add
+        .sprite(x, y, PLAYER_TEXTURES.ATTACK)
+        .setOrigin(0.5, ORIGIN_Y)
+        .setCrop(ARC_CROP_X, 0, FRAME_WIDTH - ARC_CROP_X, FRAME_HEIGHT)
+        .setTint(HEAVY_WAVE_TINT)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setAlpha(HEAVY_WAVE_ALPHA)
+        .setVisible(false)
+    );
 
     // Enélkül a player a legelső updateState()-ig a sheet 0. frame-jén állna mozdulatlanul.
     this.updateAnimation();
@@ -217,21 +295,39 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
 
   // ----------------------------------------------------------------------
 
-  /** A player egyetlen kardtámadása (J / bal egérgomb). */
+  /** A player alap kardtámadása (J / bal egérgomb). */
   attack(): void {
     this.performAttack(AttackType.SWORD);
   }
 
-  // Paraméteres marad, hogy egy jövőbeli második támadás-típus bekötése egy hívás legyen.
+  /**
+   * A nagy csapás (K / jobb egérgomb). Nincs saját, magától lejáró cooldownja: kizárólag
+   * `HEAVY_CHARGE_HITS` beérkezett alapcsapásból tölthető fel — ez kényszeríti a playert
+   * a közelharcra a távolsági spam helyett.
+   */
+  heavyAttack(): void {
+    this.performAttack(AttackType.HEAVY);
+  }
+
   private performAttack(type: AttackType): void {
     if (this.isLocked() || this.climbing || !this.canAttack) return;
+    // A töltés-kapu a többi guard MELLETT, MINDEN állapotváltás és event ELŐTT áll:
+    // a blokkolt heavy így néma marad és nem is animál — ugyanaz az elv, mint a
+    // cooldownnal blokkolt alapcsapásnál.
+    if (type === AttackType.HEAVY && !this.isHeavyReady()) return;
 
     const config = ATTACK_CONFIGS[type];
     this.isAttacking = true;
     this.canAttack = false;
+    this.currentAttackType = type;
     this.playerState = PlayerState.ATTACK;
     this.hitTargetsThisAttack.clear();
     this.setVelocityX(0);
+
+    if (type === AttackType.HEAVY) {
+      this.heavyCharge = 0;
+      this.showSlashWaves();
+    }
 
     // A suhintás hangját a SCENE játssza le (ugyanaz a minta, mint a 'fireball-cast'):
     // a Player így nem függ az AudioManagertől, a kibocsátás pedig unit-tesztben
@@ -241,7 +337,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     // A hang AZONNAL, a gombnyomásra szól, nem a 150ms-os startup után: az azonnali
     // input-visszajelzés többet ér, mint a képi szinkron — a whoosh a windup alatt fut fel,
     // és épp a csapás frame-jére ér a csúcsára.
-    this.emit('sword-swing');
+    this.emit(type === AttackType.HEAVY ? 'heavy-swing' : 'sword-swing');
 
     // A korábbi sárga attack-tint elmaradt: a támadás-animáció önmagában közli az infót.
     // Nullázás a playAnim() guardja miatt: két gyors csapás között a kulcs nem változna.
@@ -259,6 +355,10 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
 
     this.scene.time.delayedCall(config.startupDelayMs + config.activeDurationMs, () => {
       this.isAttacking = false;
+      // A heavy hullámai a MEGLÉVŐ időzítőn tűnnek el, szándékosan nem egy újon: a
+      // performAttack() delayedCall-jainak száma és REGISZTRÁCIÓS SORRENDJE így
+      // változatlan marad (a combat.test.ts erre lépteti a támadás-teszteket).
+      this.hideSlashWaves();
       if (this.playerState === PlayerState.ATTACK) {
         this.playerState = this.isGrounded() ? PlayerState.IDLE : PlayerState.FALL;
       }
@@ -283,12 +383,104 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.attackHitboxBody.enable = false;
   }
 
+  // --- Heavy slash ------------------------------------------------------
+
+  /**
+   * A hullámok kirakása. Az első a lovag SAJÁT ívére fekszik (offset 0) és felizzítja, a
+   * második a mért sávhossznyival előrébb — tehát PONTOSAN ott kezdődik, ahol az első véget
+   * ér. A kettő így egyetlen, kétszer olyan messzire érő lángcsapásnak olvas.
+   */
+  private showSlashWaves(): void {
+    this.syncSlashWaves();
+    for (const wave of this.slashWaves) {
+      wave.setVisible(true);
+      wave.play(PLAYER_ANIMS.ATTACK_HEAVY, true);
+    }
+  }
+
+  private hideSlashWaves(): void {
+    for (const wave of this.slashWaves) wave.setVisible(false);
+  }
+
+  /**
+   * A hullámok a playerhez vannak ragasztva, amíg látszanak. Vízszintesen nem mozdulhatnak
+   * el (a támadás `setVelocityX(0)`-val kezd), FÜGGŐLEGESEN viszont igen: a levegőben
+   * indított heavy alatt a player tovább esik/emelkedik.
+   */
+  private syncSlashWaves(): void {
+    const direction = this.flipX ? -1 : 1;
+    this.slashWaves.forEach((wave, index) => {
+      wave.setPosition(this.x + direction * HEAVY_WAVE_OFFSETS[index], this.y);
+      wave.setFlipX(this.flipX);
+    });
+  }
+
+  getHeavyCharge(): number {
+    return this.heavyCharge;
+  }
+
+  getHeavyChargeMax(): number {
+    return HEAVY_CHARGE_HITS;
+  }
+
+  isHeavyReady(): boolean {
+    return this.heavyCharge >= HEAVY_CHARGE_HITS;
+  }
+
+  // ----------------------------------------------------------------------
+
   hasHitTarget(target: Phaser.GameObjects.GameObject): boolean {
     return this.hitTargetsThisAttack.has(target);
   }
 
+  /**
+   * A scene-ek ezt hívják EGY sikeres, ténylegesen sebző találat után — ez az egyetlen
+   * pont, ahol a Player megtudja, hogy egy csapása beérkezett, ezért itt tölt a heavy.
+   *
+   * Két megszorítással:
+   *  - CSAK alapcsapásra tölt, különben a heavy önmagát finanszírozná;
+   *  - csapásonként EGYSZER (`size === 0` = ez a swing első találata), tehát egy több
+   *    ellenfelet elérő ív sem ad több töltetet. A swing számít, nem a célpont — így a
+   *    töltődés üteme kiszámítható, nem a tömeg sűrűségétől függ.
+   */
   registerHit(target: Phaser.GameObjects.GameObject): void {
+    if (this.currentAttackType === AttackType.SWORD && this.hitTargetsThisAttack.size === 0) {
+      this.heavyCharge = Math.min(this.heavyCharge + 1, HEAVY_CHARGE_HITS);
+    }
     this.hitTargetsThisAttack.add(target);
+  }
+
+  // --- Tűzgolyó töltetek ------------------------------------------------
+
+  /**
+   * A lejárt visszatöltéseket kiveszi a sorból. A tömb növekvő sorrendű (lásd a mező
+   * doc-kommentjét), ezért elég az elejéről addig ürítenünk, amíg lejárt bejegyzést látunk.
+   */
+  private pruneFireballCharges(): void {
+    const now = this.scene.time.now;
+    while (this.fireballRechargeAt.length > 0 && this.fireballRechargeAt[0] <= now) {
+      this.fireballRechargeAt.shift();
+    }
+  }
+
+  getFireballCharges(): number {
+    return FIREBALL_MAX_CHARGES - this.fireballRechargeAt.length;
+  }
+
+  getFireballMaxCharges(): number {
+    return FIREBALL_MAX_CHARGES;
+  }
+
+  /**
+   * A LEGKÖZELEBB visszatérő töltet állapota, 0..1. Teli tárnál 1 — így a HUD-nak nem kell
+   * külön esetet kezelnie az "épp nincs mit tölteni" helyzetre.
+   */
+  getFireballRechargeProgress(): number {
+    const next = this.fireballRechargeAt[0];
+    if (next === undefined) return 1;
+
+    const remaining = next - this.scene.time.now;
+    return Phaser.Math.Clamp(1 - remaining / FIREBALL_RECHARGE_MS, 0, 1);
   }
 
   // Fireball castolás: elindítja a CAST state-et, majd egy rövid startup delay után
@@ -297,12 +489,27 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   castFireball(): void {
     if (this.isLocked() || this.climbing || !this.canCastFireball) return;
 
+    // Védekező pruning: az updateState() amúgy is minden frame-ben fut, de a cast egy
+    // billentyű-listenerből jön, tehát a frissesség itt nem a hívási sorrenden múlik.
+    this.pruneFireballCharges();
+    if (this.getFireballCharges() <= 0) return;
+
+    // A töltet a GOMBNYOMÁSKOR fogy, nem a lövedék születésekor: az elkötelezettség
+    // pillanata számít, különben a 260 ms-os cast alatt még "ingyen" meg lehetne szakítani.
+    this.fireballRechargeAt.push(this.scene.time.now + FIREBALL_RECHARGE_MS);
+
     this.isCasting = true;
     this.canCastFireball = false;
     this.playerState = PlayerState.CAST;
     this.setVelocityX(0);
     // A korábbi kék cast-tint elmaradt: a cast-animáció (felemelt izzó gömb + szikrák)
     // maga a visszajelzés.
+    //
+    // Nullázás a playAnim() guardja miatt — ugyanaz az indok, mint a támadásnál. Amíg a
+    // tűzgolyó korlátlan volt, az 500 ms-os cooldown mindig hosszabb volt a 260 ms-os
+    // animációnál, tehát nem kellett; egy két-töltetes sorozatnál viszont a második cast
+    // az animáció utolsó frame-jén ragadhatna.
+    this.currentAnimKey = null;
     this.updateAnimation();
 
     this.scene.time.delayedCall(CAST_DELAY_MS, () => {
@@ -359,6 +566,8 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.playerState = PlayerState.DEAD;
     this.setVelocity(0, 0);
     this.disableHitbox();
+    // A megkezdett heavy hullámai ne lógjanak a képen, amíg a lovag összerogy.
+    this.hideSlashWaves();
     this.lastFootstepAt = null;
     // Egyetlen halál = egyetlen nyögés. A takeDamage() DEAD-guardja miatt a die() nem
     // futhat le kétszer, és ez az ág fedi a zuhanás-halált is (az takeDamage(getHP())-en
@@ -393,6 +602,16 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     this.ladder = null;
     this.hitTargetsThisAttack.clear();
     this.disableHitbox();
+
+    this.currentAttackType = AttackType.SWORD;
+    this.hideSlashWaves();
+    // A felhalmozott heavy ELVÉSZ: a haláleset visszaállít, nem továbbvisz. Konzisztens
+    // azzal, hogy a player halálakor az enemyk is újraélednek — egy nehéz szakaszt nem
+    // lehet ismételt halálokkal "lekoptatni", felgyűjtött nagy csapással a zsebben.
+    this.heavyCharge = 0;
+    // A tár TELE éled újra (mint a canCastFireball). Helyben ürítés, a projekt tömb-szabálya
+    // szerint — bár ez a tömb nem kötődik colliderhez, a minta egységes marad.
+    this.fireballRechargeAt.length = 0;
     // Nullázni KELL: enélkül a halál előtti utolsó lépés ideje maradna érvényben, és a
     // respawn utáni első lépés a kadencia szerint késne (vagy azonnal duplázna).
     this.lastFootstepAt = null;
@@ -436,6 +655,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
     // pont a lockolt state-ek (ATTACK, HURT, DEAD) és a mászás maradnának animáció nélkül.
     this.updateAnimation();
     this.updateFootsteps();
+
+    // A tűzgolyó-töltetek per-frame lejáratása. Ez a hook azért jó hely, mert a
+    // PlayerController MINDKÉT ága meghívja, és a controller nélküli scene-ek (PreScene),
+    // illetve a befagyasztott input (Level1Scene ház-párbeszéd) is kötelesek hívni.
+    this.pruneFireballCharges();
+
+    if (this.slashWaves[0].visible) this.syncSlashWaves();
   }
 
   /**
@@ -479,7 +705,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite implements Dama
   }
 
   private updateAnimation(): void {
-    this.playAnim(animKeyForState(this.playerState));
+    this.playAnim(animKeyForState(this.playerState, this.currentAttackType));
 
     // Létrán állva (nincs függőleges input) a mászás-animáció fagyjon ki, ne pörögjön
     // a helyben álló lovag alatt.

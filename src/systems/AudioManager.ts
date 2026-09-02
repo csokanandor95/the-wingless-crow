@@ -48,14 +48,17 @@ export const SFX_KEYS = {
   /** A boss lövedéke. SZÁNDÉKOSAN másik hang, mint a playeré: hallani, kié a lövedék. */
   BOSS_PROJECTILE: 'sfx-boss-projectile',
   /**
-   * Boss-varázslat becsapódása — nem a cast, és nem is a telegraph alatt.
+   * Varázslat becsapódása/kioldása — nem a cast, és nem is a telegraph alatt.
    *
-   * HÁROM helyen szól, mind a becsapódás/kioldás pillanatában (user-döntés): a Wing-Breaker
-   * Shadow Spelljénél, valamint az Ancient Demon ÁRNY-HULLÁMÁNÁL és IDÉZÉSÉNÉL. Közös hang,
-   * mint az `ENEMY_SWING` a három közelharci lénynél — a ±120 cent detune-szórás miatt a
-   * sorozatos megszólalás sem válik gépiessé.
+   * NÉGY helyen szól (user-döntések): a Wing-Breaker Shadow Spelljénél, az Ancient Demon
+   * ÁRNY-HULLÁMÁNÁL és IDÉZÉSÉNÉL, valamint a **player HEAVY SLASH-énél**. Közös hang, mint
+   * az `ENEMY_SWING` a három közelharci lénynél — a detune-szórás miatt a sorozatos
+   * megszólalás sem válik gépiessé.
+   *
+   * A kulcs neve korábban `BOSS_SPELL_IMPACT` volt; a heavy slash bekötésekor lett
+   * semleges, mert a hang azóta NEM boss-specifikus. A hangfájl és a betöltés változatlan.
    */
-  BOSS_SPELL_IMPACT: 'sfx-boss-spell-impact',
+  SPELL_IMPACT: 'sfx-spell-impact',
   /**
    * A Gravecaller lövedéke, a KIOLDÁS pillanatában. Harmadik, saját tűzgolyó-hang: a
    * player (Fireball 2) és a boss (Fireball 3) mellé a csomag addig nem használt
@@ -195,6 +198,21 @@ export const PLAYER_LAND_VOLUME = 0.6;
 export const DEATH_SFX_DETUNE_RANGE = 0;
 
 /**
+ * A heavy slash a `SPELL_IMPACT` (Firebuff 2) hangját szólaltatja meg — user-választás, és
+ * pont ez teszi „spell-karddá" a csapást: nem suhintás, hanem fellobbanás.
+ *
+ * **Új asset NEM kellett**: a kért `Firebuff 2.wav` BITRE AZONOS a repóban már meglévő
+ * `assets/audio/sfx/firebuff-2.wav`-val (md5 `ad78f8af…`), amit a bossok varázslatai
+ * használnak. Ezért lett a kulcs neve `BOSS_SPELL_IMPACT`-ról `SPELL_IMPACT`-ra írva.
+ *
+ * A -200 cent a bossok varázslatától különbözteti meg: ugyanaz a láng, de mélyebben —
+ * egy kard mögötte, nem egy oltár. A szórás mellette megmarad (ismétlődő hang), csak
+ * szűkebben: a heavy ritka, nem kell akkora változatosság a gépiesség ellen.
+ */
+export const HEAVY_SLASH_DETUNE = -200;
+export const HEAVY_SLASH_DETUNE_RANGE = 60;
+
+/**
  * A `sound.add()` deklarált visszatérési típusa `Phaser.Sound.BaseSound`, amin viszont
  * NINCS `volume`/`setVolume` — azok csak a konkrét implementációkon élnek. Mivel a fade
  * a `volume` tweenelésén alapul, erre a unióra szűkítünk. (A `NoAudioSound` ág — audio
@@ -214,6 +232,12 @@ export interface PlaySfxOptions {
   volume?: number;
   /** 0 = pontos lejátszás; egyébként ±ennyi cent véletlen elhangolás. */
   detuneRange?: number;
+  /**
+   * FIX hangmagasság-eltolás centben, a véletlen `detuneRange` MELLETT. Arra való, hogy
+   * ugyanabból a fájlból két, egymástól megkülönböztethető hang legyen — a heavy slash
+   * így kap mélyebb, súlyosabb suhintást a kardéval azonos felvételből, új asset nélkül.
+   */
+  detune?: number;
 }
 
 export default class AudioManager {
@@ -291,10 +315,11 @@ export default class AudioManager {
     if (this.scene.sound.locked) return;
 
     const detuneRange = options.detuneRange ?? DEFAULT_SFX_DETUNE_RANGE;
+    const spread = detuneRange === 0 ? 0 : Phaser.Math.Between(-detuneRange, detuneRange);
 
     this.scene.sound.play(key, {
       volume: options.volume ?? DEFAULT_SFX_VOLUME,
-      detune: detuneRange === 0 ? 0 : Phaser.Math.Between(-detuneRange, detuneRange),
+      detune: (options.detune ?? 0) + spread,
     });
   }
 
@@ -340,7 +365,7 @@ export default class AudioManager {
 }
 
 /**
- * A player SAJÁT hangjainak bekötése (suhintás, lépés, ugrás, halál) — mindhárom scene-nek
+ * A player SAJÁT hangjainak bekötése (suhintás, heavy, lépés, ugrás, halál) — mindhárom scene-nek
  * (`Level1Scene`, `Level2Scene`, `BossScene`) SZÓ SZERINT ugyanez kell, hiszen ugyanaz a
  * lovag fut, ugrik és hal meg bennük.
  *
@@ -354,6 +379,14 @@ export default class AudioManager {
  */
 export function bindPlayerSfx(player: Phaser.Events.EventEmitter, audio: AudioManager): void {
   player.on('sword-swing', () => audio.playSfx(SFX_KEYS.SWORD_SWING));
+  // A heavy NEM suhintás, hanem fellobbanás: a varázslat-hang mélyebbre hangolva.
+  // Lásd HEAVY_SLASH_DETUNE.
+  player.on('heavy-swing', () =>
+    audio.playSfx(SFX_KEYS.SPELL_IMPACT, {
+      detune: HEAVY_SLASH_DETUNE,
+      detuneRange: HEAVY_SLASH_DETUNE_RANGE,
+    })
+  );
   player.on('footstep', () => audio.playSfx(SFX_KEYS.PLAYER_FOOTSTEP, { volume: FOOTSTEP_VOLUME }));
   player.on('player-jump', () =>
     audio.playSfx(SFX_KEYS.PLAYER_JUMP, { volume: PLAYER_JUMP_VOLUME })

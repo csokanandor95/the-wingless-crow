@@ -39,8 +39,12 @@ export default class TutorialHint {
         color: '#e8dcc8',
         backgroundColor: '#00000088',
         padding: { x: 10, y: 6 },
+        align: 'center',
       })
-      .setOrigin(0.5)
+      // Az origin SZÁNDÉKOSAN (0, 0), nem (0.5, 0.5) — a középre igazítást a `show()`
+      // számolja ki EGÉSZ pixelre. Lásd az ott lévő indoklást: fél pixeles pozíció mellett
+      // a felirat mozgó kamera alatt remeg.
+      .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(HINT_DEPTH)
       .setAlpha(0);
@@ -66,6 +70,7 @@ export default class TutorialHint {
     this.activeTween?.stop();
 
     this.text.setText(message).setAlpha(0);
+    this.centerText();
 
     // hold + yoyo: befadel, áll, majd ugyanazzal a tweennel kifadel — ugyanaz a minta,
     // mint a BossScene boss-nevénél.
@@ -76,6 +81,33 @@ export default class TutorialHint {
       hold: HINT_HOLD_MS,
       yoyo: true,
     });
+  }
+
+  /**
+   * A felirat középre igazítása EGÉSZ pixelre — ez a „remegő súgó" javítása.
+   *
+   * A hiba oka a Phaser kamera-matematikája: a `setScrollFactor(0)` objektum végső
+   * pozíciója `copyWithScrollFactorFrom()`-ban `scrollX * (1 - 0)` hozzáadásával, majd a
+   * kamera saját eltolásának levonásával áll elő — a kamera `scrollX`-e viszont a
+   * `startFollow` lerpje miatt TÖRT szám, és a kettő kiejtése lebegőpontos maradékot hagy.
+   * A `pixelArt: true` bekapcsolja a `roundPixels`-t, ami a végeredményt kerekíti: ha az
+   * pontosan fél pixelre esik, a maradék frame-enként átbillenti a kerekítést -> 1 px-es
+   * vízszintes remegés. Ez akkor áll le, amikor a kamera beáll (a player megáll) — pontosan
+   * ezt írta le a kézi teszt.
+   *
+   * `origin 0.5` mellett a pozíció `HINT_X - displayWidth / 2`, tehát PÁRATLAN
+   * szövegszélességnél mindig fél pixelre esik. Egész originnel + kerekített pozícióval a
+   * probléma fogalmilag megszűnik, a látvány (középre igazítás) pedig változatlan.
+   *
+   * **Ugyanez a csapda vár minden `setOrigin(0.5)` + `setScrollFactor(0)` feliratra** — a
+   * meglévők (ajtó-/checkpoint-prompt) csak azért nem remegnek láthatóan, mert álló
+   * kamera mellett jelennek meg.
+   */
+  private centerText(): void {
+    this.text.setPosition(
+      Math.round(HINT_X - this.text.displayWidth / 2),
+      Math.round(HINT_Y - this.text.displayHeight / 2)
+    );
   }
 
   destroy(): void {

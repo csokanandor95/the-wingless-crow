@@ -5,7 +5,10 @@
 // kétszer, és a scene leállása fade közben is elvágja a zenét. Ez utóbbi három a
 // leggyakoribb valós hibaforrás, mert a Phaser SoundManager GAME-szintű, nem scene-szintű.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type Phaser from 'phaser';
+// Érték-importként (nem `import type`), mert a bindPlayerSfx tesztje a fake
+// `Phaser.Events.EventEmitter`-t példányosítja player helyett — a helper szándékosan
+// EventEmittert vár, nem Playert.
+import Phaser from 'phaser';
 import AudioManager, {
   MUSIC_KEYS,
   SFX_KEYS,
@@ -23,6 +26,9 @@ import AudioManager, {
   GRAVECALLER_DEATH_VOLUME,
   BEAST_DEATH_VOLUME,
   DEATH_SFX_DETUNE_RANGE,
+  HEAVY_SLASH_DETUNE,
+  HEAVY_SLASH_DETUNE_RANGE,
+  bindPlayerSfx,
 } from '../../src/systems/AudioManager';
 import {
   createMockScene,
@@ -351,6 +357,58 @@ describe('AudioManager', () => {
 
         expect(lastSfxConfig(scene).detune).toBe(0);
       });
+
+      // A FIX eltolás a szórás MELLETT hat: ez teszi lehetővé, hogy ugyanabból a
+      // felvételből két, egymástól megkülönböztethető hang legyen (kard vs. heavy).
+      it('a fix detune a szórással EGYÜTT érvényesül', () => {
+        for (let i = 0; i < 50; i++) {
+          audio.playSfx(SFX_KEYS.SWORD_SWING, { detune: -350, detuneRange: 60 });
+
+          const detune = lastSfxConfig(scene).detune as number;
+          expect(detune).toBeGreaterThanOrEqual(-410);
+          expect(detune).toBeLessThanOrEqual(-290);
+        }
+      });
+
+      it('fix detune szórás nélkül pontosan annyi', () => {
+        audio.playSfx(SFX_KEYS.SWORD_SWING, { detune: -350, detuneRange: 0 });
+
+        expect(lastSfxConfig(scene).detune).toBe(-350);
+      });
+    });
+  });
+
+  // A heavy slash NEM kap saját asset-et: a bossok varázslat-hangja szól mélyebbre hangolva
+  // (a kért `Firebuff 2.wav` bitre azonos a repóban már meglévő firebuff-2.wav-val).
+  describe('bindPlayerSfx — a heavy slash hangja', () => {
+    it('a heavy a VARÁZSLAT-hangot szólaltatja meg, LEJJEBB hangolva', () => {
+      const player = new Phaser.Events.EventEmitter();
+      bindPlayerSfx(player, audio);
+
+      player.emit('heavy-swing');
+
+      const [key, config] = scene.sound.play.mock.calls[0] as [
+        string,
+        { detune?: number },
+      ];
+      expect(key).toBe(SFX_KEYS.SPELL_IMPACT);
+      // A bossok ugyanezt a hangot ALAPHANGON szólaltatják meg — a heavy-t a mélyítés
+      // különbözteti meg tőlük.
+      expect(config.detune).toBeLessThan(0);
+      expect(config.detune).toBeGreaterThanOrEqual(
+        HEAVY_SLASH_DETUNE - HEAVY_SLASH_DETUNE_RANGE
+      );
+      expect(config.detune).toBeLessThanOrEqual(HEAVY_SLASH_DETUNE + HEAVY_SLASH_DETUNE_RANGE);
+    });
+
+    it('az alapcsapás hangja NEM hangolódik el', () => {
+      const player = new Phaser.Events.EventEmitter();
+      bindPlayerSfx(player, audio);
+
+      player.emit('sword-swing');
+
+      const detune = lastSfxConfig(scene).detune as number;
+      expect(Math.abs(detune)).toBeLessThanOrEqual(DEFAULT_SFX_DETUNE_RANGE);
     });
   });
 

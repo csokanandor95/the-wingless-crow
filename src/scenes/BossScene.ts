@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import Player from '../player/Player';
 import PlayerController from '../player/PlayerController';
+import CombatHud from '../ui/CombatHud';
 import Fireball from '../combat/Projectile';
 import GraftedWingBreaker, {
   BossState,
@@ -110,7 +111,7 @@ export default class BossScene extends Phaser.Scene {
   private chargeTrail!: AfterImageTrail;
   private dialogue: Dialogue | null = null;
 
-  private playerHpText!: Phaser.GameObjects.Text;
+  private combatHud!: CombatHud;
   private bossHpBar!: Phaser.GameObjects.Graphics;
   private bossNameText!: Phaser.GameObjects.Text;
 
@@ -298,7 +299,7 @@ export default class BossScene extends Phaser.Scene {
       // sebzés nélkül — a hangnak a látványt kell követnie. Scene-shutdownnál viszont a
       // Phaser törli a függő delayedCall-okat, tehát a győzelmi fade alá nem szól be.
       this.time.delayedCall(SPELL_IMPACT_MS, () =>
-        this.audio.playSfx(SFX_KEYS.BOSS_SPELL_IMPACT)
+        this.audio.playSfx(SFX_KEYS.SPELL_IMPACT)
       );
     });
 
@@ -326,10 +327,7 @@ export default class BossScene extends Phaser.Scene {
   }
 
   private createHud(): void {
-    this.playerHpText = this.add
-      .text(10, 10, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' })
-      .setScrollFactor(0)
-      .setDepth(100);
+    this.combatHud = new CombatHud(this);
 
     this.bossNameText = this.add
       .text(ARENA_WIDTH / 2, HP_BAR_Y - 14, BOSS_NAME, {
@@ -415,9 +413,7 @@ export default class BossScene extends Phaser.Scene {
       }
     }
 
-    this.playerHpText.setText(
-      `HP: ${this.player.getHP()}/${this.player.getMaxHP()} | ${this.player.playerState}`
-    );
+    this.combatHud.update(this.player);
     this.drawBossHealthBar();
 
     if (this.outcomeScheduled) return;

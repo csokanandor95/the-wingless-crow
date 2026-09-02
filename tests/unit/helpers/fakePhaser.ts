@@ -169,6 +169,9 @@ export function createFakePhaserModule() {
     // Phaser 4-ben a tint módja külön enum (Phaser 3-ban a setTintFill() kapcsolta).
     // Csak a ténylegesen használt kettő kell; az értékek a valódi Phaser sorrendjét követik.
     TintModes: { MULTIPLY: 0, FILL: 1 },
+    // A Player heavy-hullámai ADD blenddel IZZANAK (nem sötétítenek, mint a tint) — csak a
+    // ténylegesen használt kettő kell, az értékek a valódi Phaser sorrendjét követik.
+    BlendModes: { NORMAL: 0, ADD: 1 },
     Math: {
       // Ugyanaz a lerp-képlet, mint a valódi Phaser.Math.Linear: p0 + (p1 - p0) * t.
       Linear: (p0: number, p1: number, t: number) => p0 + (p1 - p0) * t,

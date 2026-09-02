@@ -25,6 +25,32 @@ export const BODY_OFFSET_Y = 18;
 // topY/bottomY-ja, a CHECKPOINT_Y) a placeholder óta VÁLTOZATLANUL érvényes marad.
 export const ORIGIN_Y = 0.625;
 
+/**
+ * A HEAVY második hullámát rajzoló "echo" sprite VÁGÁSI határa a frame-en belül: innen
+ * jobbra már csak a kard íve van, a lovag teste nincs.
+ *
+ * MÉRT érték: az Attacks.png f15-f19 frame-jein a rajzolt test az x 47..76 sávban van
+ * (lásd a HEAVY_ECHO_OFFSET_PX levezetését az Attack.ts-ben), tehát a 77. oszloptól
+ * kezdve a frame már csak a félhold-hullámot tartalmazza. Az echo sprite ezért
+ * `setCrop(ARC_CROP_X, 0, FRAME_WIDTH - ARC_CROP_X, FRAME_HEIGHT)`-tel rajzol — enélkül
+ * egy második lovag is látszana a player előtt.
+ *
+ * Ha kézi teszten az f16-on (ahol a hullám még a testhez ér) látszik a vágás pereme,
+ * EZ a hangolópont: emeld addig, amíg a perem a hullám sűrű részébe esik.
+ */
+export const ARC_CROP_X = 77;
+
+/**
+ * A heavy „spell-kard" izzása. Az ADD blend miatt a hullám nem sötétedik, hanem VILÁGÍT: a
+ * világos penge-ív × ez a szín hozzáadódik a háttérhez, tehát a sötét arénákban is égő
+ * lángcsóvaként olvas. (MULTIPLY tinttel csak barnább ív lenne — a `TintModes` 14. tanulsága
+ * fordítva: itt nem elnyelni akarunk, hanem fényt adni.)
+ *
+ * Az alpha az EGYETLEN hangolópont, ha túl harsány: az ADD blend könnyen kiég.
+ */
+export const HEAVY_WAVE_TINT = 0xff7a2a;
+export const HEAVY_WAVE_ALPHA = 0.85;
+
 // --- Kulcsok ----------------------------------------------------------------
 
 export const PLAYER_TEXTURES = {
@@ -44,6 +70,8 @@ export const PLAYER_ANIMS = {
   JUMP: 'player-jump',
   FALL: 'player-fall',
   ATTACK: 'player-attack',
+  /** Ugyanaz a frame-tartomány, mint az ATTACK-é, de a HEAVY lassabb tempójával. */
+  ATTACK_HEAVY: 'player-attack-heavy',
   CAST: 'player-cast',
   HURT: 'player-hurt',
   CLIMB: 'player-climb',
@@ -109,6 +137,7 @@ interface AnimDef {
 }
 
 const SWORD = ATTACK_CONFIGS[AttackType.SWORD];
+const HEAVY = ATTACK_CONFIGS[AttackType.HEAVY];
 
 const ANIM_DEFS: AnimDef[] = [
   {
@@ -146,6 +175,17 @@ const ANIM_DEFS: AnimDef[] = [
     texture: PLAYER_TEXTURES.ATTACK,
     frames: ATTACK_FRAMES,
     durationMs: SWORD.startupDelayMs + SWORD.activeDurationMs,
+    repeat: 0,
+  },
+  // A HEAVY UGYANAZT az öt frame-et játssza le, csak lassabban (480ms / 5 frame = 10,4 fps
+  // a kard 15 fps-e helyett). Külön kulcs kell hozzá, mert a Phaser az frameRate-et az
+  // animációhoz köti, nem a lejátszáshoz — a hossz pedig itt is SZÁMÍTOTT, tehát a HEAVY
+  // windupjának hangolása magával viszi az animációt.
+  {
+    key: PLAYER_ANIMS.ATTACK_HEAVY,
+    texture: PLAYER_TEXTURES.ATTACK,
+    frames: ATTACK_FRAMES,
+    durationMs: HEAVY.startupDelayMs + HEAVY.activeDurationMs,
     repeat: 0,
   },
   {
@@ -199,8 +239,15 @@ export function createPlayerAnimations(scene: Phaser.Scene): void {
 /**
  * A state -> animáció leképezés. Szándékosan PURE függvény (nem a Player metódusa), hogy
  * a leképezés Phaser AnimationManager mockolása nélkül unit-tesztelhető legyen.
+ *
+ * Az `attackType` CSAK az ATTACK state-en számít, és azért van default-ja, mert a
+ * repertoár bővülése előtt egyetlen kardtámadás volt: így minden korábbi hívó (és a
+ * state->kulcs teszt-tábla) változatlanul érvényes maradt.
  */
-export function animKeyForState(state: PlayerState): string {
+export function animKeyForState(
+  state: PlayerState,
+  attackType: AttackType = AttackType.SWORD
+): string {
   switch (state) {
     case 'RUN':
       return PLAYER_ANIMS.RUN;
@@ -209,9 +256,9 @@ export function animKeyForState(state: PlayerState): string {
     case 'FALL':
       return PLAYER_ANIMS.FALL;
     case 'ATTACK':
-      // Egyetlen kardtámadás van. Ha a repertoár bővül, itt egy támadás-típus paraméter
-      // szerinti elágazás a következő lépés (ATTACK_CONFIGS már most is Record).
-      return PLAYER_ANIMS.ATTACK;
+      // A HEAVY ugyanazokat a frame-eket kapja, csak lassabb tempóval — a különbséget a
+      // külön anim kulcs hordozza (lásd ANIM_DEFS).
+      return attackType === AttackType.HEAVY ? PLAYER_ANIMS.ATTACK_HEAVY : PLAYER_ANIMS.ATTACK;
     case 'CAST':
       return PLAYER_ANIMS.CAST;
     case 'HURT':

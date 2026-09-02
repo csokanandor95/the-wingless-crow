@@ -20,22 +20,29 @@ export default class PlayerController {
     }
 
     this.cursors = scene.input.keyboard.createCursorKeys();
-    this.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,J,F') as {
+    this.keys = scene.input.keyboard.addKeys('W,A,S,D,SPACE,J,K,F') as {
       [key: string]: Phaser.Input.Keyboard.Key;
     };
 
     this.keys.J.on('down', () => {
       if (this.enabled) this.player.attack();
     });
+    // A heavy-nek billentyűs útja IS van: a játék eddig teljesen játszható volt egér
+    // nélkül (J = kard, F = tűzgolyó), és ez nem veszhet el egy új támadással.
+    this.keys.K.on('down', () => {
+      if (this.enabled) this.player.heavyAttack();
+    });
     this.keys.F.on('down', () => {
       if (this.enabled) this.player.castFireball();
     });
 
-    // A jobb gomb már nem támad, de a context menü letiltása marad: a canvas fölött
-    // felugró böngésző-menü akkor is zavaró, ha a kattintásnak nincs játékbeli hatása.
+    // A context menü letiltása KÖTELEZŐ, mert a jobb gomb megint játékbeli akció (heavy):
+    // enélkül minden nagy csapásra felugrana a böngésző-menü a canvas fölött.
     scene.input.mouse?.disableContextMenu();
     scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (this.enabled && pointer.leftButtonDown()) this.player.attack();
+      if (!this.enabled) return;
+      if (pointer.leftButtonDown()) this.player.attack();
+      else if (pointer.rightButtonDown()) this.player.heavyAttack();
     });
   }
 
@@ -43,9 +50,9 @@ export default class PlayerController {
    * Az input teljes ki-/bekapcsolása — a `Level1Scene` ezzel fagyasztja be a playert a ház
    * előtti párbeszéd idejére.
    *
-   * **Az `update()` kihagyása önmagában NEM elég**, ezért kell ez: a konstruktor a `J` / `F`
-   * billentyűre és a `pointerdown`-ra listenereket regisztrál, tehát a player a monológ alatt
-   * is kardot suhinthatna és tűzgolyót dobhatna. A `Boss2Scene` trükkje ("a controllert csak a
+   * **Az `update()` kihagyása önmagában NEM elég**, ezért kell ez: a konstruktor a `J` / `K` /
+   * `F` billentyűre és a `pointerdown`-ra listenereket regisztrál, tehát a player a monológ
+   * alatt is kardot suhinthatna és tűzgolyót dobhatna. A `Boss2Scene` trükkje ("a controllert csak a
    * harc előtt hozzuk létre") itt nem alkalmazható, mert a player a párbeszéd ELŐTT és UTÁN is
    * sétál; a `PreScene`-é (saját, minimális input) sem, mert ez harci pálya.
    *

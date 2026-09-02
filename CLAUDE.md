@@ -720,7 +720,7 @@ Atmosphere folytatása is: a Level 1 első valódi „lakott világ" eleme.
   KÉTOLDALI** (a harc előtt induljon, de még a képen legyen, amikor a harc kezdődik), tehát
   sem az enemy, sem a trigger nem csúszhat el csendben a másiktól.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a NÉGY Boss** le van fedve a Project_plan.md §23 bontása szerint (**30 fájl, 861 teszt** — ebből 12 az animáció-/háttér-/VFX-vezérlést, 4 a **pálya-geometriát** (Level 1–3 + a nyitó szentély), 1 a **mozgó platformot**, 1 a **hazardokat**, 2 a **párbeszéd-rendszert** (a pure mag + a „már láttam" memória), 1 pedig a **végső boss idézett lidérceit** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a NÉGY Boss** le van fedve a Project_plan.md §23 bontása szerint (**32 fájl, 925 teszt** — ebből 12 az animáció-/háttér-/VFX-vezérlést, 4 a **pálya-geometriát** (Level 1–3 + a nyitó szentély), 1 a **mozgó platformot**, 1 a **hazardokat**, 2 a **párbeszéd-rendszert** (a pure mag + a „már láttam" memória), 1 a **végső boss idézett lidérceit**, 1 a **harci HUD-ot**, 1 pedig a **billentyű-súgót** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -956,6 +956,8 @@ the-wingless-crow/
 │       │                        # testközép-mérés egyezése (köpeny vs. hullám-szimmetria)
 │       ├── shadeMinion.test.ts  # a lidérc: sodródás, EGYSZERI kontakt-sebzés, lejárat, destroy()
 │       ├── dialogue.test.ts     # a párbeszéd pure magja + a léptetés (nyíl vs. automatikus)
+│       ├── combatHud.test.ts    # a HUD pure pipa-helperei + a rajzolás/életciklus
+│       ├── tutorialHint.test.ts # a KEREKÍTETT középre igazítás (a „remegő felirat" ellen)
 │       ├── dialogueMemory.test.ts # a „már láttam" registry-emlékezet (Phaser-mock NÉLKÜL)
 │       ├── preSceneLayout.test.ts # a nyitó szentély geometriája (panel, padló-lap, zuhanás,
 │       │                        # az interakciós zóna) + a párbeszéd sorhossza
@@ -1012,7 +1014,9 @@ the-wingless-crow/
 │   │   └── SwingingReaper.ts     # determinisztikus lengő kasza (pure swingAngleAt mag)
 │   ├── ui/
 │   │   ├── TutorialHint.ts       # egyszer megjelenő billentyű-súgó (ez nyitja meg az ui/ mappát)
-│   │   └── Dialogue.ts           # in-scene párbeszéd-panel: MAGÁTÓL megy, nyíllal gyorsítható
+│   │   ├── Dialogue.ts           # in-scene párbeszéd-panel: MAGÁTÓL megy, nyíllal gyorsítható
+│   │   └── CombatHud.ts          # HP + tűzgolyó-töltetek + heavy slash töltés. KIVÁLTOTTA a
+│   │                             # 7 scene-ben duplikált playerHpText blokkot
 │   ├── scenes/
 │   │   ├── BootScene.ts          # placeholder textúrák + audio betöltés + loading kijelzés
 │   │   ├── PreScene.ts           # A NYITÓ SZENTÉLY: zuhanás -> séta -> párbeszéd -> Level 1
@@ -1064,7 +1068,7 @@ the-wingless-crow/
 │       └── DamageSystem.ts       # Damageable interface + PhysicsOverlapObject típus-alias
 ```
 
-Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `enemies/Archer.ts`, `systems/GameState.ts`, és az `assets/` alatt az `effects/` mappa. *(Az `Archer.ts` szerepét a `Gravecaller.ts`, a tervezett `Beast.ts`-ét pedig a `Beast.ts` tölti be — utóbbi 2026-08-31 óta KÉSZ.)* Az `ui/` mappában megvan a `TutorialHint.ts` és a `Dialogue.ts`, de a **valódi HUD** és a **Menu** még hátravan.
+Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `enemies/Archer.ts`, `systems/GameState.ts`, és az `assets/` alatt az `effects/` mappa. *(Az `Archer.ts` szerepét a `Gravecaller.ts`, a tervezett `Beast.ts`-ét pedig a `Beast.ts` tölti be — utóbbi 2026-08-31 óta KÉSZ.)* Az `ui/` mappában megvan a `TutorialHint.ts`, a `Dialogue.ts` és — 2026-09-02 óta — a `CombatHud.ts` (a HP + a két erőforrás-mérő, a 7 scene duplikációja helyett). Az `ui/`-ból még hátravan a **boss HP-bar** átköltöztetése, a **valódi, ikonos HUD-kijelző** és a **Menu**.
 
 > **A tervezett `EndingScene.ts` szerepét TÉNYLEG a `NarrationScene` töltötte be** (a korábbi
 > jóslat bevált): a játék záró narrációja ugyanaz az adatvezérelt scene, változtatás nélkül,
@@ -1135,10 +1139,136 @@ Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implement�
   `performAttack()` **nullázza a `currentAnimKey`-t**: 20ms rés mellett a state-reset és a
   cooldown lejárta ugyanabba a frame-közbe eshet, és a `playAnim()` guardja "ugyanaz a kulcs"
   alapon átugorná az animáció újraindítását (a kard a csapás utolsó frame-jén ragadna).
-  **A korábbi Light/Heavy pár megszűnt** (az `AttackType` enum egyetlen taggal marad, hogy
-  egy jövőbeli bővítés egy tag + egy `ATTACK_CONFIGS` bejegyzés legyen); a K billentyű és a
-  jobb egérgomb már nem támad
-- Fireball: F billentyű, `combat/Projectile.ts` Fireball osztályt hoz létre a Level1Scene-ben egy `fireball-cast` eventen keresztül
+  *(A korábbi Light/Heavy pár egy időre megszűnt, de a `Record` szerkezet megmaradt — és a
+  2026-09-02-i bővítés pontosan az ott megjósolt „egy tag + egy bejegyzés" volt.)*
+- **Heavy slash (K / jobb egérgomb)** — lásd lentebb a saját szakaszát.
+- Fireball: F billentyű, `combat/Projectile.ts` Fireball osztályt hoz létre a Level1Scene-ben
+  egy `fireball-cast` eventen keresztül. **KÉT töltete van, független visszatöltéssel** —
+  lásd lentebb.
+
+### Heavy slash + tűzgolyó-töltetek (2026-09-02)
+
+A harc két okból volt egysíkú: a tűzgolyó korlátlan volt (30 dps *biztonságból*, szemben a
+kard 28,6 dps-ével *kockázat mellett*), és egyetlen kardtámadás létezett. A cél **nem egy
+erősebb player** volt, hanem változatosabb harc — ezt mindkét szám levezetése rögzíti, és
+unit tesztek őrzik.
+
+**TŰZGOLYÓ — 2 töltet, EGYMÁSTÓL FÜGGETLEN visszatöltéssel.**
+- `FIREBALL_MAX_CHARGES = 2`, `FIREBALL_RECHARGE_MS = 3000` (`combat/Projectile.ts`).
+  A `FIREBALL_CONFIG.cooldownMs` (500) VÁLTOZATLAN: az a lövések közti RITMUS, nem a
+  fegyver kapuja. A kettő szándékosan külön él.
+- **A modell időbélyeg-sor, NEM `delayedCall`** (`Player.fireballRechargeAt`): minden
+  elköltött töltet betesz egy `now + rechargeMs` bejegyzést, ami lejáratkor kikerül. Ebből
+  adódik a kért viselkedés — két gyors lövés → egyszerre visszatérő töltetek; egy lövés,
+  várakozás, még egy → eltolt visszatérés. **Két oka van, hogy nem timer:** (1) a
+  `combat.test.ts` a `delayedCall` regisztrációit SZÁMOLJA és sorrendben lépteti, tehát egy
+  új timer minden meglévő támadás-tesztet elmozdítana; (2) így a viselkedés `scene.time.now`
+  léptetésével közvetlenül tesztelhető. A sor MAGÁTÓL rendezett marad (a `now` monoton, a
+  `rechargeMs` konstans) — a `shift()`-es lejáratás erre épül.
+- **A lejáratás az `updateState()`-ben fut** (a per-frame hook, amit a `PlayerController`
+  MINDKÉT ága, a `PreScene` és a befagyasztott inputú `Level1Scene` is meghív) **és
+  védekezésből a `castFireball()` elején** — így a frissesség nem a hívási sorrenden múlik.
+  A getterek tiszta olvasások maradnak.
+- **Az 5000 ms LEVEZETETT:** fenntartott sebzés `2×15/5000 = 6 dps` a kard 28,6-jával
+  szemben; egy 40 HP-s CrowHarvester 3 tűzgolyót kíván (≈5,5 s), miközben a lény a
+  220 px-es `DETECTION_RANGE`-ét ~2,2 s alatt teszi meg → **a tisztán távolsági megölés
+  kétszer annyi ideig tart, mint amennyi alatt a lény beér.** Ez az elsődleges hangolópont.
+  *(Első nekifutásra 3000 volt; kézi teszten még mindig túl bőkezű volt. A 2 lövéses BURST
+  szándékosan változatlan — a nyomásnak a sorozat UTÁN kell jönnie.)*
+- A `castFireball()` mostantól **nullázza a `currentAnimKey`-t** (a támadás precedense):
+  amíg a lőszer korlátlan volt, az 500 ms-os cooldown mindig hosszabb volt a 260 ms-os
+  animációnál; egy két-töltetes sorozatnál viszont a második cast az animáció utolsó
+  frame-jén ragadhatna.
+- `respawn()`: a tár **tele** éled újra.
+
+**HEAVY SLASH — `AttackType.HEAVY`, K / jobb egérgomb.**
+- **A látvány EGY vágott „echo" sprite.** A mérés szerint az `Attacks.png` f17–f19
+  frame-jein a félhold-hullám LEVÁLIK a testről (oszlop-hézag: 76..88, 76..94, 76..108) és
+  előre halad. Elég tehát ugyanazt az animációt még egyszer lejátszani egy előrébb tolt
+  sprite-on, amiről a lovag testét levágjuk — a két ív egyetlen, kétszer olyan messzire érő
+  csapásnak olvas. A sprite egyszer jön létre a `Player` konstruktorában (az `attackHitbox`
+  mintája), és csak pozíciót/láthatóságot vált.
+- **MÉRT geometria:** a test a frame `x 47..76` sávjában van (világ-koordinátában −17..+12),
+  a hullám a `+12..+63` sávot tölti ki → **`HEAVY_ECHO_OFFSET_PX = 51`** (`Attack.ts`) és
+  **`ARC_CROP_X = 77`** (`PlayerAnimations.ts`). A crop koordinátáit **NEM kell tükrözni**:
+  a Phaser 4 `Frame.setCropUVs()` a `flipX`-et magától kezeli.
+- **A hitbox a sávhosszal tolódik ki**, nem hangolva: `hitboxWidth = SWORD + 51` (101),
+  `hitboxOffsetX = SWORD + 51/2` (59,5) → +9..+110. **Önellenőrző:** a kard látványa +63-ig
+  ér az +59-es hitbox mellett (4 px behúzás), a heavyé +114-ig a +110-es mellett — UGYANAZ
+  a 4 px. Unit teszt őrzi.
+- **A `cooldownMs = 800` LEVEZETETT, és ez biztosítja, hogy a player ne legyen erősebb.**
+  A heavy `HEAVY_CHARGE_HITS = 3` BEÉRKEZETT alapcsapásból tölt, tehát a ciklus 3 kard +
+  1 heavy; a feltétel `(3·10 + 22)/(3·350 + C) ≤ 10/350` → `C ≥ 770`. Eredmény: **28,1 dps**
+  a tiszta kard **28,6**-ja ellenében — a heavy egy hajszálnyi dps-t ad fel HATÓTÁVÉRT.
+  Regressziós teszt bukik, ha valaki megemeli a sebzést vagy csökkenti a cooldownt.
+- **A töltés a `registerHit()`-ben történik** — ez az egyetlen pont, amit mind a 9 scene-beli
+  találat-kezelő már ma is meghív, és csak ténylegesen sebző találatnál. Két megszorítással:
+  CSAK `SWORD` tölt (különben a heavy önmagát finanszírozná), és **csapásonként egyszer**
+  (`hitTargetsThisAttack.size === 0`), tehát egy több ellenfelet elérő ív sem ad többet — a
+  swing számít, nem a célpont. Mindkettőre van teszt.
+  *Mellékhatás, ami helyes:* a `Boss3Scene`/`FinalBossScene` a sebezhetőséget a
+  `registerHit()` ELŐTT nézi, tehát egy DORMANT/villanó célponton elhasznált csapás nem tölt.
+- **Nincs új `PlayerState`** — a heavy is `ATTACK`, csak saját anim kulccsal
+  (`PLAYER_ANIMS.ATTACK_HEAVY`: UGYANAZ az öt frame 480 ms alatt, 10,4 fps a kard 15-e
+  helyett). Ezért maradt érintetlen az `isLocked()` és a `player.test.ts` lock-táblája.
+  Az `animKeyForState(state, attackType?)` bővítés PONTOSAN az, amit a fájl kommentje
+  megjósolt; a default paraméter miatt a régi teszt-tábla is változatlan.
+- **Az echo a MEGLÉVŐ `startup+active` időzítőn tűnik el**, szándékosan nem egy újon: a
+  `performAttack()` `delayedCall`-jainak száma és sorrendje így változatlan. A `die()` is
+  elrejti (ne lógjon a hullám, amíg a lovag összerogy), a `respawn()` szintén.
+- `respawn()`: a felgyűjtött heavy **ELVÉSZ** (user-döntés) — konzisztens azzal, hogy a
+  player halálakor az enemyk is újraélednek.
+- **A heavy IZZIK — „spell-kard" (user-kérés).** Mindkét hullám `HEAVY_WAVE_TINT`
+  (`0xff7a2a`) színt kap **ADD blenddel**, `HEAVY_WAVE_ALPHA` (0.85) mellett. Az ADD itt
+  KÉNYSZER, nem ízlés: a MULTIPLY tint (a projekt szokásos módja) csak SÖTÉTÍTENI tud, tehát
+  barnább ívet adna — az ADD viszont hozzáadja a fényt a háttérhez, így a sötét arénákban is
+  égő csóvaként olvas. **Ez a 14. és a 26. tanulság kiegészítése:** ha nem elnyelni akarsz,
+  hanem világítani, a tint önmagában kevés.
+  Ezért van a hullámokból KETTŐ (`HEAVY_WAVE_OFFSETS = [0, HEAVY_ECHO_OFFSET_PX]`): a
+  `0`-s a lovag SAJÁT ívére fekszik és felizzítja (a crop miatt a testére nem), a másik a
+  második hullám. Enélkül csak a távoli ív égne, a közeli fehér maradna.
+- **Hang: NINCS új asset.** A user által kért `Firebuff 2.wav` **bitre azonos** a repóban már
+  meglévő `assets/audio/sfx/firebuff-2.wav`-val (md5 `ad78f8af…`), amit eddig a bossok
+  varázslatai használtak — ezért lett a kulcs `BOSS_SPELL_IMPACT`-ról **`SPELL_IMPACT`**-ra
+  átnevezve (a hang azóta nem boss-specifikus). A `PlaySfxOptions` kapott egy fix `detune`
+  mezőt (a véletlen `detuneRange` MELLETT), és a heavy `HEAVY_SLASH_DETUNE = -200` centtel
+  szól: ugyanaz a láng, mélyebben — egy kard mögötte, nem egy oltár.
+- **VÁLLALT KÖVETKEZMÉNY — a hatótáv a bossokkal szemben.** Player-elérés = 110 + a boss
+  félszélessége: *Wing-Breaker* (32) → 142 vs. `SLASH_RANGE` 138, tehát a player **4 px-szel**
+  kijjebbről üt (elhanyagolható, és a 3 töltő csapást a boss hatótávján BELÜL kell bevinni);
+  *Mad King* (24) → 134 vs. 142, **a király továbbra is kijjebbről üt**; *Ancient Demon* (16)
+  → 126 vs. 90, valódi stand-off, de a `NOVA_HIT_RANGE` pont 90 és CSAK ugrással kerülhető
+  ki, tehát a nyomása megmarad. Ha kézi teszten mégis soknak bizonyul, a knob a
+  `HEAVY.hitboxOffsetX`.
+
+### HUD (`src/ui/CombatHud.ts`)
+
+A HP-sor + a két erőforrás-mérő. **Ez a modul váltotta ki a HÉT scene-ben szó szerint
+duplikált `playerHpText` blokkot** — pontosan az a költöztetés, amit a `TutorialHint.ts`
+fejléce a Phase 8 `ui/` iterációjának feladataként jegyez. A duplikáció megszüntetése nem
+esztétikai döntés volt: a két új mérőt különben ugyanúgy hétszer kellett volna bemásolni.
+
+- **A HP-sor formátuma betű szerint a régi** (`HP: 100/100 | IDLE`) — továbbra is debug
+  kijelzés, a valódi ikonos HUD külön iteráció.
+- **`HUD_DEPTH = 100` egységesen.** Korábban a pályák depth nélkül, a boss arénák 100-zal
+  rakták ki; a 100 mindenhol biztonságos, mert ez a projekt legmagasabb használt értéke
+  (`Dialogue` 90/91, `TutorialHint` 50, minden terep/díszlet negatív). Konstruktor-opció
+  ezért nem kell.
+- **Nem importálja a `Player`-t**, hanem a `CombatHudSource` strukturális felületet várja
+  (a `LevelEnemy` / `PhysicsOverlapObject` precedense) — így a `ui/` nem függ a `player/`-től,
+  és a modul Player-mock nélkül tesztelhető.
+- **PURE segédfüggvények** (`fireballPipFill`, `heavySegmentFilled`) a `Dialogue` magjának
+  mintájára — ezeken van a teszt súlypontja.
+- Színek a projekt meglévő nyelvén: tűzgolyó **narancs** `0xff9a3c` (a lövedék-placeholderé),
+  heavy **arany** `0xffd070` (a bossok `SLASH_TELEGRAPH_TINT`-je — az arany a projektben
+  következetesen „nagy kardcsapást" jelent), teli állapotban világosabb kerettel.
+- A scene-ek `update()`-jében a hívás a `controller.update()` **UTÁN** áll: az lejáratja a
+  tűzgolyó-tölteteket, különben a töltés-csík egy frame-et késne.
+- **`setVisible()` — a Level 1 ház-párbeszéde alatt a HUD elrejtőzik.** Ez az EGYETLEN
+  párbeszéd a játékban, aminek a panelje a képernyő TETEJÉN ül (`HOUSE_DIALOGUE_PANEL_TOP`,
+  mert egy PÁLYA padlója 418, és `418 + PANEL_RESERVE_PX > 450`) — pont a HUD helyén,
+  ráadásul a HUD magasabb mélységen, tehát belelógna. A négy boss-aréna panelje 369-nél van,
+  azokkal nincs ütközés. A player a párbeszéd alatt amúgy is teljesen be van fagyasztva.
 
 ### Enemy — CrowHarvester (`src/enemies/CrowHarvester.ts`, `CrowHarvesterAnimations.ts`)
 > Korábbi neve **`Hollow`** volt. A Phase 8 3. iterációjában átnevezve, mert a hozzá
@@ -2339,12 +2469,12 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
 
   | kulcs | asset | mikor |
   |---|---|---|
-  | `SWORD_SWING` | `sword-attack-2` | a player `performAttack()`-jában, AZONNAL a gombnyomásra |
+  | `SWORD_SWING` | `sword-attack-2` | a player `performAttack()`-jában, AZONNAL a gombnyomásra (CSAK az alapcsapásé — a heavy a `SPELL_IMPACT`-ot kapja) |
   | `SWORD_IMPACT` | `sword-impact-hit-1` | a scene-ek kard-találat kezelőiben (enemy ÉS boss) |
   | `ENEMY_SWING` | `sword-attack-3` | CrowHarvester + boss közelharc, a CSAPÁS pillanatában |
   | `FIREBALL_CAST` | `fireball-2` | a player `'fireball-cast'`-jánál, a lövedék születésekor |
   | `BOSS_PROJECTILE` | `fireball-3` | a `'boss-projectile'`-nél; más hang, mint a playeré |
-  | `BOSS_SPELL_IMPACT` | `firebuff-2` | HÁROM helyen: a Wing-Breaker Shadow Spelljének becsapódásakor (`SPELL_IMPACT_MS`), és a démon ÁRNY-HULLÁMÁNÁL + IDÉZÉSÉNÉL (a kioldás pillanatában) |
+  | `SPELL_IMPACT` | `firebuff-2` | NÉGY helyen: a Wing-Breaker Shadow Spelljének becsapódásakor (`SPELL_IMPACT_MS`), a démon ÁRNY-HULLÁMÁNÁL + IDÉZÉSÉNÉL, és a **player HEAVY SLASH-énél** (`HEAVY_SLASH_DETUNE = -200` centtel mélyítve). A kulcs neve korábban `BOSS_SPELL_IMPACT` volt |
   | `GRAVECALLER_CAST` | `fireball-1` | a `'gravecaller-projectile'`-nél; HARMADIK tűzgolyó-hang |
   | `PLAYER_FOOTSTEP` | `stone-chain-run-5` | futás közben, `FOOTSTEP_INTERVAL_MS`-enként |
   | `PLAYER_JUMP` | `stone-jump` | a `jump()` grounded-guardja mögül |
@@ -2649,6 +2779,26 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
     átlátszó-e ott, ahol nincs rajta rajz. Ha nem az, a réteg nem mögé kerül, hanem KERETET
     rajzol köré. *(A Level 1/2 sziluettjei alpha-kivágottak, ezért ott a kérdés fel sem merült
     — ez a csomag más felépítésű.)*
+29. **`setOrigin(0.5)` + `setScrollFactor(0)` + `pixelArt` = REMEGŐ felirat, ha a kamera
+    mozog.** A `TutorialHint` harc-súgója kézi teszten láthatóan vibrált, majd „stabilizálódott,
+    mielőtt eltűnt volna" — és a kettő között pont az a különbség, hogy a player fut-e még.
+    A lánc: a `setScrollFactor(0)` objektum végső pozíciója a
+    `TransformMatrix.copyWithScrollFactorFrom()`-ban `scrollX * (1 - scrollFactorX)`
+    hozzáadásával, majd a kamera saját eltolásának levonásával áll elő. A `camera.scrollX`
+    viszont NINCS kerekítve (a `Camera.preRender()` a nyers, lerpelt lebegőpontos értéket
+    írja vissza), tehát a két tag kiejtése lebegőpontos maradékot hagy. A `pixelArt: true`
+    bekapcsolja a `roundPixels`-t, ami a VÉGEREDMÉNYT kerekíti — és ha az pontosan fél
+    pixelre esik, a maradék frame-enként átbillenti a kerekítést: 1 px-es vízszintes
+    remegés. Álló kameránál a maradék frame-enként azonos, tehát a felirat megnyugszik.
+    **`origin 0.5` mellett a pozíció `X - displayWidth / 2`, tehát PÁRATLAN
+    szövegszélességnél MINDIG fél pixelre esik** — pontosan ezért jött elő, amikor a
+    harc-súgó két sorosra bővült (más lett a leghosszabb sor hossza).
+    **A javítás nem a kerekítés kikapcsolása, hanem egész origin + kézzel kerekített
+    pozíció** (`TutorialHint.centerText()`): a látvány változatlan, a fél pixel viszont
+    fogalmilag megszűnik. Unit teszt őrzi.
+    **Ez minden `setOrigin(0.5)`-ös, kamerához rögzített feliratra igaz** — az ajtó- és
+    checkpoint-promptok csak azért nem remegnek láthatóan, mert álló kamera mellett jelennek
+    meg. Ha valamelyik valaha mozgás közben jön elő, ugyanez a javítás kell.
 
 ## Ideiglenes/debug elemek a kódban (Phase 8 – Atmosphere-ben cserélendők)
 
@@ -2660,7 +2810,7 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   A `ground-placeholder` / `platform-placeholder` textúra megmarad, de a Level 1-en már
   **láthatatlan fizikai testként** (a `ground-placeholder`-t a `BossScene` is használja)
 - CrowHarvester felett lebegő HP szöveg (debug célra, valódi HUD a `ui/` modulban készül majd)
-- A bal felső sarki HUD szöveg a HP mellett a **player state-et is kiírja** (`HP: 100/100 | CLIMB`) — a mászás manuális tesztelését segíti, Phase 8-ban cserélendő
+- A bal felső sarki HUD szöveg a HP mellett a **player state-et is kiírja** (`HP: 100/100 | CLIMB`) — a mászás manuális tesztelését segíti. **2026-09-02 óta a `ui/CombatHud.ts`-ben él** (nem 7 scene-ben duplikálva), a két erőforrás-mérő mellett; a szöveges HP-sor cseréje valódi, ikonos kijelzőre továbbra is hátravan
 - A boss találat-visszajelzése **szándékosan** csak fehér sziluett-villanás (`TintModes.FILL`),
   nincs hurt animáció: egy bossnál a minden ütésre bekövetkező flinch megszakítaná a
   telegraph-okat. NEM placeholder, hanem design-döntés — a `Hurt` frame-ek a falnak ütköző
@@ -2833,8 +2983,8 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   Level 1 hátteréé. **Ez NEM nyitott jogi tétel.** A user a licenceket külön gyűjti, ezért
   itt sincs licenc fájl; a forrást a `BootScene` importjainál lévő komment és a
   `src/levels/LevelTileset.ts` fejlécének forrás-rect táblázata köti vissza
-- A checkpoint-prompt szöveg ("E: Checkpoint" / "Checkpoint mentve...") debug-stílusú `add.text`, a `playerHpText`-hez hasonlóan — valódi UI a `ui/` modulban készül majd
-- A `BossScene` HP-barja nyers `Graphics`-szal rajzolt téglalap (`drawBossHealthBar()`), és a player HP-ja ott is a debug `add.text` — mindkettő a `ui/` modulba költözik Phase 8-ban
+- A checkpoint-prompt szöveg ("E: Checkpoint" / "Checkpoint mentve...") debug-stílusú `add.text` — valódi UI a `ui/` modulban készül majd. *(A player HP-ja már NEM ilyen: 2026-09-02 óta a `ui/CombatHud.ts` rajzolja.)*
+- A **boss** HP-barja nyers `Graphics`-szal rajzolt téglalap (`drawBossHealthBar()` és társai), mind a négy arénában külön — ez a `ui/` modul következő természetes lépése, a `CombatHud` mintájára
 - A boss lövedéke (`boss-projectile-placeholder`) még lila kör. A `Cast` animáció végén
   **varjak röppennek fel** a kaszáról — egy varjú-lövedék tökéletesen illene a témához,
   de az az `assets/effects/` iteráció dolga
@@ -2957,8 +3107,10 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
 - A maradék kódból generált placeholder téglalapok cseréje valódi pixel art sprite-okra
   (`assets/effects/`): a hazardok (tüske, reaper, checkpoint-jelölő) és a három lövedék.
   **Mindkét háttér, mind a három karakter és a Level 1 terrainje kész.**
-- `ui/` modul: valódi HUD a debug `add.text`-ek helyett, és a boss HP-bar átköltöztetése
-  a `BossScene.drawBossHealthBar()`-ból. Ide kerülhet a `BootScene` betöltésjelzője is.
+- `ui/` modul: **a player HUD-ja KÉSZ** (`ui/CombatHud.ts`, 2026-09-02 — HP + tűzgolyó-töltetek
+  + heavy slash, mind a 7 scene-ben ugyanaz a példány). Hátravan: a **boss HP-bar**
+  átköltöztetése a négy aréna `draw*HealthBar()`-jából, a HP-sor cseréje valódi, ikonos
+  kijelzőre, és a `BootScene` betöltésjelzője.
 
 **Phase 8 után jön a Döntési pont** (lásd fentebb és a Project_plan.md 21. pontjában):
 többi Enemy típus + Level + Bossok, VAGY tovább a Lore (Phase 9) / QA (Phase 10) irányba.
