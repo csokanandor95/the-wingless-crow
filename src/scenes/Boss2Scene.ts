@@ -15,6 +15,7 @@ import AudioManager, {
   SFX_KEYS,
 } from '../systems/AudioManager';
 import AfterImageTrail from '../systems/AfterImageTrail';
+import { hasSeenDialogue, markDialogueSeen } from '../systems/DialogueMemory';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 import Dialogue, { type DialogueLine } from '../ui/Dialogue';
 
@@ -178,7 +179,15 @@ export default class Boss2Scene extends Phaser.Scene {
     this.registerKingEvents();
 
     this.createHud();
-    this.startDialogue();
+
+    // Ismételt próbálkozásnál egyenesen a belépőre ugrunk (a BossScene azonos mintája): a
+    // "már láttam" tény a REGISTRY-ben él, mert a vereség-ág a Level 2-re tesz vissza, és a
+    // player onnan, az ajtón át jön újra.
+    if (hasSeenDialogue(this.registry, this.scene.key)) {
+      this.startEntrance();
+    } else {
+      this.startDialogue();
+    }
   }
 
   /**
@@ -193,13 +202,19 @@ export default class Boss2Scene extends Phaser.Scene {
    * A párbeszéd a boss entrance ELSŐ fele: a király DORMANT, tehát nem mozog és nem is
    * sebezhető, a player pedig kontroller nélkül áll. A jobbra-nyíl gyorsítja a szöveget;
    * a párbeszéd magától is végigmegy.
+   *
+   * VÉGIGJÁTSZÁSONKÉNT EGYSZER fut le (a `markDialogueSeen()` a végén) — egy bukott
+   * próbálkozás után a harc egyből a cím-kártyával nyit.
    */
   private startDialogue(): void {
     this.dialogue = new Dialogue(
       this,
       KING_DIALOGUE,
       { groundTop: GROUND_TOP, viewportWidth: ARENA_WIDTH },
-      () => this.startEntrance()
+      () => {
+        markDialogueSeen(this.registry, this.scene.key);
+        this.startEntrance();
+      }
     );
 
     // A KeyboardPlugin a scene leállásakor magától leiratkoztat, ezért itt nincs kézi

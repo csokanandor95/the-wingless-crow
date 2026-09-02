@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { DIALOGUE_SEEN_REGISTRY_KEY } from '../systems/DialogueMemory';
 
 /**
  * A játék záró képernyője: köszönet + a felhasznált assetek és zenék szerzői.
@@ -29,6 +30,9 @@ const PROGRESS_REGISTRY_KEYS = [
   'checkpoint',
   'level2Checkpoint',
   'level3Checkpoint',
+  // A már látott boss-párbeszédek listája (systems/DialogueMemory). Enélkül egy második
+  // végigjátszásból NÉMÁN eltűnne az összes boss-átvezető: mindegyik "már láttam"-ra futna.
+  DIALOGUE_SEEN_REGISTRY_KEY,
 ] as const;
 
 interface CreditLine {

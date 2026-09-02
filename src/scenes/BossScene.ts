@@ -19,6 +19,7 @@ import {
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 import AudioManager, { bindPlayerSfx, MUSIC_KEYS, SFX_KEYS } from '../systems/AudioManager';
 import AfterImageTrail from '../systems/AfterImageTrail';
+import { hasSeenDialogue, markDialogueSeen } from '../systems/DialogueMemory';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 import Dialogue, { type DialogueLine } from '../ui/Dialogue';
 
@@ -170,7 +171,15 @@ export default class BossScene extends Phaser.Scene {
     this.registerBossEvents();
 
     this.createHud();
-    this.startDialogue();
+
+    // Ismételt próbálkozásnál egyenesen a belépőre ugrunk: a párbeszédet a player már látta.
+    // A "látta" tény a REGISTRY-ben él (nem scene-adatban), mert a vereség-ág a Level 1-re tesz
+    // vissza, és a player onnan, az ajtón át jön újra — azt egy scene-adat nem élné túl.
+    if (hasSeenDialogue(this.registry, this.scene.key)) {
+      this.startEntrance();
+    } else {
+      this.startDialogue();
+    }
   }
 
   /**
@@ -178,17 +187,19 @@ export default class BossScene extends Phaser.Scene {
    * sebezhető, a player pedig kontroller nélkül áll. A jobbra-nyíl gyorsítja a szöveget;
    * a párbeszéd magától is végigmegy. (A Boss2Scene / Boss3Scene / FinalBossScene mintája.)
    *
-   * Vereség után a scene-be visszalépve a párbeszéd ÚJRA lefut, `skipDialogue` NINCS —
-   * szemben a FinalBossScene-nel, ahová egy 7200 px-es pálya végéről vezetett az út. Ide a
-   * Level 1 ajtajától néhány lépés, és a nyílat nyomva tartva négy sor pillanatok alatt
-   * lepörög.
+   * VÉGIGJÁTSZÁSONKÉNT EGYSZER fut le: a végén a `markDialogueSeen()` elteszi a scene
+   * kulcsát, tehát egy bukott próbálkozás után a harc egyből a cím-kártyával nyit. Új
+   * játéknál a `CreditsScene` törli ezt az emlékezetet.
    */
   private startDialogue(): void {
     this.dialogue = new Dialogue(
       this,
       WING_BREAKER_DIALOGUE,
       { groundTop: GROUND_TOP, viewportWidth: ARENA_WIDTH },
-      () => this.startEntrance()
+      () => {
+        markDialogueSeen(this.registry, this.scene.key);
+        this.startEntrance();
+      }
     );
 
     // A KeyboardPlugin a scene leállásakor magától leiratkoztat, ezért itt nincs kézi

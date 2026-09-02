@@ -29,6 +29,7 @@ import AudioManager, {
   SFX_KEYS,
 } from '../systems/AudioManager';
 import AfterImageTrail from '../systems/AfterImageTrail';
+import { hasSeenDialogue, markDialogueSeen } from '../systems/DialogueMemory';
 import Dialogue, { type DialogueLine } from '../ui/Dialogue';
 import {
   ARENA_GROUND_TOP,
@@ -193,7 +194,15 @@ export default class Boss3Scene extends Phaser.Scene {
     this.registerMasterEvents();
 
     this.createHud();
-    this.startDialogue();
+
+    // Ismételt próbálkozásnál egyenesen a belépőre ugrunk (a BossScene azonos mintája): a
+    // "már láttam" tény a REGISTRY-ben él, mert a vereség-ág a Level 3-ra tesz vissza, és a
+    // player onnan, az ajtón át jön újra.
+    if (hasSeenDialogue(this.registry, this.scene.key)) {
+      this.startEntrance();
+    } else {
+      this.startDialogue();
+    }
   }
 
   /**
@@ -257,13 +266,20 @@ export default class Boss3Scene extends Phaser.Scene {
     }
   }
 
-  /** A párbeszéd a belépő ELSŐ fele: a Master DORMANT, a player pedig kontroller nélkül áll. */
+  /**
+   * A párbeszéd a belépő ELSŐ fele: a Master DORMANT, a player pedig kontroller nélkül áll.
+   * VÉGIGJÁTSZÁSONKÉNT EGYSZER fut le (a `markDialogueSeen()` a végén) — egy bukott
+   * próbálkozás után a harc egyből a cím-kártyával nyit.
+   */
   private startDialogue(): void {
     this.dialogue = new Dialogue(
       this,
       MASTER_DIALOGUE,
       { groundTop: GROUND_TOP, viewportWidth: ARENA_WIDTH },
-      () => this.startEntrance()
+      () => {
+        markDialogueSeen(this.registry, this.scene.key);
+        this.startEntrance();
+      }
     );
 
     this.input.keyboard?.on('keydown-RIGHT', () => this.dialogue?.advance());

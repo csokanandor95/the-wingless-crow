@@ -540,6 +540,28 @@ pontjában tervezett `ui/Dialogue.ts` slotot. **A terv korábbi megjegyzése —
   `beginFight()`-ban jön létre. Nem elég az `update()`-jét kihagyni — a konstruktora
   regisztrálja a J/F billentyű- és pointer-listenereket, tehát a player különben a
   párbeszéd alatt is támadhatna és varázsolhatna.
+
+**BOSS-PÁRBESZÉD MEMÓRIA (`src/systems/DialogueMemory.ts`) — 2026-09-01.** Mind a NÉGY aréna
+párbeszéde **végigjátszásonként EGYSZER** fut le: ha a player egy boss-harcot ismételten kezd
+újra, egyből a cím-kártya jön (user-kérés). A **vereség utáni ÚTVONAL NEM változott** — a Boss
+1/2/3 továbbra is a saját pályájára tesz vissza, a végső boss továbbra is azonnal újraindítja
+az arénát.
+
+- **REGISTRY, nem scene-adat.** A `FinalBossScene` eddig `{ skipDialogue: true }` scene-adattal
+  oldotta meg, mert ott a vereség UGYANAZT a scene-t indítja újra. A Boss 1/2/3 retry-útja
+  viszont **átmegy egy másik scene-en** (halál → a pálya checkpointja → ajtó → aréna), amit a
+  scene-adat nem él túl; a registry game-szintű, tehát igen. A `skipDialogue` ezért törölve —
+  egy mechanizmus van, mind a négy arénában.
+- **EGYETLEN registry-kulcs alatt egy scene-kulcs lista** (`DIALOGUE_SEEN_REGISTRY_KEY`), nem
+  bossonként külön bejegyzés: így egy új boss felvétele sem új kulccsal, sem a
+  `CreditsScene` takarításának bővítésével nem jár.
+- **A jelölés a `Dialogue` `onComplete`-jében történik**, nem a párbeszéd indításakor: a
+  dialógusból nincs kilépési út (a `PlayerController` csak a `beginFight()`-ban jön létre),
+  tehát ez az egyetlen pont, ahol a szöveg biztosan lement.
+- **A modul NEM importál Phasert** (csak a registry `get`/`set` felületét várja
+  strukturálisan) — ezért mockolás nélkül unit-tesztelhető, mint a `Level*Layout` adatmodulok.
+- **A `CreditsScene` új játéknál törli** (a kulcs importtal kerül a `PROGRESS_REGISTRY_KEYS`
+  listába). Enélkül egy második végigjátszásból NÉMÁN eltűnne az összes boss-átvezető.
 - **HAT háttér-ház** világ-koordinátásan (`BACKDROP_BUILDINGS`, `BUILDING_DEPTH = -15`) és
   **17 hangulati prop** (`DECOR_PROPS`, tint nélkül), mind unit-tesztelt elhelyezéssel.
 - Ami a Level 2-n MÉG placeholder: a **létra** és a **boss-ajtó** (a csomagban nincs létra,
@@ -577,7 +599,7 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a NÉGY Boss** le van fedve a Project_plan.md §23 bontása szerint (**27 fájl, 801 teszt** — ebből 11 az animáció-/háttér-/VFX-vezérlést, 3 a **pálya-geometriát** (Level 1–3), 1 a **mozgó platformot**, 1 a **hazardokat**, 1 a **párbeszéd-rendszert**, 1 pedig a **végső boss idézett lidérceit** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a NÉGY Boss** le van fedve a Project_plan.md §23 bontása szerint (**28 fájl, 808 teszt** — ebből 11 az animáció-/háttér-/VFX-vezérlést, 3 a **pálya-geometriát** (Level 1–3), 1 a **mozgó platformot**, 1 a **hazardokat**, 2 a **párbeszéd-rendszert** (a pure mag + a „már láttam" memória), 1 pedig a **végső boss idézett lidérceit** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -788,6 +810,7 @@ the-wingless-crow/
 │       │                        # testközép-mérés egyezése (köpeny vs. hullám-szimmetria)
 │       ├── shadeMinion.test.ts  # a lidérc: sodródás, EGYSZERI kontakt-sebzés, lejárat, destroy()
 │       ├── dialogue.test.ts     # a párbeszéd pure magja + a léptetés (nyíl vs. automatikus)
+│       ├── dialogueMemory.test.ts # a „már láttam" registry-emlékezet (Phaser-mock NÉLKÜL)
 │       ├── audio.test.ts        # §23 Utility logic (AudioManager életciklus, fade, shutdown, SFX)
 │       ├── level1Layout.test.ts # a Level 1 geometria invariánsai (elérhetőség-BFS, gapek, enemy-bounds, spike-ok)
 │       ├── beastMaster.test.ts  # §23 Boss scope, Boss 3 (mini): HP, roham, STAGGER, FALKA
@@ -875,6 +898,7 @@ the-wingless-crow/
 │   │   ├── CheckpointSystem.ts   # egyetlen aktív respawn-pont tárolása
 │   │   ├── LevelCheckpoint.ts    # a köztes checkpoint jelölője + zónája (mindkét pályán)
 │   │   ├── AudioManager.ts       # egy zenesáv (loop + fade) + állapot nélküli one-shot SFX
+│   │   ├── DialogueMemory.ts     # „melyik boss párbeszédét látta már?" — registry, Phaser-mentes
 │   │   ├── SpriteFacing.ts       # off-center sprite fordulás-kompenzáció (CrowHarvester + boss)
 │   │   ├── AfterImageTrail.ts    # afterimage-csík gyors mozgáshoz (a boss dash-éhez)
 │   │   └── ParallaxBackground.ts # réteges parallax háttér + a Level 1 réteg-terve
@@ -1560,8 +1584,9 @@ nem becslés.
   `beginFight()`-ban jön létre (a konstruktora regisztrálja a J/F listenereket, tehát nem
   elég az `update()`-jét kihagyni), az `update()` pedig `(_time, delta)`-t vesz, mert a
   párbeszéd a scene delta-idejéből ketyeg.
-  **`skipDialogue` SZÁNDÉKOSAN NINCS** (szemben a `FinalBossScene`-nel): ide a Level 1
-  ajtajától néhány lépés vezet, és a jobbra-nyíl végigpörgeti a négy sort.
+  **A párbeszéd VÉGIGJÁTSZÁSONKÉNT EGYSZER fut le** (2026-09-01): vereség után a Level 1
+  ajtaján visszalépve egyből a cím-kártya jön — lásd a „BOSS-PÁRBESZÉD MEMÓRIA" blokkot.
+  *(Korábban minden bukott próbálkozás után elölről végigment.)*
   - A 3 `pillar-placeholder` + 1 `door-placeholder` dekoráció **törölve** (a festményen
     valódi oszlopok és oltár van). A `createDecor()` helyére `createBackground()` lépett.
   - **A két aréna-platform TÖRÖLVE** (Phase 8, 6. iteráció — user döntés). Az aréna padlója
@@ -1842,7 +1867,9 @@ A `BossScene` szerkezetének a párja (fix 800×450-es aréna, nincs kameragörg
 player↔boss collider nélkül, HP-bar + „PHASE II" felirat). Ami MÁS:
 
 - **A belépő KÉT részből áll: párbeszéd, majd cím-kártya.** `create()` → `startDialogue()` →
-  (a `Dialogue` `onComplete`-je) → `startEntrance()` → `beginFight()`.
+  (a `Dialogue` `onComplete`-je) → `startEntrance()` → `beginFight()`. **Ismételt
+  próbálkozásnál a `create()` egyenesen a `startEntrance()`-re ugrik** — lásd a
+  „BOSS-PÁRBESZÉD MEMÓRIA" blokkot. *(A `Boss3Scene` szerkezete ugyanez.)*
 - **A player a párbeszéd alatt TELJESEN befagyasztva**: a `PlayerController` csak a
   `beginFight()`-ban jön létre, ezért a mező típusa `PlayerController | null`, és az `update()`
   `this.controller?.update()`-et hív. **Nem elég az `update()`-et kihagyni** — a controller
@@ -1990,15 +2017,16 @@ A `Boss2Scene` szerkezetének a párja (fix 800x450 aréna, párbeszéd -> cím-
 - **A győzelem az ÖSSZES lidércet megsemmisíti**: a gazdájuk nélkül nincs, ami tartsa őket, és
   a záró beat alatt nem sebezhetik halálra a playert.
 - **Győzelem:** `demonDefeated` registry-flag -> `NarrationScene` (ending) -> `CreditsScene`.
-- **Vereség: a scene ÖNMAGÁT indítja újra** (`{ skipDialogue: true }`), nem egy pályára tesz
-  vissza. **Ez a végső bossnál MÁS, mint a másik háromnál, és user-döntés (kézi teszt után):**
-  azok ajtaja egy pálya végén van, tehát a visszatérés néhány lépés — ide viszont a Level 2
-  boss-ajtaján át vezetett az út, ami minden bukott próbálkozás után egy 7200 px-es pálya
-  TELJES újrafutását jelentette, a játék leghosszabb harcánál.
+- **Vereség: a scene ÖNMAGÁT indítja újra**, nem egy pályára tesz vissza. **Ez a végső bossnál
+  MÁS, mint a másik háromnál, és user-döntés (kézi teszt után):** azok ajtaja egy pálya végén
+  van, tehát a visszatérés néhány lépés — ide viszont a Level 2 boss-ajtaján át vezetett az út,
+  ami minden bukott próbálkozás után egy 7200 px-es pálya TELJES újrafutását jelentette, a
+  játék leghosszabb harcánál.
   A **„checkpoint a harc KEZDETÉN"** pontosan azt jelenti, hogy az átvezetőt sem kell
-  újranézni — ezért a `skipDialogue`, ami **scene-DATA, nem registry**: a „már láttam"
-  kizárólag a retry-lánc alatt érdekes. Registryben a `CreditsScene` új-játék takarítását is
-  bővíteni kellene, és egy későbbi, ajtón át érkező belépés is némán elveszítené az átvezetőt.
+  újranézni — ezt 2026-09-01 óta a **`systems/DialogueMemory`** adja, ugyanaz a registry-alapú
+  emlékezet, mint a másik három arénában (lásd a „BOSS-PÁRBESZÉD MEMÓRIA" blokkot).
+  *(Korábban ez itt `{ skipDialogue: true }` scene-DATA volt. Azt a Boss 1/2/3 nem tudta
+  átvenni: náluk a retry-út egy PÁLYÁN keresztül vezet, amit a scene-adat nem él túl.)*
   A `scene.start()` ugyanazon a példányon fut, tehát a `create()` eleje továbbra is KÖTELEZŐEN
   üríti a tömböket és a flageket (CLAUDE.md 3. tanulság).
 
@@ -2008,8 +2036,11 @@ Thanks for playing + lassan felfelé görgő szerzői lista (karakterek / körny
 hangok). `Space` a végére ugrik, ott pedig **új játékot indít**.
 
 - **Az új játék TÖRLI a registry-t** (`bossDefeated`, `kingDefeated`, `beastMasterDefeated`,
-  `demonDefeated`, `checkpoint`, `level2Checkpoint`, `level3Checkpoint`). A registry GAME-szintű, tehát enélkül az új játék a
-  Level 1 ajtajánál azonnal a Level 2-re vinne, és a player a pálya végén éledne.
+  `demonDefeated`, `checkpoint`, `level2Checkpoint`, `level3Checkpoint` és a
+  `DIALOGUE_SEEN_REGISTRY_KEY`). A registry GAME-szintű, tehát enélkül az új játék a
+  Level 1 ajtajánál azonnal a Level 2-re vinne, a player a pálya végén éledne, és **egyetlen
+  boss-párbeszéd sem futna le** (mind „már láttam"-ra futna). Az utolsó kulcs IMPORTTAL jön a
+  `systems/DialogueMemory`-ból, nem beírt sztringként.
 - **A TARTALOM PLACEHOLDER** (user: a részleteit majd egy későbbi iterációban). A lista a
   `2D helper/Credits.txt` gyűjtéséből indul — és ez egyben az a hely, ahol a még nyitott
   licenc-tételeket le kell zárni a publikálás előtt.

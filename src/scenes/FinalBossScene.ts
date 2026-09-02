@@ -10,6 +10,7 @@ import {
 import ShadeMinion from '../bosses/ShadeMinion';
 import type { PhysicsOverlapObject } from '../combat/DamageSystem';
 import AudioManager, { bindPlayerSfx, MUSIC_KEYS, SFX_KEYS } from '../systems/AudioManager';
+import { hasSeenDialogue, markDialogueSeen } from '../systems/DialogueMemory';
 import { BACKGROUND_TEXTURES } from '../systems/ParallaxBackground';
 import Dialogue, { type DialogueLine } from '../ui/Dialogue';
 
@@ -91,16 +92,13 @@ const FADE_MS = 700;
  * át vezetett az út, ami egy 7200 px-es pálya TELJES újrafutását jelentette volna minden
  * bukott próbálkozás után — a játék leghosszabb harcánál a legrosszabb helyen.
  *
- * Az újraindítás `{ skipDialogue: true }`-val megy: a „checkpoint a harc KEZDETÉN" pontosan
- * azt jelenti, hogy az átvezetőt nem kell újranézni.
+ * A „checkpoint a harc KEZDETÉN" azt is jelenti, hogy az átvezetőt nem kell újranézni: erről a
+ * `systems/DialogueMemory` gondoskodik, ugyanaz a registry-alapú emlékezet, amit a másik három
+ * aréna is használ. *(Korábban ez itt scene-adat volt (`{ skipDialogue: true }`) — azt a Boss
+ * 1/2/3 retry-útja nem tudta átvinni, mert az egy pályán keresztül vezet.)*
  */
 const RETRY_SCENE_KEY = 'FinalBossScene';
 const CREDITS_SCENE_KEY = 'CreditsScene';
-
-/** A scene indítási adata — csak az ismételt próbálkozás állítja. */
-interface FinalBossSceneData {
-  skipDialogue?: boolean;
-}
 
 /**
  * Placeholder lore-párbeszéd: a végleges szöveget a Phase 9 – Lore írja meg, a csere ennek a
@@ -163,22 +161,8 @@ export default class FinalBossScene extends Phaser.Scene {
   private fightStarted = false;
   private outcomeScheduled = false;
 
-  /**
-   * Igaz, ha ez egy ismételt próbálkozás (vereség után). Ilyenkor a párbeszéd kimarad, és a
-   * belépő cím-kártyával kezdünk.
-   *
-   * Scene-DATA, nem registry: a „már láttam a párbeszédet" pontosan addig érdekes, amíg ez a
-   * retry-lánc tart. Registry-be téve a `CreditsScene` új-játék takarítását is bővíteni
-   * kellene, és egy későbbi, ajtón át érkező belépés is némán elveszítené az átvezetőt.
-   */
-  private skipDialogue = false;
-
   constructor() {
     super('FinalBossScene');
-  }
-
-  init(data: FinalBossSceneData): void {
-    this.skipDialogue = data?.skipDialogue === true;
   }
 
   create(): void {
@@ -230,8 +214,9 @@ export default class FinalBossScene extends Phaser.Scene {
 
     this.createHud();
 
-    // Ismételt próbálkozásnál egyenesen a belépőre ugrunk: a checkpoint a harc KEZDETE.
-    if (this.skipDialogue) {
+    // Ismételt próbálkozásnál egyenesen a belépőre ugrunk: a checkpoint a harc KEZDETE, tehát
+    // az átvezetőt sem kell újranézni (a másik három aréna azonos mintája).
+    if (hasSeenDialogue(this.registry, this.scene.key)) {
       this.startEntrance();
     } else {
       this.startDialogue();
@@ -250,13 +235,19 @@ export default class FinalBossScene extends Phaser.Scene {
    * A párbeszéd a boss entrance ELSŐ fele: a démon DORMANT, tehát nem mozog és nem is
    * sebezhető, a player pedig kontroller nélkül áll. A jobbra-nyíl gyorsítja a szöveget;
    * a párbeszéd magától is végigmegy. (A Boss2Scene azonos mintája.)
+   *
+   * VÉGIGJÁTSZÁSONKÉNT EGYSZER fut le (a `markDialogueSeen()` a végén) — a vereség utáni
+   * azonnali újraindítás egyből a cím-kártyával nyit.
    */
   private startDialogue(): void {
     this.dialogue = new Dialogue(
       this,
       DEMON_DIALOGUE,
       { groundTop: GROUND_TOP, viewportWidth: ARENA_WIDTH },
-      () => this.startEntrance()
+      () => {
+        markDialogueSeen(this.registry, this.scene.key);
+        this.startEntrance();
+      }
     );
 
     // A KeyboardPlugin a scene leállásakor magától leiratkoztat, ezért itt nincs kézi
@@ -517,7 +508,7 @@ export default class FinalBossScene extends Phaser.Scene {
     this.audio.stopMusic();
 
     this.time.delayedCall(DEFEAT_DELAY_MS, () => {
-      this.fadeToScene(RETRY_SCENE_KEY, { skipDialogue: true });
+      this.fadeToScene(RETRY_SCENE_KEY);
     });
   }
 
