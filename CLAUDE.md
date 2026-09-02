@@ -250,6 +250,11 @@ láda ×2, ládahalom ×3. Forrás: **GothicVania Town** (Luis Zuno / @ansimuz) 
   - A cél-sáv mindkettőnél ugyanaz: a talaj `(42,33,33)` és a mögöttük lévő `03-ruins`
     háttérréteg `(74,45,39)` KÖZÖTT — a díszlet legyen sötétebb a gameplay-elemeknél, de ne
     sötétebb a mögötte lévő rétegnél.
+  - **HARMADIK tint is van azóta** (`BUILDING_TINT_CATHEDRAL_SOURCE`, a Level 1 háza), és a
+    létezése a fenti „két csoport" gondolkodás korrekciója: **a tintet a NYERS ARÁNYBÓL kell
+    választani, nem az anyag kategóriájából.** A ház szintén „kő", de nyersen jóval kevésbé
+    kék a lámpánál (`R/B` 1,13 vs. 0,77), ezért a hideg tint rajta túllő. Részletek a
+    „Finomhangolás, 2. kör" blokkban.
 - **Az elhelyezés unit-tesztelt, nem szemre rakott** (`DECOR_PROPS` a `Level1Layout.ts`-ben):
   minden lábnyom egyetlen talaj-szegmensen belül marad, nem metsz spike-mezőt, nem lóg a
   kasza söprési sávjába (ezért van a `G-well` 4790-en és nem 4760-on), nem takarja a létrát
@@ -654,11 +659,22 @@ Atmosphere folytatása is: a Level 1 első valódi „lakott világ" eleme.
   ugyanabból az okból PLACEMENT-szintű: ugyanaz a `house-a` a Level 2-n hazai pályán van, a
   Level 1 cathedral-tónusában viszont korrekciót kíván. Elhagyva `PROP_TINT_NONE`, ami
   MULTIPLY-ban NO-OP → **a Level 2 és a Level 3 viselkedése bitre változatlan**.
-- **A tint MÉRT, nem tippelt:** a `house-a.png` nyers átlagszíne `(68,45,60)`, amit a
-  `PROP_TINT_COOL_SOURCE` `(68,39,27)`-re visz — fényességben **44,7**, PONT a `03-ruins`
-  háttérréteg (52,7) és a hangulati propok (41,7) KÖZÖTT. Ez egybeesik a mélységsorrenddel
-  is (a ház a kettő között ül). A fa-tint 39-et adna, tehát a propoknál is sötétebbet — a
-  rétegzéssel ellentétesen.
+- **A tint MÉRT, nem tippelt** — `BUILDING_TINT_CATHEDRAL_SOURCE` (`0xf3e599`), a HARMADIK
+  tint a projektben. A nyers `(68,45,60)`-ból `(65,40,36)` lesz: fényességben (46,9) ÉS
+  telítettségben (`R/B` 1,80) is pont a hangulati propok `(55,35,32)` és a mögötte lévő
+  `03-ruins` réteg `(74,46,40)` FELEZŐPONTJA — vagyis oda esik, ahol a ház a
+  mélységsorrendben is ül (−15 a −10 és a −20 között).
+  **Ez a második nekifutás, és a tanulság általános:** először a `PROP_TINT_COOL_SOURCE`-t
+  kapta, „kő/vakolat" alapon, és kézi teszten TÚL NARANCSOS lett. A mérés meg is nevezte,
+  miért — és **nem a fényesség volt a baj** (44,3 rendben lett volna), hanem a
+  **TELÍTETTSÉG**: `R/B 2,55`, miközben a pálya képernyőjén minden elfogadott elem az
+  **1,25..1,87** sávban van. Az a tint ugyanis a nyersen sokkal KÉKEBB lámpához/kúthoz
+  (`R/B 0,77`) van hangolva; a ház már nyersen 1,13, tehát ugyanaz a kékvágás rajta túllő.
+  A `PROP_TINT_WARM_SOURCE` viszont ALÁLŐ (fényesség 39,0 — a propoknál is sötétebb, a
+  rétegzéssel ellentétesen).
+  **A szabály tehát: a tintet a NYERS ARÁNYBÓL kell választani, nem az anyag
+  kategóriájából.** Unit teszt őrzi, hogy a tintelt eredmény a sávban marad (a régi
+  értékkel bukik).
 - **Opcionális párbeszéd `E`-re** (`HOUSE_DIALOGUE`, egyetlen sor, PLACEHOLDER lore):
   valaki kiszól a házból. **A panel a képernyő TETEJÉRE kerül** (`HOUSE_DIALOGUE_PANEL_TOP`),
   és ez KÉNYSZER: a `Dialogue` a horgony ALÁ rajzol `PANEL_RESERVE_PX` (75) px-t, a
@@ -704,7 +720,7 @@ Atmosphere folytatása is: a Level 1 első valódi „lakott világ" eleme.
   KÉTOLDALI** (a harc előtt induljon, de még a képen legyen, amikor a harc kezdődik), tehát
   sem az enemy, sem a trigger nem csúszhat el csendben a másiktól.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a NÉGY Boss** le van fedve a Project_plan.md §23 bontása szerint (**30 fájl, 860 teszt** — ebből 12 az animáció-/háttér-/VFX-vezérlést, 4 a **pálya-geometriát** (Level 1–3 + a nyitó szentély), 1 a **mozgó platformot**, 1 a **hazardokat**, 2 a **párbeszéd-rendszert** (a pure mag + a „már láttam" memória), 1 pedig a **végső boss idézett lidérceit** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a NÉGY Boss** le van fedve a Project_plan.md §23 bontása szerint (**30 fájl, 861 teszt** — ebből 12 az animáció-/háttér-/VFX-vezérlést, 4 a **pálya-geometriát** (Level 1–3 + a nyitó szentély), 1 a **mozgó platformot**, 1 a **hazardokat**, 2 a **párbeszéd-rendszert** (a pure mag + a „már láttam" memória), 1 pedig a **végső boss idézett lidérceit** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).

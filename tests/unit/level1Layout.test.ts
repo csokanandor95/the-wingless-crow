@@ -955,6 +955,41 @@ describe('BACKDROP_BUILDINGS', () => {
     }
   });
 
+  it('a tint a Level 1 PALETTA-SÁVJÁBA viszi a házat', () => {
+    // REGRESSZIÓ (kézi teszt, 2026-09-02): a ház először a `PROP_TINT_COOL_SOURCE`-t kapta,
+    // „kő/vakolat" alapon — és láthatóan TÚL NARANCSOS lett. A baj nem a fényesség volt
+    // (44,3 rendben lett volna), hanem a TELÍTETTSÉG: `R/B 2,55`, miközben a pálya képernyőjén
+    // minden elfogadott elem az 1,25..1,87 sávban van. Az a tint ugyanis a nyersen sokkal
+    // KÉKEBB lámpához/kúthoz (`R/B 0,77`) van hangolva, a ház viszont már nyersen 1,13.
+    //
+    // A MÉRT értékek (a PNG-k átlagos, nem átlátszó pixelszíne) itt vannak beírva, nem
+    // futásidőben olvasva: a `PROP_ASSETS` méreteinél is ez a bevett módszer — fájlrendszer-
+    // olvasás a tesztben elszállasztaná a `tsc --noEmit`-et.
+    const HOUSE_RAW = { r: 67.7, g: 44.9, b: 59.8 };
+    /** A pálya elfogadott sávja: talaj-csempe .. `03-ruins` háttérréteg. */
+    const BAND = { minBrightness: 36.6, maxBrightness: 53.2, minRatio: 1.25, maxRatio: 1.87 };
+
+    const house = BACKDROP_BUILDINGS.find((b) => b.id === 'A-house');
+    expect(house?.tint, 'a ház tint nélkül maradt').toBeDefined();
+
+    const tint = house!.tint!;
+    const r = (HOUSE_RAW.r * ((tint >> 16) & 0xff)) / 255;
+    const g = (HOUSE_RAW.g * ((tint >> 8) & 0xff)) / 255;
+    const b = (HOUSE_RAW.b * (tint & 0xff)) / 255;
+
+    const brightness = (r + g + b) / 3;
+    const ratio = r / b;
+
+    expect(brightness, 'a ház kilóg a pálya fényesség-sávjából').toBeGreaterThanOrEqual(
+      BAND.minBrightness
+    );
+    expect(brightness).toBeLessThanOrEqual(BAND.maxBrightness);
+    expect(ratio, 'a ház TÚL NARANCSOS a pálya palettájához').toBeLessThanOrEqual(BAND.maxRatio);
+    expect(ratio, 'a ház túl hideg/lilás a pálya palettájához').toBeGreaterThanOrEqual(
+      BAND.minRatio
+    );
+  });
+
   it('a talp a felszín ALÁ kerül, nem fölé', () => {
     // A BUILDING_SINK_PX MÉRT érték a csomag preview-jából: ettől "a földben áll" a ház.
     expect(BUILDING_SINK_PX).toBeGreaterThan(0);

@@ -687,6 +687,36 @@ export const PROP_TINT_WARM_SOURCE = 0xc0b890;
 export const PROP_TINT_COOL_SOURCE = 0xffdc71;
 
 /**
+ * Színkorrekció a Level 1 HÁTTÉR-ÉPÜLETÉHEZ (`house-a`). **Harmadik tint, és nem
+ * kényelmi okból: a fenti kettő egyike sem működik rajta.**
+ *
+ * A tanulság, amiért ez a konstans létezik: **a tintet a NYERS ARÁNYBÓL kell választani, nem
+ * az anyag kategóriájából.** A `PROP_TINT_COOL_SOURCE` a lámpához/kúthoz van hangolva, amik
+ * nyersen `R/B = 0.77` (erősen kékek) — a felezett kék náluk 1.75-öt ad. A ház ugyan szintén
+ * „kő", de nyersen `(68,45,60)`, azaz `R/B = 1.13`: ugyanaz a kékvágás rajta **2.55**-re
+ * lövi, miközben a Level 1 KÉPERNYŐJÉN minden elfogadott elem az `1.25..1.87` sávban van.
+ * Kézi teszten pontosan ez jött elő „túl narancsos"-ként — nem a fényesség volt a baj (44,3
+ * rendben lett volna), hanem a telítettség.
+ *
+ * A `PROP_TINT_WARM_SOURCE` viszont ALÁLŐ: `(51,32,34)`, fényesség 39,0 — az a propoknál
+ * (40,6) is SÖTÉTEBB, ami a mélységsorrenddel ellentétes (a ház MÖGÖTTÜK van).
+ *
+ * A cél ezért LEVEZETETT, nem hangolt: a ház a `BUILDING_DEPTH`-en (−15) pont a hangulati
+ * propok (−10) és a `03-ruins` háttérréteg (−20) KÖZÖTT ül, tehát a színe is a kettő
+ * felezőpontja legyen — mindkét tengelyen:
+ *
+ *   propok tint után  (55,35,32)  fényesség 40,6  R/B 1,72
+ *   03-ruins mögötte  (74,46,40)  fényesség 53,2  R/B 1,87
+ *   -> cél            (65,40,36)  fényesség 46,9  R/B 1,80
+ *
+ * `tint = 255 * cél / nyers` csatornánként a `(67.7, 44.9, 59.8)` mért nyers átlagra.
+ *
+ * **Ha valaha másik ház-textúrát teszel a Level 1-re, ezt ÚJRA KELL SZÁMOLNI** — az érték az
+ * adott PNG nyers átlagszínéhez tartozik, nem a szerephez.
+ */
+export const BUILDING_TINT_CATHEDRAL_SOURCE = 0xf3e599;
+
+/**
  * „Ne korrigálj" — a Level 2 propjai ezt kapják.
  *
  * A fenti két tint a cathedral-paletta korrekciója: ezek a propok EREDETILEG a GothicVania

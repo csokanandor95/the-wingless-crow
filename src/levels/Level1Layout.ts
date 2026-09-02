@@ -1,10 +1,10 @@
 import {
   BUILDING_TEXTURES,
+  BUILDING_TINT_CATHEDRAL_SOURCE,
   GROUND_TOP,
   PLAYER_BODY_HEIGHT,
   PLAYER_HALF_HEIGHT,
   PROP_TEXTURES,
-  PROP_TINT_COOL_SOURCE,
   enemyChaseBounds as enemyChaseBoundsIn,
   groundGaps as groundGapsIn,
   groundSegmentById as groundSegmentByIdIn,
@@ -59,6 +59,7 @@ import type { DialogueLine } from '../ui/Dialogue';
 export {
   BUILDING_ASSETS,
   BUILDING_SINK_PX,
+  BUILDING_TINT_CATHEDRAL_SOURCE,
   EDGE_INSET,
   FALL_DEATH_Y,
   FALL_DEPTH,
@@ -449,12 +450,16 @@ export const DECOR_PROPS: DecorPropDef[] = [
  * ér hozzá sem az `A-lamp`-hez (34,5..69,5), sem a `B-crates`-hez (973,5..1046,5). A háza
  * teteje `418 + 2 - 183 = 237`, fölötte nincs platform.
  *
- * **A tint MÉRT, nem tippelt** (a projekt bevett módszere a Level 1 cathedral-tónusához):
- * a `house-a.png` nyers átlagszíne `(68,45,60)`, amit a `PROP_TINT_COOL_SOURCE` `(68,39,27)`-re
- * visz — fényességben **44,7**, ami PONT a `03-ruins` háttérréteg (52,7) és a hangulati propok
- * (41,7) KÖZÖTT van. Ez egybeesik a mélységsorrenddel is: a ház a kettő között ül (-15 a -20 és
- * a -10 között). A fa-tint 39-et adna, tehát a propoknál is sötétebbet — a rétegzéssel
- * ellentétesen. A ház ráadásul kategóriailag kő/vakolat, nem fa.
+ * **A tint MÉRT, nem tippelt** — a teljes levezetés a `BUILDING_TINT_CATHEDRAL_SOURCE`
+ * kommentjében van. Röviden: a nyers `(68,45,60)`-ból `(65,40,36)` lesz, ami fényességben
+ * (46,9) ÉS telítettségben (`R/B` 1,80) is pont a hangulati propok és a mögötte lévő
+ * `03-ruins` réteg felezőpontja — vagyis oda esik, ahol a ház a mélységsorrendben is ül.
+ *
+ * *(Első nekifutásra a `PROP_TINT_COOL_SOURCE`-t kapta, „kő/vakolat" alapon — kézi teszten
+ * túl narancsosnak bizonyult. A mérés meg is nevezte, miért: az a tint a nyersen sokkal
+ * KÉKEBB lámpához/kúthoz van hangolva, a házon `R/B 2,55`-re lő, jóval a pálya
+ * `1,25..1,87`-es sávja fölé. A tintet a NYERS ARÁNYBÓL kell választani, nem az anyag
+ * kategóriájából.)*
  */
 export const BACKDROP_BUILDINGS: BuildingDef[] = [
   {
@@ -462,7 +467,7 @@ export const BACKDROP_BUILDINGS: BuildingDef[] = [
     texture: BUILDING_TEXTURES.HOUSE_A,
     x: 620,
     surfaceId: 'G1',
-    tint: PROP_TINT_COOL_SOURCE,
+    tint: BUILDING_TINT_CATHEDRAL_SOURCE,
   },
 ];
 
