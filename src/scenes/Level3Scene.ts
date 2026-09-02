@@ -102,10 +102,10 @@ const TRANSITION_FADE_MS = 500;
  * a Phase 9 – Lore írja meg, a csere ennek a tömbnek a szerkesztése.
  */
 const LEVEL3_END_NARRATION = [
-  'A folyosó zsákutcába fut, és a zsákutca ajtóban végződik.\nAz ajtó mögül nem csend hallatszik.',
-  'A kövön karmolásnyomok. Nem egy állaté —\nsokféléé, egymás fölé rétegezve, évek óta.',
-  'Valaki idehordta őket. Valaki etette őket.\nÉs valaki megtanította nekik, mikor kell csendben maradni.',
-  'Lazarus leveszi a kezét a kilincsről.\nMár tudja, hogy odabent nem a falka a legnagyobb.',
+  'The corridor runs into a dead end, and that end is a door.\nWhat comes from behind it is not silence.',
+  'There are claw marks on the stone. Not from one animal —\nfrom many kinds, layered over each other for years.',
+  'Someone brought them here. Someone fed them.\nAnd someone taught them when to stay quiet.',
+  'Lazar takes his hand off the latch.\nHe already knows the pack is not the largest thing inside.',
 ];
 
 export default class Level3Scene extends Phaser.Scene {
@@ -248,7 +248,7 @@ export default class Level3Scene extends Phaser.Scene {
       .text(
         400,
         400,
-        this.registry.get('beastMasterDefeated') ? 'E: Tovább — The Broken Gate' : 'E: Belépés',
+        this.registry.get('beastMasterDefeated') ? 'E: Continue — The Broken Gate' : 'E: Enter',
         { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' }
       )
       .setOrigin(0.5)
@@ -392,7 +392,7 @@ export default class Level3Scene extends Phaser.Scene {
     this.checkpoint.activate(DOOR_CHECKPOINT.x, DOOR_CHECKPOINT.y);
 
     this.isTransitioning = true;
-    this.doorPromptText.setText('Checkpoint mentve...').setVisible(true);
+    this.doorPromptText.setText('Checkpoint saved...').setVisible(true);
 
     // A zene a KÉPPEL EGYÜTT halkul el, ugyanabból a konstansból, amiből a kamera-fade.
     this.audio.stopMusic(TRANSITION_FADE_MS);

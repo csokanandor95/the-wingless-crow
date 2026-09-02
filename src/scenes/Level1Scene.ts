@@ -265,7 +265,7 @@ export default class Level1Scene extends Phaser.Scene {
 
     this.interactKey = this.input.keyboard!.addKey('E');
     const doorPrompt = this.registry.get('bossDefeated')
-      ? 'E: Tovább — The Crowless Quarter'
+      ? 'E: Continue — The Crowless Quarter'
       : 'E: Checkpoint';
     this.checkpointPromptText = this.add
       .text(400, 400, doorPrompt, {
@@ -669,7 +669,7 @@ export default class Level1Scene extends Phaser.Scene {
   private activateCheckpointAndTransition(): void {
     this.isTransitioning = true;
     this.checkpoint.activate(DOOR_CHECKPOINT.x, DOOR_CHECKPOINT.y);
-    this.checkpointPromptText.setText('Checkpoint mentve...').setVisible(true);
+    this.checkpointPromptText.setText('Checkpoint saved...').setVisible(true);
 
     // A zene a KÉPPEL EGYÜTT halkul el. A scene shutdownja önmagában is elvágná (az
     // AudioManager shutdown-hookja), de fade nélkül, hirtelen — pont a fekete képernyő

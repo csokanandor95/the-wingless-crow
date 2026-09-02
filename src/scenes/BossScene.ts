@@ -64,6 +64,9 @@ const BOSS_SPAWN_Y = GROUND_TOP - BOSS_FEET_OFFSET_Y;
 const BACKGROUND_TINT = 0xb0b0b0;
 
 const BOSS_NAME = 'The Grafted Wing-Breaker';
+// A cím-kártya alcíme. Külön konstansban, a Boss2/Boss3/FinalBoss mintájára — korábban a
+// `startEntrance()`-ben álló szöveg-literál volt.
+const BOSS_SUBTITLE = 'keeper of the crows';
 
 const HP_BAR_X = 110;
 const HP_BAR_Y = 34;
@@ -83,19 +86,25 @@ const FADE_MS = 700;
  * NÉGY sor — a többi bossnál hat —, mert ez a játék ELSŐ harca: itt még nincs mit felidézni.
  */
 const WING_BREAKER_DIALOGUE: DialogueLine[] = [
-  { speaker: 'A SZÁRNYTÖRŐ', text: 'Szárnyatlan. Végre. A tieid itt lógnak a hátamon.' },
-  { speaker: 'LAZARUS', text: 'Azok nem a te szárnyaid. Levarrtad őket, mert magadnak nem nőtt.' },
-  { speaker: 'A SZÁRNYTÖRŐ', text: 'A király adta a tűt. Én csak begyűjtöm, ami a kapun kirepül.' },
-  { speaker: 'LAZARUS', text: 'Akkor tedd le. Vagy leszedem rólad.' },
+  { speaker: 'THE WING-BREAKER', text: 'Wingless. At last. Yours are hanging from my back.' },
+  {
+    speaker: 'LAZAR',
+    text: 'Those are not your wings. You stitched them on because none ever grew for you.',
+  },
+  {
+    speaker: 'THE WING-BREAKER',
+    text: 'The king gave me the needle. I only gather what flies out of the gate.',
+  },
+  { speaker: 'LAZAR', text: 'Then put them down. Or I will take them off you.' },
 ];
 
 // Placeholder lore-szöveg: a végleges narrációt a Phase 9 – Lore írja meg,
 // a csere ennek a tömbnek a szerkesztése.
 const BOSS_VICTORY_NARRATION = [
-  'A Wing-Breaker térdre rogy. A testéhez varrt szárnyak\nutoljára megrándulnak, majd hamuvá válnak.',
-  'A hamuból egyetlen varjú emelkedik ki.\nNem szól — csak kelet felé fordul.',
-  'Lazarus utánanéz. A háta még mindig üres,\nde most már tudja, hol keresse a többit.',
-  'A kapu nyitva marad.\nValaki másnak kell bezárnia.',
+  'The Wing-Breaker sinks to his knees. The wings stitched\nto his body twitch one last time, then turn to ash.',
+  'A single crow rises from the ash.\nIt makes no sound — it only turns to the east.',
+  'Lazar, the Crowmarked watches it go. His back is still bare,\nbut now he knows where to look for the rest.',
+  'The gate stays open.\nSomeone else will have to close it.',
 ];
 
 export default class BossScene extends Phaser.Scene {
@@ -357,7 +366,7 @@ export default class BossScene extends Phaser.Scene {
       .setDepth(100);
 
     const subtitle = this.add
-      .text(ARENA_WIDTH / 2, 226, 'a varjak fogvatartója', {
+      .text(ARENA_WIDTH / 2, 226, BOSS_SUBTITLE, {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#8a7a8a',

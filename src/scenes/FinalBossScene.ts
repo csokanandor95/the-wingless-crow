@@ -110,12 +110,12 @@ const CREDITS_SCENE_KEY = 'CreditsScene';
  * A sorok SZÁNDÉKOSAN rövidek: a panel 2 sorra tördel, ennél hosszabb szöveg kilógna belőle.
  */
 const DEMON_DIALOGUE: DialogueLine[] = [
-  { speaker: 'AZ ŐSI DÉMON', text: 'Hát idáig eljöttél. A király csak a kapu kilincse volt.' },
-  { speaker: 'LAZARUS', text: 'A varjakat akarom. Mind a hetvenkettőt.' },
-  { speaker: 'AZ ŐSI DÉMON', text: 'A tieid? Ők most az enyémek. Én tartom a kaput, amit te elhagytál.' },
-  { speaker: 'LAZARUS', text: 'Nem elhagytam. Elvetted.' },
-  { speaker: 'AZ ŐSI DÉMON', text: 'Ugyanaz. Egy őr, aki nem őriz, már csak egy madár szárnyak nélkül.' },
-  { speaker: 'LAZARUS', text: 'Akkor ma megtanulod, mire képes egy szárnyatlan varjú.' },
+  { speaker: 'THE ANCIENT DEMON', text: 'So you came this far. The king was only the handle of the gate.' },
+  { speaker: 'LAZAR', text: 'I want the crows. All seventy-two of them.' },
+  { speaker: 'THE ANCIENT DEMON', text: 'Yours? They are mine now. I keep the gate that you abandoned.' },
+  { speaker: 'LAZAR', text: 'I did not abandon it. You took it.' },
+  { speaker: 'THE ANCIENT DEMON', text: 'The same thing. A keeper who keeps nothing is just a bird without wings.' },
+  { speaker: 'LAZAR', text: 'Then today you learn what a wingless crow can do.' },
 ];
 
 /**
@@ -124,11 +124,11 @@ const DEMON_DIALOGUE: DialogueLine[] = [
  * varjakat, és helyreáll a rend az élők és a holtak világa között.
  */
 const ENDING_NARRATION = [
-  'A csuklya összeesik, mint egy elengedett zászló.\nAmi alatta volt, nem hagy maga után testet.',
-  'A kapu kinyílik. Nem a hegy oldalában — mindenütt,\nahol valaki várt rá túl régóta.',
-  'Hetvenkét varjú emelkedik ki a törésből.\nEgyik sem néz vissza. Nem is kell.',
-  'Lazarus vállán megmozdul valami, ami régóta nem mozdult.\nElőször fáj. Aztán felemeli.',
-  'A holtak elindulnak a maguk útján.\nA rend nem visszatér. Megőrzik.',
+  'The hood collapses like a banner let go.\nWhatever was under it leaves no body behind.',
+  'The gate opens. Not in the mountainside — everywhere\nsomeone has been waiting for it far too long.',
+  'Seventy-two crows rise out of the breach.\nNot one of them looks back. They do not need to.',
+  'Something stirs on the shoulders of Lazar,\nsomething long still. First it hurts. Then he lifts it.',
+  'The dead set out on their own road.\nOrder does not return. It is kept.',
 ];
 
 export default class FinalBossScene extends Phaser.Scene {

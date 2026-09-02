@@ -80,7 +80,7 @@ const MASTER_SPAWN_Y = GROUND_TOP - MASTER_FEET_OFFSET_Y;
 const SUMMON_MARGIN_X = 60;
 
 const BOSS_NAME = 'The Beast Master';
-const BOSS_SUBTITLE = 'aki a falkát etette';
+const BOSS_SUBTITLE = 'who fed the pack';
 
 const HP_BAR_X = 110;
 const HP_BAR_Y = 34;
@@ -99,12 +99,12 @@ const FALLBACK_SCENE_KEY = 'Level3Scene';
  * tömbnek a szerkesztése. A sorok SZÁNDÉKOSAN rövidek: a panel 2 sorra tördel.
  */
 const MASTER_DIALOGUE: DialogueLine[] = [
-  { speaker: 'A FENEVADAK URA', text: 'Hallottam, ahogy jössz. Ők is hallották. Napok óta nem esznek.' },
-  { speaker: 'LAZARUS', text: 'Láncon tartod őket. Ez nem hűség.' },
-  { speaker: 'A FENEVADAK URA', text: 'Nincs lánc, szárnyatlan. Csak éhség és szokás. Mint nálad.' },
-  { speaker: 'LAZARUS', text: 'Én nem etettem a démont.' },
-  { speaker: 'A FENEVADAK URA', text: 'Nem. Te csak kinyitottad neki a kaput, és elfordultál.' },
-  { speaker: 'LAZARUS', text: 'Akkor most becsukom.' },
+  { speaker: 'THE BEAST MASTER', text: 'I heard you coming. So did they. They have not eaten for days.' },
+  { speaker: 'LAZAR', text: 'You keep them on a chain. That is not loyalty.' },
+  { speaker: 'THE BEAST MASTER', text: 'There is no chain, wingless one. Only hunger and habit. Like yours.' },
+  { speaker: 'LAZAR', text: 'I never fed the demon.' },
+  { speaker: 'THE BEAST MASTER', text: 'No. You only opened the gate for it, and turned away.' },
+  { speaker: 'LAZAR', text: 'Then I will close it now.' },
 ];
 
 /**
@@ -112,10 +112,10 @@ const MASTER_DIALOGUE: DialogueLine[] = [
  * közvetlenül a végső ellenfélhez vezet.
  */
 const MASTER_VICTORY_NARRATION = [
-  'A falka nem támad tovább. Nem menekül — csak áll,\nés nézi a testet, ami eddig etette őket.',
-  'Aztán egyenként elszivárognak a folyosók sötétjébe.\nNem Lazarus felé.',
-  'A dungeon végén az utolsó kapu magától nyílik.\nMögötte nem kő van, és nem is föld.',
-  'A démon tudja, hogy jön. És már nem is rejtőzik.',
+  'The pack does not attack again. It does not flee — it only stands\nand watches the body that used to feed it.',
+  'Then, one by one, they slip away into the dark of the corridors.\nNot toward Lazar.',
+  'At the end of the dungeon the last gate opens on its own.\nBehind it there is no stone, and no earth either.',
+  'The demon knows he is coming. And it is not hiding any more.',
 ];
 
 export default class Boss3Scene extends Phaser.Scene {

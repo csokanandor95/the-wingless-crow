@@ -42,14 +42,14 @@ interface CreditLine {
 }
 
 const CREDITS: CreditLine[] = [
-  { text: 'Köszönöm, hogy végigjátszottad.' },
+  { text: 'Thank you for playing.' },
   { text: '' },
   { text: 'THE WINGLESS CROW' },
   { text: '' },
   { text: '' },
-  { section: true, text: 'KARAKTEREK' },
-  { text: 'Lazarus — Szadi art (2D Soulslike Character)' },
-  { text: 'A Lángőrző — GandalfHardcore (FREE NPC: Goddess)' },
+  { section: true, text: 'CHARACTERS' },
+  { text: 'Lazar, the Crowmarked — Szadi art (2D Soulslike Character)' },
+  { text: 'The Flamekeeper — GandalfHardcore (FREE NPC: Goddess)' },
   { text: 'Crow Harvester — Szadi art (Animated Character Pack)' },
   { text: 'Gravecaller — oco (Medieval Fantasy Character Pack 6)' },
   { text: 'Beast / The Beast Master — Omni-Machina (Goatman)' },
@@ -57,17 +57,17 @@ const CREDITS: CreditLine[] = [
   { text: 'The Mad King — LuizMelo (Medieval King Pack 2)' },
   { text: 'Ancient Demon — Kronovi- (Undead Executioner)' },
   { text: '' },
-  { section: true, text: 'KÖRNYEZET' },
+  { section: true, text: 'ENVIRONMENT' },
   { text: 'Level 1 — Szadi art (Pixel Platformer: Castle)' },
   { text: 'Level 2 — Luis Zuno / @ansimuz (GothicVania Town)' },
   { text: 'Level 3 — Luis Zuno / @ansimuz (GothicVania Church)' },
-  { text: 'Hangulati propok — Luis Zuno / @ansimuz (GothicVania Town)' },
-  { text: 'Nyitó szentély — AI-generált háttérfestmény (ChatGPT)' },
+  { text: 'Ambient props — Luis Zuno / @ansimuz (GothicVania Town)' },
+  { text: 'Opening shrine — AI-generated background painting (ChatGPT)' },
   // A NÉGY boss-aréna háttere SZÁNDÉKOSAN hiányzik innen: azok a képek önálló fájlként,
   // szerző és licenc nélkül érkeztek (nyitott jogi tétel, lásd CLAUDE.md). Ide csak akkor
   // kerülhet sor, ha a forrásuk tisztázódott — kitalált attribúció rosszabb a hiánynál.
   { text: '' },
-  { section: true, text: 'ZENE' },
+  { section: true, text: 'MUSIC' },
   { text: 'Elkmire Keep — Lisette Amago (Free Dark Fantasy Music)' },
   { text: 'Library of Veles — Lisette Amago (Free Dark Fantasy Music)' },
   { text: 'Whispers of the Abyss — AlkaKrab' },
@@ -77,12 +77,12 @@ const CREDITS: CreditLine[] = [
   { text: 'Dread March — AlkaKrab' },
   { text: 'Veil of Eternal Nightfall — AlkaKrab' },
   { text: '' },
-  { section: true, text: 'HANGOK' },
-  { text: 'Harci hangok és mozgás — TomMusic (Free Fantasy SFX Pack)' },
-  { text: 'Player halál — VoiceBosch (Death Sounds Male)' },
-  { text: 'Szörny-hangok — Lazy Spartan Games' },
+  { section: true, text: 'SOUND' },
+  { text: 'Combat and movement SFX — TomMusic (Free Fantasy SFX Pack)' },
+  { text: 'Player death — VoiceBosch (Death Sounds Male)' },
+  { text: 'Monster vocals — Lazy Spartan Games' },
   { text: '' },
-  { section: true, text: 'KÉSZÍTETTE' },
+  { section: true, text: 'MADE BY' },
   { text: 'Csóka Nándor' },
   { text: 'Phaser 4 · Vite · TypeScript' },
 ];
@@ -154,7 +154,7 @@ export default class CreditsScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.tweens.add({ targets: this.hintText, alpha: 0.35, duration: 900, yoyo: true, repeat: -1 });
-    this.hintText.setText('▼  Space: gyorsítás');
+    this.hintText.setText('▼  Space: Speed up');
 
     const keyboard = this.input.keyboard;
     if (keyboard) {
@@ -185,7 +185,7 @@ export default class CreditsScene extends Phaser.Scene {
     if (this.finished) return;
     this.finished = true;
     this.content.y = this.scrollEndY;
-    this.hintText.setText('Space: új játék');
+    this.hintText.setText('Space: New game');
   }
 
   /**

@@ -59,7 +59,7 @@ const KING_SPAWN_Y = GROUND_TOP - KING_FEET_OFFSET_Y;
 const BACKGROUND_COLOR = '#0b0a18';
 
 const BOSS_NAME = 'The Mad King';
-const BOSS_SUBTITLE = 'aki nem engedte el';
+const BOSS_SUBTITLE = 'he who would not let go';
 
 const HP_BAR_X = 110;
 const HP_BAR_Y = 34;
@@ -89,12 +89,12 @@ const FALLBACK_SCENE_KEY = 'Level2Scene';
  * A sorok SZÁNDÉKOSAN rövidek: a panel 2 sorra tördel, ennél hosszabb szöveg kilógna belőle.
  */
 const KING_DIALOGUE: DialogueLine[] = [
-  { speaker: 'AZ ŐRÜLT KIRÁLY', text: 'Ismerlek, szárnyatlan. A varjaid egykor az én tornyaim felett köröztek.' },
-  { speaker: 'LAZARUS', text: 'És most a te ketrecedben ülnek. Engedd el őket.' },
-  { speaker: 'AZ ŐRÜLT KIRÁLY', text: 'Elengedni? Te őrizted a kaput, és hagytad, hogy elvigye őt.' },
-  { speaker: 'LAZARUS', text: 'A királyné meghalt. Amit visszahoztál, az nem ő.' },
-  { speaker: 'AZ ŐRÜLT KIRÁLY', text: 'Hazudsz. Alszik. Csak addig alszik, amíg a rend helyre nem áll.' },
-  { speaker: 'LAZARUS', text: 'Akkor előbb téged fektetlek le mellé.' },
+  { speaker: 'THE MAD KING', text: 'I know you, wingless one. Your crows once circled above my towers.' },
+  { speaker: 'LAZAR', text: 'And now they sit in your cage. Let them go.' },
+  { speaker: 'THE MAD KING', text: 'Let them go? You kept the gate, and you let it take her.' },
+  { speaker: 'LAZAR', text: 'The queen is dead. What you brought back is not her.' },
+  { speaker: 'THE MAD KING', text: 'You lie. She sleeps. She sleeps only until order is restored.' },
+  { speaker: 'LAZAR', text: 'Then I will lay you down beside her first.' },
 ];
 
 /**
@@ -102,10 +102,10 @@ const KING_DIALOGUE: DialogueLine[] = [
  * kap (Project_plan.md 16. pont), ezért nem diadal, hanem lezárás.
  */
 const KING_VICTORY_NARRATION = [
-  'A korona lecsúszik a fejéről, és megáll a trón lépcsőjén.\nA király nem nyúl utána.',
-  'Odébb, a félhomályban, valami elernyed.\nAmi a királyné helyett feküdt ott, végre nem mozdul.',
-  'A trónterem mennyezete megnyílik.\nNem az égre — valami mélyebbre.',
-  'A démon nem a kastélyban van.\nA kapunál vár, amit Lazarusnak kellett volna őriznie.',
+  'The crown slides from his head and stops on the throne steps.\nThe king does not reach for it.',
+  'Further off, in the half-dark, something goes slack.\nWhat lay there in place of the queen finally stops moving.',
+  'The ceiling of the throne room opens.\nNot onto the sky — onto something deeper.',
+  'The demon is not in the castle.\nIt waits at the gate Lazar was meant to keep.',
 ];
 
 export default class Boss2Scene extends Phaser.Scene {

@@ -82,7 +82,7 @@ export default class NarrationScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.hintText = this.add
-      .text(centerX, this.scale.height - 46, '▼  Space: tovább   ·   Esc: átugrás', {
+      .text(centerX, this.scale.height - 46, '▼  Space: Continue   ·   Esc: Skip', {
         fontFamily: 'monospace',
         fontSize: '12px',
         color: '#5a5560',

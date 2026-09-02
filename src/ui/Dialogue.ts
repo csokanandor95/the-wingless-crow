@@ -151,7 +151,7 @@ export default class Dialogue {
         // (tördelt) sorába lógna bele: a body 15px-es sorai + a 4px lineSpacing a panel
         // aljáig érnek, a súgó pedig jobbra zárt, tehát egy hosszú második sor alá csúszna.
         panelTop + PANEL_PADDING - 2,
-        '→  gyorsítás',
+        '→  Skip',
         {
           fontFamily: 'monospace',
           fontSize: HINT_FONT_SIZE,

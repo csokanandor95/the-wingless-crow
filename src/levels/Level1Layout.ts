@@ -377,7 +377,7 @@ export const TUTORIAL_HINTS: TutorialHintDef[] = [
   // triggerX 0 = AZONNAL, a spawn pillanatában. A START_X (100) fölötti küszöb csapda
   // lenne: a mozgás-súgó csak azután jelenne meg, hogy a játékos magától már elindult —
   // pont akkor, amikor már nincs rá szüksége.
-  { id: 'movement', triggerX: 0, text: '← → / A D  — mozgás      Space / W  — ugrás' },
+  { id: 'movement', triggerX: 0, text: '← → / A D  — Move      Space / W  — Jump' },
   // A harc-súgó a `gap1` (1660) ELŐTT villan fel, tehát a player a szakadék átugrása KÖZBEN
   // és az első ellenfélhez (`C-1`, patrol 2000-től) érve is olvassa. A `HINT_HOLD_MS` (4000)
   // alatt `MOVE_SPEED` (200) mellett 800 px tehető meg, tehát a felirat 1560..2360-ig van a
@@ -389,7 +389,7 @@ export const TUTORIAL_HINTS: TutorialHintDef[] = [
   {
     id: 'combat',
     triggerX: 1560,
-    text: 'J / bal klikk  — kard      F  — tűzgolyó\nK / jobb klikk  — nagy csapás (3 kardtalálat tölti)',
+    text: 'J / Left Click  — Sword      F  — Fireball\nK / Right Click  — Heavy Slash (charged by 3 sword hits)',
   },
 ];
 
@@ -510,8 +510,8 @@ export const HOUSE_INTERACT = {
  */
 export const HOUSE_DIALOGUE_PANEL_TOP = 8;
 
-/** A prompt-szövegek konvenciója a repóban: magyar, `E: `-vel kezdve. */
-export const HOUSE_PROMPT = 'E: Kopogás';
+/** A prompt-szövegek konvenciója a repóban: `E: `-vel kezdve. */
+export const HOUSE_PROMPT = 'E: Knock';
 
 /**
  * A prompt függőleges helye — **VILÁG-koordinátában, a player feje fölött**, nem a képernyő
@@ -539,8 +539,8 @@ export const HOUSE_PROMPT_Y = GROUND_TOP - PLAYER_BODY_HEIGHT - HOUSE_PROMPT_GAP
  * a `fakePhaser` nem ad `Scene` osztályt, tehát a scene unit tesztből nem importálható — így
  * viszont bizonyítható, hogy a sor elfér a panelen.
  */
-export const HOUSE_SPEAKER = 'HANG A HÁZBÓL';
+export const HOUSE_SPEAKER = 'VOICE FROM THE HOUSE';
 
 export const HOUSE_DIALOGUE: DialogueLine[] = [
-  { speaker: HOUSE_SPEAKER, text: 'Veszély közeleg. Ne menj tovább, ha jót akarsz...!' },
+  { speaker: HOUSE_SPEAKER, text: 'Danger is coming. Go no further, if you know what is good for you...!' },
 ];

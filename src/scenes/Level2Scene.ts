@@ -106,9 +106,9 @@ const NEXT_LEVEL_SCENE_KEY = 'Level3Scene';
  * az átvezető indul.)
  */
 const LEVEL2_END_NARRATION = [
-  'A negyed véget ér. A macskaköves út egy kapuban fut ki,\nés a kapu mögött nincs több utca.',
-  'A kastély áll. Egyetlen ablakában sem ég fény —\ncsak a tróntermében, ahol soha nem alszik ki.',
-  'Odabent valaki beszél. Nem hozzá,\nhanem valakihez, aki már nem válaszol.',
+  'The quarter ends. The cobbled road runs out into a gate,\nand behind the gate there are no more streets.',
+  'The castle still stands. No light burns in any window —\nonly in the throne room, where it never goes out.',
+  'Someone is talking inside. Not to himself,\nbut to someone who no longer answers.',
 ];
 
 const RESPAWN_DELAY_MS = 1200;
@@ -308,7 +308,7 @@ export default class Level2Scene extends Phaser.Scene {
 
     this.interactKey = this.input.keyboard!.addKey('E');
     this.doorPromptText = this.add
-      .text(400, 400, this.registry.get('kingDefeated') ? 'E: Tovább — The Beast Dungeon' : 'E: Belépés', {
+      .text(400, 400, this.registry.get('kingDefeated') ? 'E: Continue — The Beast Dungeon' : 'E: Enter', {
         fontFamily: 'monospace',
         fontSize: '16px',
         color: '#ffffff',
@@ -544,7 +544,7 @@ export default class Level2Scene extends Phaser.Scene {
     this.checkpoint.activate(DOOR_CHECKPOINT.x, DOOR_CHECKPOINT.y);
 
     this.isTransitioning = true;
-    this.doorPromptText.setText('Checkpoint mentve...').setVisible(true);
+    this.doorPromptText.setText('Checkpoint saved...').setVisible(true);
 
     // A zene a KÉPPEL EGYÜTT halkul el, ugyanabból a konstansból, amiből a kamera-fade. A
     // scene shutdownja önmagában is elvágná (az AudioManager hookja), de fade nélkül —

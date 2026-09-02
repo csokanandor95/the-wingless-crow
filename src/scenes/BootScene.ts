@@ -393,7 +393,7 @@ const LOADING_BAR_HEIGHT = 14;
  * fejlesztés közben ez a leggyorsabb út. **Commit előtt mindig állítsd vissza
  * `'PreScene'`-re.**
  */
-const START_SCENE = 'Level1Scene';
+const START_SCENE = 'PreScene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a
@@ -693,7 +693,7 @@ export default class BootScene extends Phaser.Scene {
     const centerY = this.scale.height / 2;
 
     this.add
-      .text(centerX, centerY - 30, 'Betöltés...', {
+      .text(centerX, centerY - 30, 'Loading...', {
         fontFamily: 'monospace',
         fontSize: '16px',
         color: '#8a7a8a',

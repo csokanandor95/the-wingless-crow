@@ -88,33 +88,39 @@ export const INTERACT_ZONE_Y = GROUND_TOP - INTERACT_ZONE.height / 2 + 7;
  * amit Lazarusnak kellett volna őriznie, az ŐRÜLT KIRÁLY, a VARJAK és a „szárnyatlan"
  * megszólítás mind visszaköszön a későbbi boss-párbeszédekben.
  *
- * A beszélő neve NAGYBETŰS, mint mindenhol máshol; a player oldalán `LAZARUS`.
+ * A beszélő neve NAGYBETŰS, mint mindenhol máshol; a player oldalán `LAZAR`.
  */
-export const GODDESS_SPEAKER = 'A LÁNGŐRZŐ';
-export const PLAYER_SPEAKER = 'LAZARUS';
+export const GODDESS_SPEAKER = 'THE FLAMEKEEPER';
+export const PLAYER_SPEAKER = 'LAZAR';
 
 export const GODDESS_DIALOGUE: DialogueLine[] = [
-  { speaker: GODDESS_SPEAKER, text: 'Felébredtél. Pedig aki innen zuhan, az ritkán ébred fel.' },
-  { speaker: PLAYER_SPEAKER, text: 'Hol vagyok? És mi történt velem?' },
-  { speaker: GODDESS_SPEAKER, text: 'A hátad üres, szárnyatlan. Valaki elvette, ami a tiéd volt.' },
-  { speaker: PLAYER_SPEAKER, text: 'Ki?' },
-  { speaker: GODDESS_SPEAKER, text: 'Nem „ki". Ami a kapun átjött, annak nincs neve — csak éhsége.' },
+  { speaker: GODDESS_SPEAKER, text: 'You woke. Few who fall from up there ever wake again.' },
+  { speaker: PLAYER_SPEAKER, text: 'Where am I? And what happened to me?' },
   {
     speaker: GODDESS_SPEAKER,
-    text: 'A szárnyaid nem törtek le. Fizetség voltak, és nem te fizettél velük.',
+    text: 'Your back is bare, wingless one. Someone took what was yours.',
   },
-  { speaker: PLAYER_SPEAKER, text: 'Akkor megkeresem azt, aki fizetett.' },
+  { speaker: PLAYER_SPEAKER, text: 'Who?' },
   {
     speaker: GODDESS_SPEAKER,
-    text: 'Az őrült király tudja. Menj a várába, amíg még emlékszik a saját nevére.',
+    text: 'Not "who". What came through the gate has no name — only hunger.',
   },
-  { speaker: PLAYER_SPEAKER, text: 'És te? Miért segítesz?' },
   {
     speaker: GODDESS_SPEAKER,
-    text: 'Én csak a lángot őrzöm. Te vagy az, aki visszahozhatja, amit elvettek.',
+    text: 'Your wings were not broken off. They were payment, and you were not the one who paid.',
+  },
+  { speaker: PLAYER_SPEAKER, text: 'Then I will find the one who did.' },
+  {
+    speaker: GODDESS_SPEAKER,
+    text: 'The mad king knows. Go to his castle, while he still remembers his own name.',
+  },
+  { speaker: PLAYER_SPEAKER, text: 'And you? Why help me?' },
+  {
+    speaker: GODDESS_SPEAKER,
+    text: 'I only keep the flame. You are the one who can bring back what was taken.',
   },
 ];
 
-/** A prompt-szövegek. A repó összes interakciós promptja magyar és `E: `-vel kezdődik. */
-export const TALK_PROMPT = 'E: Beszélgetés';
-export const DEPART_PROMPT = 'E: Indulás';
+/** A prompt-szövegek. A repó összes interakciós promptja `E: `-vel kezdődik. */
+export const TALK_PROMPT = 'E: Talk';
+export const DEPART_PROMPT = 'E: Depart';
