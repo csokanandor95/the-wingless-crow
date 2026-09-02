@@ -91,14 +91,15 @@ describe('AudioManager', () => {
       expect(MUSIC_KEYS.FINAL_BOSS_THEME).not.toBe(MUSIC_KEYS.LEVEL2_THEME);
     });
 
-    // Mind a HÉT zenét játszó scene-nek (3 pálya + 4 boss aréna) saját kulcsa van.
+    // Mind a NYOLC zenét játszó scene-nek (nyitó szentély + 3 pálya + 4 boss aréna) saját
+    // kulcsa van.
     it('minden zenét játszó scene-nek van kulcsa', () => {
-      expect(Object.keys(MUSIC_KEYS)).toHaveLength(7);
+      expect(Object.keys(MUSIC_KEYS)).toHaveLength(8);
     });
 
-    // Mind a hét sáv KÜLÖN fájl: egy „ez ugyanaz a hangulat, vonjuk össze" takarítás
+    // Mind a nyolc sáv KÜLÖN fájl: egy „ez ugyanaz a hangulat, vonjuk össze" takarítás
     // csendben elvenné valamelyik scene zenéjét (lásd a fenti Shadowforge-esetet).
-    it('a hét zene-kulcs mind különbözik', () => {
+    it('a nyolc zene-kulcs mind különbözik', () => {
       const keys = Object.values(MUSIC_KEYS);
       expect(new Set(keys).size).toBe(keys.length);
     });

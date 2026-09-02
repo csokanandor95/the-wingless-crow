@@ -49,8 +49,10 @@ const CREDITS: CreditLine[] = [
   { text: '' },
   { section: true, text: 'KARAKTEREK' },
   { text: 'Lazarus — Szadi art (2D Soulslike Character)' },
+  { text: 'A Lángőrző — GandalfHardcore (FREE NPC: Goddess)' },
   { text: 'Crow Harvester — Szadi art (Animated Character Pack)' },
   { text: 'Gravecaller — oco (Medieval Fantasy Character Pack 6)' },
+  { text: 'Beast / The Beast Master — Omni-Machina (Goatman)' },
   { text: 'The Grafted Wing-Breaker — Clembod (Bringer of Death)' },
   { text: 'The Mad King — LuizMelo (Medieval King Pack 2)' },
   { text: 'Ancient Demon — Kronovi- (Undead Executioner)' },
@@ -58,11 +60,21 @@ const CREDITS: CreditLine[] = [
   { section: true, text: 'KÖRNYEZET' },
   { text: 'Level 1 — Szadi art (Pixel Platformer: Castle)' },
   { text: 'Level 2 — Luis Zuno / @ansimuz (GothicVania Town)' },
+  { text: 'Level 3 — Luis Zuno / @ansimuz (GothicVania Church)' },
+  { text: 'Hangulati propok — Luis Zuno / @ansimuz (GothicVania Town)' },
+  { text: 'Nyitó szentély — AI-generált háttérfestmény (ChatGPT)' },
+  // A NÉGY boss-aréna háttere SZÁNDÉKOSAN hiányzik innen: azok a képek önálló fájlként,
+  // szerző és licenc nélkül érkeztek (nyitott jogi tétel, lásd CLAUDE.md). Ide csak akkor
+  // kerülhet sor, ha a forrásuk tisztázódott — kitalált attribúció rosszabb a hiánynál.
   { text: '' },
   { section: true, text: 'ZENE' },
+  { text: 'Elkmire Keep — Lisette Amago (Free Dark Fantasy Music)' },
   { text: 'Library of Veles — Lisette Amago (Free Dark Fantasy Music)' },
+  { text: 'Whispers of the Abyss — AlkaKrab' },
+  { text: 'Eclipsed Desolation — AlkaKrab' },
   { text: 'Shadowforge Convergence — AlkaKrab' },
   { text: 'Cursed Citadel — AlkaKrab' },
+  { text: 'Dread March — AlkaKrab' },
   { text: 'Veil of Eternal Nightfall — AlkaKrab' },
   { text: '' },
   { section: true, text: 'HANGOK' },
@@ -186,8 +198,10 @@ export default class CreditsScene extends Phaser.Scene {
 
     // FADE_OUT_COMPLETE, nem a fadeOut() callbackje: utóbbi a fade MINDEN frame-jén lefutna
     // (CLAUDE.md 4. tanulság).
+    // A PreScene-re, NEM a Level 1-re: az új játéknak a nyitó szentélyben kell kezdődnie,
+    // különben a második végigjátszásból kimaradna a felvezetés.
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start('Level1Scene');
+      this.scene.start('PreScene');
     });
     this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
   }

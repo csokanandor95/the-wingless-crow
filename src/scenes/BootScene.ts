@@ -48,6 +48,11 @@ import {
   FRAME_WIDTH as BOSS_FRAME_WIDTH,
   TEXTURE_KEY as BOSS_TEXTURE_KEY,
 } from '../bosses/GraftedWingBreakerAnimations';
+import {
+  createGoddessAnimations,
+  FRAME_SIZE as GODDESS_FRAME_SIZE,
+  TEXTURE_KEY as GODDESS_TEXTURE_KEY,
+} from '../npc/GoddessAnimations';
 // Vite-on át importálva (nem `public/`-ból): így az asset hash-elve bekerül a buildbe,
 // a base path (GitHub Pages) magától helyes lesz, és HIÁNYZÓ fájl esetén a build elszáll
 // ahelyett, hogy néma 404 lenne futásidőben.
@@ -78,6 +83,11 @@ import level2ThemeUrl from '../../assets/audio/whispers-of-the-abyss.mp3';
 // intrója minden fordulónál újraszólna.
 import level3ThemeUrl from '../../assets/audio/eclipsed-desolation.mp3';
 import boss3ThemeUrl from '../../assets/audio/dread-march.mp3';
+// A nyitó szentély (PreScene): `Elkmire Keep (LOOP)`, UGYANABBÓL a "Free Dark Fantasy Music"
+// csomagból, amiből a Level 1 `Library of Veles`-e jön — tehát NEM nyit új jogi tételt (a
+// csomag hiányzó licencfájlja már dokumentált tétel, lásd CLAUDE.md). Ez a csomag addig
+// kihasználatlan második sávja; a forrás-cím megtartása a fájlnévben a kapocs a csomaghoz.
+import presceneThemeUrl from '../../assets/audio/elkmire-keep.mp3';
 // Boss 2 (Mad King) theme: UGYANAZ az AlkaKrab csomag, `6. Veil of Eternal Nightfall (Loop)`.
 // Nem nyit új jogi tételt — ugyanaz a `2D helper/music/Loops mp3/` mappa, amiből a boss theme
 // és a Level 2 sávja is jön (a licenc-PDF átolvasása továbbra is nyitott, lásd CLAUDE.md).
@@ -130,6 +140,15 @@ import beastDeathSfxUrl from '../../assets/audio/sfx/fatman-death.wav';
 // nem nyit új jogi tételt. A kardsuhintásnál nehezebb, 2 mp-es dörej — a fight legnagyobb
 // ütése. A fájlnévben megtartott csomagbeli név a kapocs a forráshoz.
 import kingSlamUrl from '../../assets/audio/sfx/rock-wall-1.wav';
+// A PreScene nyitó becsapódása: UGYANAZ a TomMusic lépés-készlet, mint a járásé
+// (`Footsteps/Stone/Stone Chain Land.wav`), tehát nem nyit új jogi tételt.
+//
+// A "Chain" (láncinges) változat nyert, mérés alapján: a `Stone Chain Jump` annak idején
+// azért BUKOTT, mert a farka visszaemelkedett a csúcs 81 %-ára — a két `Land` változat farka
+// viszont MINDKETTŐNÉL a csúcs 10 %-a, tehát az a kifogás itt nem áll. Cserébe a Chain
+// HF-aránya 0,901 (a simáé 0,223): pont az a láncing-csörgés, ami egy páncélos test kőre
+// csapódásához kell. A csúcsok gyakorlatilag azonosak (0,3087 vs. 0,3094).
+import playerLandUrl from '../../assets/audio/sfx/stone-chain-land.wav';
 // Player halál. SZÁRMAZTATOTT asset: a forrás `2D helper/sounds/17. Death Groan (Male).wav`
 // KÉT külön felvételt tartalmaz egy fájlban (50-330ms és 575-950ms, közte csend). Egyetlen
 // halálhoz egy nyögés kell, ezért az ELSŐ szakasz van kivágva (0-360ms) + 30ms fade-out a
@@ -146,6 +165,13 @@ import knightHurtUrl from '../../assets/sprites/knight/Hurt.png';
 import knightDeathUrl from '../../assets/sprites/knight/Death.png';
 import knightClimbUrl from '../../assets/sprites/knight/Climb.png';
 import knightCastUrl from '../../assets/sprites/knight/Health.png';
+// A LÁNGŐRZŐ (a PreScene NPC-je): egyetlen 832x64-es csík, 13 db 64x64-es frame, mind egyedi
+// — egyetlen idle loop. Forrás: GandalfHardcore "FREE NPC (Goddess)". Ez NEM nyitott jogi
+// tétel: a csomag READ ME.txt-je tartalmaz licencszöveget, és az be van másolva a repóba
+// (`assets/sprites/goddess/license.txt`), a knight és a Mad King mintájára.
+// A fájlnév az eredeti, csak a szóközök lettek kötőjelek: a Vite-import szóközzel törékeny
+// (a Mad King `Take-Hit.png`-jének precedense).
+import goddessSheetUrl from '../../assets/sprites/goddess/GandalfHardcore-Goddess-NPC.png';
 // CrowHarvester (Enemy 1): egyetlen 1792x64-es csík, 28 db 64x64-es frame.
 import crowHarvesterSheetUrl from '../../assets/sprites/crow-harvester/enemy04_sheet.png';
 // Beast (Enemy 3): egyetlen 384x512-es lap = 6x8 db 64x64-es frame (48 cella, 41 rajzolt).
@@ -258,6 +284,18 @@ import finalArenaUrl from '../../assets/backgrounds/broken-gate/final-arena.png'
 //     vs. 117), tükrözve viszont mindkét átmenet duplázott oszlopra esik.
 import bgTownSkyUrl from '../../assets/backgrounds/gothic-town/01-sky.png';
 import bgTownUrl from '../../assets/backgrounds/gothic-town/02-town.png';
+// A nyitó szentély (PreScene) háttere: romos gótikus szentély egy SZÁRNYAS angyalszoborral —
+// pontosan az, amit Lazarus elvesztett. A képet a user CHATGPT-vel generálta.
+//
+// SZÁRMAZTATOTT asset, de a legegyszerűbb módon: a forrás (`2D helper/level/Pre-scene.png`,
+// 1672x941) sima 800x450-es KICSINYÍTÉSE, KIVÁGÁS NÉLKÜL — a forrás aspektusa (1.7768)
+// gyakorlatilag azonos a 800/450-ével (1.7778). Pontosan a `final-arena.png` receptje, ami
+// ugyanebből a méretből indult.
+//
+// A rajzolt mozaikpadló lapja a kicsinyített képen a 345-397. sor (a 398.-ban -21,06 a
+// fényesség-zuhanás: ott van a lap első pereme), tehát a PreScene GROUND_TOP-ja (369) a
+// lapon belülre esik. TINT nem kerül rá, lásd a PreScene.createBackground() indoklását.
+import preSceneUrl from '../../assets/backgrounds/shrine/pre-scene.png';
 // Level 1 terrain-csempék. Forrás: UGYANAZ a PixelPlatformerSet1 v1.1 csomag (Szadi art,
 // public domain), amiből a fenti parallax háttér is jön — ezért illeszkedik a paletta
 // korrekció nélkül. Származtatott assetek: kivágások a csomag `main_lev_build.png` és
@@ -345,14 +383,17 @@ const LOADING_BAR_WIDTH = 320;
 const LOADING_BAR_HEIGHT = 14;
 
 /**
- * Melyik pályán induljon a játék a betöltés után.
+ * Melyik jelenettel induljon a játék a betöltés után.
  *
- * NORMÁL érték: `'Level1Scene'`. A `'Level2Scene'`-re átírva a Level 2 KÖZVETLENÜL
- * tesztelhető, anélkül hogy végig kellene játszani a Level1 -> Boss -> átvezető láncot —
- * fejlesztés közben ez a leggyorsabb út az új szakaszokhoz. **Commit előtt mindig állítsd
- * vissza `'Level1Scene'`-re.**
+ * NORMÁL érték: `'PreScene'` — a nyitó szentély, ahonnan a lánc indul. (Korábban
+ * `'Level1Scene'` volt; a PreScene beszúrásával az lett a második állomás.)
+ *
+ * Bármelyik másik kulcsra átírva (`'Level2Scene'`, `'Boss2Scene'`, `'FinalBossScene'`, ...)
+ * az adott szakasz KÖZVETLENÜL tesztelhető, anélkül hogy végig kellene játszani a láncot —
+ * fejlesztés közben ez a leggyorsabb út. **Commit előtt mindig állítsd vissza
+ * `'PreScene'`-re.**
  */
-const START_SCENE = 'BossScene';
+const START_SCENE = 'PreScene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a
@@ -393,6 +434,7 @@ const MUSIC_TRACKS: Array<{ key: string; url: string }> = [
   { key: MUSIC_KEYS.FINAL_BOSS_THEME, url: finalBossThemeUrl },
   { key: MUSIC_KEYS.LEVEL3_THEME, url: level3ThemeUrl },
   { key: MUSIC_KEYS.BOSS3_THEME, url: boss3ThemeUrl },
+  { key: MUSIC_KEYS.PRESCENE_THEME, url: presceneThemeUrl },
 ];
 
 const SFX_SOUNDS: Array<{ key: string; url: string }> = [
@@ -410,6 +452,7 @@ const SFX_SOUNDS: Array<{ key: string; url: string }> = [
   { key: SFX_KEYS.GRAVECALLER_DEATH, url: gravecallerDeathSfxUrl },
   { key: SFX_KEYS.BEAST_DEATH, url: beastDeathSfxUrl },
   { key: SFX_KEYS.KING_SLAM, url: kingSlamUrl },
+  { key: SFX_KEYS.PLAYER_LAND, url: playerLandUrl },
 ];
 
 // Gravecaller (Enemy 2): öt külön sheet, mind 96x96-os frame-ekkel — a knight
@@ -462,6 +505,7 @@ const BACKGROUND_IMAGES: Array<{ key: string; url: string }> = [
   { key: BACKGROUND_TEXTURES.FINAL_ARENA, url: finalArenaUrl },
   { key: BACKGROUND_TEXTURES.TOWN_SKY, url: bgTownSkyUrl },
   { key: BACKGROUND_TEXTURES.TOWN, url: bgTownUrl },
+  { key: BACKGROUND_TEXTURES.PRE_SCENE, url: preSceneUrl },
 ];
 
 // Level 1 terrain. A `GROUND_FLOOR`, a `PLATFORM_MID` és a `LADDER` tileSprite-ként
@@ -561,6 +605,12 @@ export default class BootScene extends Phaser.Scene {
       frameHeight: HARVESTER_FRAME_SIZE,
     });
 
+    // A LÁNGŐRZŐ: 832x64 -> 13 db 64x64-es frame, egyetlen idle loop.
+    this.load.spritesheet(GODDESS_TEXTURE_KEY, goddessSheetUrl, {
+      frameWidth: GODDESS_FRAME_SIZE,
+      frameHeight: GODDESS_FRAME_SIZE,
+    });
+
     // A goatman lap 6 oszlop x 8 sor; a Phaser a frame-eket sorfolytonosan indexeli, tehát a
     // BeastAnimations frame-számai közvetlenül használhatók.
     this.load.spritesheet(BEAST_TEXTURE_KEY, beastSheetUrl, {
@@ -630,6 +680,7 @@ export default class BootScene extends Phaser.Scene {
     createMadKingAnimations(this);
     createAncientDemonAnimations(this);
     createShadeMinionAnimations(this);
+    createGoddessAnimations(this);
 
     this.scene.start(START_SCENE);
   }

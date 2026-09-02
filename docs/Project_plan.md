@@ -1067,6 +1067,13 @@ A pályák száma később változtatható.
 >
 > A teljes lánc:
 > `Level 1 → Boss 1 → Level 2 → Boss 2 → átvezető → Final Boss → ending → credits`.
+>
+> **FRISSÍTÉS (2026-08-31):** a lánc a `Level 3 – The Beast Dungeon` + `Boss 3 – The Beast
+> Master` blokkal BŐVÜLT a Boss 2 után (lásd a Level 3 szakaszt).
+> **FRISSÍTÉS (2026-09-02):** a lánc ELEJÉRE bekerült a **`PreScene`** (a nyitó szentély),
+> tehát a mai teljes útvonal:
+> `PreScene → Level 1 → Boss 1 → Level 2 → Boss 2 → Level 3 → Boss 3 → Final Boss →
+> ending → credits`.
 
 ---
 
@@ -1536,6 +1543,7 @@ the-wingless-crow/
 │   ├── scenes/
 │   │   ├── BootScene.ts
 │   │   ├── MenuScene.ts
+│   │   ├── PreScene.ts        # -> ÚJ (2026-09-02): a nyitó szentély, a lánc első jelenete
 │   │   ├── Level1Scene.ts
 │   │   ├── Level2Scene.ts
 │   │   ├── BossScene.ts
@@ -1545,6 +1553,9 @@ the-wingless-crow/
 │   ├── player/
 │   │   ├── Player.ts
 │   │   └── PlayerController.ts
+│   │
+│   ├── npc/                   # -> ÚJ (2026-09-02): nem harcoló szereplők
+│   │   └── GoddessAnimations.ts   # A Lángőrző (PreScene)
 │   │
 │   ├── enemies/
 │   │   ├── CrowHarvester.ts
@@ -1612,6 +1623,33 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 > A `NarrationScene` a világ hangja két jelenet között; a `Dialogue` két szereplő beszélgetése
 > egy jeleneten belül. Egy teljes képernyős, kézzel léptetett szövegdoboz a király előtt
 > kitakarta volna magát a királyt — pont azt, amiért a jelenet létezik.
+
+> **KIEGÉSZÍTÉS (2026-09-02) — `scenes/PreScene.ts`, a játék nyitó jelenete.**
+>
+> A tervben nem szereplő, ÚJ scene, ami a `BootScene` és a `Level1Scene` KÖZÉ került: a lánc
+> innentől `PreScene → Level 1 → Boss 1 → …`. A `BootScene.START_SCENE` normál értéke ezért
+> `'PreScene'`, és a `CreditsScene` új játéka is ide tér vissza.
+>
+> **Mit csinál:** Lazarus a képernyő tetejéről bezuhan egy romos szentélybe (a háttéren egy
+> SZÁRNYAS angyalszobor — pontosan az, amit elvesztett), majd a jobb oldalon álló NPC-vel,
+> **A LÁNGŐRZŐVEL** kell `E`-vel beszédbe elegyednie. A párbeszédből derül ki, hogy valami
+> démoni jött át a kapun, a szárnyai FIZETSÉG voltak, és válaszokért az őrült király várába
+> kell eljutnia. A párbeszéd után egy második `E` (`E: Indulás`) viszi a Level 1-re —
+> **átvezető nélkül** (user-döntés: a párbeszéd MAGA a felvezetés).
+>
+> **Miért nem a 9. pont introjának `NarrationScene`-e:** az a világ hangja fekete képernyőn;
+> ez egy JÁTSZHATÓ jelenet, ahol a player először mozog és először beszélgetnek vele. A kettő
+> nem helyettesíti egymást — ugyanaz a különbség, mint a `NarrationScene` és a `Dialogue`
+> között (lásd a fenti táblázatot).
+>
+> **A projekt első NEM HARCOLÓ szereplője**, ezért nyit új mappát: `src/npc/`. Az NPC-nek
+> nincs state machine-je, HP-ja és physics bodyja — egyetlen, 13 frame-es idle loop.
+>
+> **A jelenet EGYETLEN inputja a séta és az ugrás**, és ez tudatos: `PlayerController` NEM
+> jön létre benne. Annak a konstruktora regisztrálja a J/F és pointer listenereket, és nincs
+> `destroy()`-a, tehát a `Boss2Scene` „csak a harc előtt hozzuk létre" trükkje itt nem
+> alkalmazható (a player a párbeszéd ELŐTT már sétál) — enélkül A LÁNGŐRZŐ monológja alatt
+> kardot lehetne suhintani rá. Egy szentélyben amúgy sincs mit ütni és mit égetni.
 
 ---
 

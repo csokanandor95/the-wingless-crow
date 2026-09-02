@@ -144,13 +144,13 @@ export default class Level1Scene extends Phaser.Scene {
     // (a scene leállásakor) kell véget érnie.
     this.audio = new AudioManager(this);
 
-    // FIGYELEM — a zene NEM itt kezd szólni, hanem az első billentyűlenyomásnál.
-    // A Level1Scene közvetlenül az oldalbetöltés után indul, bármilyen user-interakció
-    // előtt, tehát az audio context GARANTÁLTAN zárolt: a playMusic() ilyenkor az
-    // UNLOCKED eseményre halasztja a lejátszást (böngésző autoplay-policy, nem kerülhető
-    // meg). Ez a korábban élhelyzetnek szánt ág itt a FŐ út — nem hiba, ha a betöltés
-    // után csend van. Emiatt kap hosszabb (2000ms) fade-int is, hogy ne robbanjon be
-    // hirtelen az első leütésre.
+    // A LEVEL_MUSIC_FADE_IN_MS (2000) a hosszabb, "ambient" belépő. Az eredeti indoklása —
+    // hogy a Level 1 közvetlenül az oldalbetöltés után indul, tehát az audio context
+    // GARANTÁLTAN zárolt, és a sáv csak az első billentyűlenyomásnál szólal meg — a PreScene
+    // beszúrása óta MÁR NEM erre a scene-re igaz: az autoplay-zárat a nyitó szentély oldja
+    // fel (ott kell E-t nyomni az induláshoz), tehát ide már feloldott contexttel érkezünk.
+    // A hosszabb fade-in ettől még helyes: a fekete képernyőből érkező sáv így sem robban be
+    // hirtelen — ugyanaz a megfontolás, amiért a Level 2 még ennél is hosszabbat kapott.
     this.audio.playMusic(MUSIC_KEYS.LEVEL1_THEME, {
       volume: LEVEL_MUSIC_VOLUME,
       fadeInMs: LEVEL_MUSIC_FADE_IN_MS,

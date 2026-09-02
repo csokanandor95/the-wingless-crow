@@ -31,6 +31,11 @@ export const BACKGROUND_TEXTURES = {
   BOSS2_ARENA: 'bg-boss2-arena',
   /** Final boss aréna (The Broken Gate) — szintén egyetlen álló kép, lásd FinalBossScene. */
   FINAL_ARENA: 'bg-final-arena',
+  /**
+   * A nyitó szentély (`PreScene`) — szintén egyetlen álló kép, fix kamerával. A háttéren egy
+   * SZÁRNYAS angyalszobor: pont az, amit Lazarus elvesztett.
+   */
+  PRE_SCENE: 'bg-pre-scene',
   /** Level 2 (GothicVania Town) — lásd `LEVEL2_BACKGROUND_LAYERS`. */
   TOWN_SKY: 'bg-town-sky',
   TOWN: 'bg-town',

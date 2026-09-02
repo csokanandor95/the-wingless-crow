@@ -32,6 +32,12 @@ export const MUSIC_KEYS = {
    * lény karakterét adja vissza: nehéz, elkötelezett roham, nem varázslás.
    */
   BOSS3_THEME: 'boss3-theme',
+  /**
+   * A nyitó szentély (`PreScene`). `Elkmire Keep (LOOP)`, UGYANABBÓL a "Free Dark Fantasy
+   * Music" csomagból, amiből a Level 1 `Library of Veles`-e jön — tehát nem nyitott új jogi
+   * tételt. A csomag másik, addig kihasználatlan sávja.
+   */
+  PRESCENE_THEME: 'prescene-theme',
 } as const;
 
 export const SFX_KEYS = {
@@ -65,6 +71,19 @@ export const SFX_KEYS = {
   PLAYER_FOOTSTEP: 'sfx-player-footstep',
   /** A player ugrása — a `jump()` grounded-guardja mögül. */
   PLAYER_JUMP: 'sfx-player-jump',
+  /**
+   * A player becsapódása a `PreScene` nyitó zuhanása után. UGYANAZ a TomMusic lépés-készlet,
+   * mint a járásé, de a `Land` változat — és a `Chain` (láncinges) verzió, mint a lépésnél.
+   *
+   * A `Stone Chain Jump` annak idején azért BUKOTT, mert a farka visszaemelkedett a csúcs
+   * 81 %-ára; a két `Land` változat farka viszont MINDKETTŐNÉL a csúcs 10 %-a, tehát az a
+   * kifogás itt nem áll. A Chain HF-aránya 0,901 (a sima 0,223) — egy páncélos test kőre
+   * csapódásához pont ez a láncing-tartalom kell.
+   *
+   * SZÁNDÉKOSAN nem szól a Level 1-3 landolásainál: ez egyetlen, dramaturgiai becsapódás,
+   * nem általános ugrás-visszajelzés (az külön SFX-tétel maradt).
+   */
+  PLAYER_LAND: 'sfx-player-land',
   /** A player halála (a zuhanás-halált is beleértve), a `die()`-ból. */
   PLAYER_DEATH: 'sfx-player-death',
   /** A CrowHarvester halála. SZÁNDÉKOSAN más lény-hang, mint a Gravecalleré. */
@@ -139,6 +158,7 @@ export const DEFAULT_SFX_DETUNE_RANGE = 120;
  * | Beast halál         | 0.751        | 100 %               | 0.19   |
  * | player halál        | 0.699        | 130 %               | 0.27   |
  * | király becsapódás   | 0.559        | 130 %               | 0.33   |
+ * | nyitó becsapódás    | 0.309        | 130 %               | 0.60   |
  *
  * (*) Az ugrás a képlet szerint 1.06-ot kívánna; 1.0 a maximum, amit torzítás nélkül
  * kiadhatunk, tehát ez a hang marad kissé a célszint alatt. A forrásfájl egyszerűen halk
@@ -160,6 +180,12 @@ export const GRAVECALLER_DEATH_VOLUME = 0.56;
  */
 export const BEAST_DEATH_VOLUME = 0.19;
 export const KING_SLAM_VOLUME = 0.33;
+/**
+ * A `PreScene` nyitó becsapódása. A király ugrásával AZONOS cél-arányt (130 %) kap: mindkettő
+ * egyszeri, nehéz testtel a kőre — csak a forrásfájl halkabb (0,309 vs. 0,559), ezért nagyobb
+ * a szorzó. `1,30 * 0,1435 / 0,309 = 0,60`.
+ */
+export const PLAYER_LAND_VOLUME = 0.6;
 
 /**
  * A halál-hangok pontos magasságon szólnak. A detune-szórás célja, hogy egy ISMÉTLŐDŐ hang
