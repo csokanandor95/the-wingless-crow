@@ -816,6 +816,15 @@ export interface BuildingDef {
   surfaceId: string;
   /** Vízszintes tükrözés — három textúrából így hatféle sziluett lesz. */
   flipX?: boolean;
+  /**
+   * Színkorrekció, a `DecorPropDef.tint` pontos tükörképe — és ugyanabból az okból
+   * PLACEMENT-szintű: ugyanaz a `house-a` textúra a Level 2-n hazai pályán van (nyers
+   * paletta), a Level 1 cathedral-tónusában viszont korrekciót kíván.
+   *
+   * Elhagyva `PROP_TINT_NONE` (`0xffffff`), ami MULTIPLY módban NO-OP — tehát a Level 2 és a
+   * Level 3 viselkedése bitre változatlan (CLAUDE.md 14. tanulság).
+   */
+  tint?: number;
 }
 
 /** A ház lábnyoma — a layout-tesztek ebből dolgoznak, GameObject-mock nélkül. */
@@ -823,3 +832,6 @@ export function buildingFootprint(def: BuildingDef): { left: number; right: numb
   const half = BUILDING_ASSETS[def.texture].width / 2;
   return { left: def.x - half, right: def.x + half };
 }
+
+/** A ténylegesen alkalmazandó tint: megadás nélkül nincs korrekció (`decorPropTint` párja). */
+export const backdropBuildingTint = (def: BuildingDef): number => def.tint ?? PROP_TINT_NONE;

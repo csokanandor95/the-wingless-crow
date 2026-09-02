@@ -596,8 +596,11 @@ az arénát.
 **LEVEL 1 REDESIGN — 1. iteráció KÉSZ (a Phase 8 közé beszúrt, 3 iterációs blokk).**
 Az eredeti Level 1 (3200 px, folyamatos talaj, hazard nélkül) pillanatok alatt átugrálható
 volt. A user layout-specje (`2D helper/level1-layout.md`) alapján a pálya **6000 px**-re nőtt,
-nyolc szakaszra tagolva: `A start/mozgás-tutorial · B első enemy · C platforming + gap ·
-D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc · H boss-ajtó`.
+nyolc szakaszra tagolva: `A start + a ház (NPC) · B csendes átvezetés · C első enemy +
+platforming + gap · D spike-tutorial · E kombinált kihívás · F Swinging Reaper ·
+G záró harc · H boss-ajtó`.
+*(Az `A` eredetileg „mozgás/ugrás-tutorial", a `B` pedig „első enemy" volt — mindkettő
+2026-09-02-én változott, lásd a finomhangolás 2. körét.)*
 
 - **1. iteráció (KÉSZ):** layout-váz — új `src/levels/Level1Layout.ts` adatmodul, öt
   talaj-szegmens + **négy szakadék**, 13 platform, **8 CrowHarvester**, zuhanás-halál,
@@ -612,7 +615,8 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 
 **Finomhangolás, 1. kör (KÉSZ)** — két user által jelzett hiba:
 - **Az A szakasz nem tanított semmit:** a három platform folyamatos talaj fölött lógott, a
-  player alattuk elfutott. Most **640 px-es gödör** van alattuk (lásd a Level1Scene szakaszt).
+  player alattuk elfutott. Ezért **640 px-es gödör** került alájuk.
+  ⚠️ **EZT A 2. KÖR VISSZAVONTA** — lásd lentebb.
 - **A földi enemyk láthatatlan falba ütköztek:** az üldözés a szűk patrol-körzetre volt
   clampelve. A `clampChaseToBounds` flag helyett most **külön `chaseMinX`/`chaseMaxX`** van,
   amit az `enemyChaseBounds()` vezet le a felület pereméből + a spike-mezőkből.
@@ -624,7 +628,83 @@ D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc
 2. **Van egy KÖZTES checkpoint** (x=3000, a spike-szakasz után), ami **érintésre**
    aktiválódik — nem `E`-re, mint az ajtó, hogy ne versenyezzen annak promptjával.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a NÉGY Boss** le van fedve a Project_plan.md §23 bontása szerint (**30 fájl, 838 teszt** — ebből 12 az animáció-/háttér-/VFX-vezérlést, 4 a **pálya-geometriát** (Level 1–3 + a nyitó szentély), 1 a **mozgó platformot**, 1 a **hazardokat**, 2 a **párbeszéd-rendszert** (a pure mag + a „már láttam" memória), 1 pedig a **végső boss idézett lidérceit** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Finomhangolás, 2. kör (KÉSZ, 2026-09-02) — az A szakasz VISSZAVÁLT: gödör helyett HÁZ.**
+A user döntése alapján az `A1`–`A3` platform és a 640 px-es gödör **törölve**; a helyükön
+**folyamatos talaj** van, rajta a pálya egyetlen **háttér-épületével**. Ez a Phase 8 —
+Atmosphere folytatása is: a Level 1 első valódi „lakott világ" eleme.
+
+- **A `G1` és a `G2` szegmens EGYETLEN, 0–1660-as szegmenssé olvadt.** A szakadékokat a
+  `groundGaps()` a szegmensek KÖZÖTTI hézagokból számítja, tehát a gödör megszüntetése =
+  a két szegmens összevonása. **Két, egymáshoz ÉRŐ szegmens nem jó**: a `LevelTerrain` a
+  cathedral skinnél minden szegmens BELSŐ peremére kirak egy 16 px-es végzárót, tehát a sík
+  talaj közepén két, egymásnak háttal álló szakadék-perem látszana. Az így keletkező
+  **id-hézag (`G1`, `G3`, `G4`, …) szándékos**: a `G3`–`G6` minden hivatkozása változatlan
+  maradhatott, csak a három `'G2'`-es `surfaceId` (`B-1`, `B-crates`, `B-wagon`) lett `'G1'`.
+  A pálya így **5 szegmens / 4 szakadék** (160 / 160 / 130 / 400 px) és **11 platform**.
+- **Következmény: az első KÉNYSZERŰ ugrás újra a C szakaszé** (a `gap1`, 1660–1820, 160 px).
+  Ezzel megszűnt a `level1-layout.md` spec-eltérése is (az A szakasz megint hazard-mentes).
+  *Ismert, elfogadott mellékhatás:* a `movement` súgó („Space / W — ugrás") ~x=800-ig áll,
+  tehát a lecke és az első gyakorlat szétcsúszik.
+- **A ház (`BACKDROP_BUILDINGS`, `A-house`, x=620)** a `house-a.png` (GothicVania Town,
+  168×183), amit a `BootScene` **már betöltött** a Level 2 miatt — **új asset nem kellett**.
+  A `createBackdropBuildings()` szerződése adja a user kérésének a lényegét: **nincs physics
+  bodyja**, és a `BUILDING_DEPTH` (−15) a parallax rétegek (−30..−20) ELŐTT, de a propok
+  (−10) és a terrain (−5) MÖGÖTT van → **a player és az enemyk elmennek előtte**.
+- **A `BuildingDef` kapott egy `tint?` mezőt** — a `DecorPropDef.tint` pontos tükörképe, és
+  ugyanabból az okból PLACEMENT-szintű: ugyanaz a `house-a` a Level 2-n hazai pályán van, a
+  Level 1 cathedral-tónusában viszont korrekciót kíván. Elhagyva `PROP_TINT_NONE`, ami
+  MULTIPLY-ban NO-OP → **a Level 2 és a Level 3 viselkedése bitre változatlan**.
+- **A tint MÉRT, nem tippelt:** a `house-a.png` nyers átlagszíne `(68,45,60)`, amit a
+  `PROP_TINT_COOL_SOURCE` `(68,39,27)`-re visz — fényességben **44,7**, PONT a `03-ruins`
+  háttérréteg (52,7) és a hangulati propok (41,7) KÖZÖTT. Ez egybeesik a mélységsorrenddel
+  is (a ház a kettő között ül). A fa-tint 39-et adna, tehát a propoknál is sötétebbet — a
+  rétegzéssel ellentétesen.
+- **Opcionális párbeszéd `E`-re** (`HOUSE_DIALOGUE`, egyetlen sor, PLACEHOLDER lore):
+  valaki kiszól a házból. **A panel a képernyő TETEJÉRE kerül** (`HOUSE_DIALOGUE_PANEL_TOP`),
+  és ez KÉNYSZER: a `Dialogue` a horgony ALÁ rajzol `PANEL_RESERVE_PX` (75) px-t, a
+  boss-arénák ezért vannak 369-en (`369+75=444 ≤ 450`) — egy PÁLYA padlója viszont **418**,
+  és `418+75=493 > 450`. Bármilyen 343 fölötti horgony a player TESTÉT (372..418) takarná ki.
+- **A player a párbeszéd alatt TELJESEN befagy** (user-döntés), és ehhez a
+  `PlayerController` kapott egy **`setEnabled()`** kapcsolót. Az `update()` kihagyása
+  önmagában NEM elég: a konstruktor a `J`/`F`/`pointerdown` listenereket regisztrálja, tehát
+  a player különben kardot suhinthatna a monológ alatt. A `Boss2Scene` trükkje („a
+  controllert csak a harc előtt hozzuk létre") itt nem alkalmazható, mert a player a
+  párbeszéd ELŐTT és UTÁN is sétál; a `PreScene`-é (saját, minimális input) sem, mert ez
+  harci pálya. **Mellékhaszon: ezzel lezárult a 17. technikai tanulság nyitott kockázata.**
+- **A párbeszéd ISMÉTELHETŐ** (user-döntés): a prompt utána visszatér, mint egy újraolvasható
+  tábla — se `DialogueMemory`, se registry-kulcs nem kell. Ebből viszont következik, hogy a
+  **`keydown-RIGHT` bekötés a `create()`-ben van, nem a `startHouseDialogue()`-ban**
+  (`this.houseDialogue?.advance()` — null-safe): a `PreScene` azért teheti a start-metódusba,
+  mert ott a párbeszéd végigjátszásonként egyszer fut, itt viszont minden újraindításkor egy
+  új listener gyűlne fel.
+- **A `JustDown` élét EGYSZER, a frissítés elején olvassuk ki**, és osztjuk szét a két
+  interakciós pont (ház + ajtó) között — a `PreScene` mintája. Két oka van: (1) a második
+  hívás ugyanabban a frame-ben már `false`, tehát a ház némán elnyelné az ajtó `E`-jét;
+  (2) a párbeszéd ALATT is ki kell olvasni, különben egy türelmetlenül `E`-t nyomkodó player
+  leütése „felgyűlne", és a párbeszéd végén azonnal újraindítaná.
+
+**Finomhangolás, 2. kör — kézi teszt utáni javítások (ugyanaznap):**
+- **Az `E: Kopogás` prompt VILÁG-koordinátás lett** (`HOUSE_PROMPT_Y`, a player feje fölött
+  24 px-szel), nem `setScrollFactor(0)`-s képernyő-felirat. **Ez a boss-ajtóval való
+  különbség lényege, és könnyű újra elrontani:** az ajtó promptja azért ülhet a (400, 400)
+  képernyő-ponton, mert a pálya VÉGÉN a kamera nekiütközik a jobb bounds-nak (`scrollX`
+  5200-nál megáll), tehát a player a képernyő jobb szélére csúszik. A ház viszont x=620-nál
+  van, ahol a kamera SZABADON követ — ott a player pontosan a képernyő közepén (400) áll,
+  tehát a felirat pont MÖGÉ került. A minta a köztes checkpoint feliratáé.
+- **Az első CrowHarvester átkerült a `G1`-ről a `G3`-ra** (`B-1` → **`C-1`**, x 1250 → 2080,
+  a `C2`/`C3` lebegő platformok alá). Így a **`gap1` (1660–1820) VÁLASZTJA EL a háztól**: a
+  párbeszéd zavartalan beat, a harc pedig külön. A `patrolMinX` (2000) a landolási zónától is
+  ~150 px-re van, tehát a szakadékot átugró player nem egy már támadó lény ölébe érkezik.
+  **Következmény a szakasz-szerepekre:** a `B` szakasz (960–1660) mostantól ÜRES — az első
+  ellenfél a `C`-ben van. Unit teszt őrzi, hogy a ház és az első enemy között tényleg van
+  szakadék, nem csak detektálási távolság.
+- **A harc-súgó `triggerX`-e 1000 → 1560**, együtt az enemy áthelyezésével. A `HINT_HOLD_MS`
+  (4000) alatt `MOVE_SPEED` (200) mellett 800 px tehető meg, tehát a felirat 1560..2360-ig
+  van a képen — a `gap1` átugrása ÉS az első harc is ebbe az ablakba esik. **A tesztje
+  KÉTOLDALI** (a harc előtt induljon, de még a képen legyen, amikor a harc kezdődik), tehát
+  sem az enemy, sem a trigger nem csúszhat el csendben a másiktól.
+
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a NÉGY Boss** le van fedve a Project_plan.md §23 bontása szerint (**30 fájl, 860 teszt** — ebből 12 az animáció-/háttér-/VFX-vezérlést, 4 a **pálya-geometriát** (Level 1–3 + a nyitó szentély), 1 a **mozgó platformot**, 1 a **hazardokat**, 2 a **párbeszéd-rendszert** (a pure mag + a „már láttam" memória), 1 pedig a **végső boss idézett lidérceit** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -1323,18 +1403,18 @@ kell bővíteni a `Level2Scene` mintájára.
 
 - **6000×450-es pálya** (a magasság szándékosan = canvas magasság, így csak vízszintes
   kameragörgetés van; a létra is belefér a sávba). Nyolc szakasz: A–H, lásd fentebb
-- **A talaj NEM folyamatos:** hat `GROUND_SEGMENTS` szegmens, a köztük lévő **öt hézag
-  a szakadék** (640 / 160 / 160 / 130 / 400 px). A `groundGaps()` SZÁMÍTJA őket a
+- **A talaj NEM folyamatos:** öt `GROUND_SEGMENTS` szegmens, a köztük lévő **négy hézag
+  a szakadék** (160 / 160 / 130 / 400 px). A `groundGaps()` SZÁMÍTJA őket a
   szegmensekből, tehát nincsenek külön felsorolva — egy szegmens elmozdítása automatikusan
   átméretezi a szomszédos szakadékot
-- **Az A szakasz gödre (320–960) a mozgás-tutorial lényege.** A start pad SZÁNDÉKOSAN rövid
-  (0–320): a gödör és a három tutorial-platform belefér a kezdőképernyőbe, tehát a player
-  egy pillantásra érti a feladatot, nem egy váratlan lyukba sétál. Eredetileg mind a három
-  platform folyamatos talaj FÖLÖTT lógott — a player alattuk elfutott, és sosem kényszerült
-  ugrani, vagyis a tutorial dekoráció volt. Az `A3` (846–974) 14 px-t **átlóg a `G2` fölé**,
-  így a szakasz végén nem kell egy negyedik ugrás: a peremén lelépve biztonságosan ér földet.
-  *Ez ELTÉR a layout-spectől* („Section A: no environmental hazards") — tudatos user-döntés,
-  a `Project_plan.md` 14. pontja frissítve
+- **Az A szakasz SÍK, és ott áll a pálya egyetlen HÁZA** (`BACKDROP_BUILDINGS`, x=620).
+  A `G1` 0–1660-ig fut: a korábbi 640 px-es tutorial-gödör (320–960) és a fölötte lógó három
+  platform (`A1`–`A3`) 2026-09-02-én törölve, a `G2` szegmens pedig beleolvadt a `G1`-be —
+  ezért a szegmens-id-k `G1, G3, G4, G5, G6`. A szakasz szerepe innentől hangulat és
+  felvezetés, nem mechanika-tanítás; a részleteket (a ház, a tint mérése, az `E`-párbeszéd,
+  a `PlayerController.setEnabled()`) lásd fentebb a „Finomhangolás, 2. kör" blokkban.
+  **Ezzel az A szakasz megint teljesíti a layout-spec „Section A: no environmental hazards"
+  pontját**, cserébe az első kényszerű ugrás a C szakaszé (`gap1`, 160 px)
 - **Zuhanás-halál:** a FIZIKAI világ mélyebb a canvasnál (`WORLD_HEIGHT + FALL_DEPTH`),
   a KAMERA bounds-a viszont 450 marad → nincs függőleges görgetés, de a player láthatóan
   kizuhan a képből. A `FALL_DEATH_Y` (520) átlépésekor `takeDamage(getHP())` — nincs új
@@ -1347,7 +1427,7 @@ kell bővíteni a `Level2Scene` mintájára.
   adja a tényleges hatótávot adott emelkedéshez (magasabbra ugorva rövidebbet lehet
   ugrani). A teszt ezzel **bejárja a pályát** (BFS a start szegmensről) és bizonyítja,
   hogy minden felület elérhető
-- **14 platform** a `PLATFORMS` tömbben (adatvezérelt: az enemy patrol-határok ugyanebből a
+- **11 platform** a `PLATFORMS` tömbben (adatvezérelt: az enemy patrol-határok ugyanebből a
   forrásból származnak, `platformTop/Left/Right` helperekkel). `H1` `oneWay: true` →
   `checkCollision.down = false`, a létra ezen megy át
 - **KÉT platform magassága NEM szabadon hangolható**, mert egy Gravecaller lő rájuk (a
@@ -1402,12 +1482,20 @@ kell bővíteni a `Level2Scene` mintájára.
 - **Két checkpoint:** a pálya végi ajtó (**E** billentyű) és egy **köztes** (x=3000, a
   spike-szakasz után), ami **ÉRINTÉSRE** aktiválódik. Utóbbi szándékosan más input, hogy ne
   versenyezzen az ajtó promptjával; a visszajelzés a jelölő kivilágosodása + egy rövid felirat
-- **Tutorial feliratok** (`src/ui/TutorialHint.ts`): a mozgás-súgó `triggerX: 140`, tehát
-  gyakorlatilag azonnal megjelenik (a player `START_X = 100`-on éled), és 4 mp-ig áll — a
-  gödör pereméig (320) csak ~1,1 mp, tehát a `Space / W — ugrás` MÉG A KÉPERNYŐN VAN, amikor
-  a player odaér. Ezért nem kell külön „ugorj" felirat a peremre. A súgók CSAK friss
-  játékban jelennek meg: boss-vereség után az ajtó-checkpointon éledünk újra, ahol mindkét
-  trigger átlépettnek számítana
+- **Tutorial feliratok** (`src/ui/TutorialHint.ts`): a mozgás-súgó `triggerX: 0`, tehát a
+  spawn pillanatában megjelenik, és 4 mp-ig áll. A súgók CSAK friss játékban jelennek meg:
+  boss-vereség után az ajtó-checkpointon éledünk újra, ahol mindkét trigger átlépettnek
+  számítana.
+  A **harc-súgó `triggerX`-e 1560**, és ez az első ellenfélhez (`C-1`, patrol 2000-től) van
+  igazítva: 4 mp × 200 px/s = 800 px, tehát a felirat 1560..2360-ig van a képen — a `gap1`
+  átugrása ÉS a harc is ebbe esik. **KÉTOLDALI unit teszt őrzi** (a harc előtt induljon, de
+  még a képen legyen, amikor a harc kezdődik), hogy az enemy áthelyezése és a trigger ne
+  csúszhasson el egymástól.
+  **ISMERT, ELFOGADOTT SZÉTCSÚSZÁS (2026-09-02 óta):** a MOZGÁS-súgó `Space / W — ugrás`
+  fele ~x=800-ig látszik, az első KÉNYSZERŰ ugrás viszont az A szakasz gödrének
+  megszüntetése óta csak a `gap1`-nél (x=1660) jön. A felirat nem hibás — a billentyűt
+  közli —, de a lecke és a gyakorlat már nem esik egybe. Ha valaha zavaró: a `HINT_HOLD_MS`
+  emelése vagy egy külön, `triggerX: 1600`-as „ugorj" súgó a javítás
 - **Létra** a pálya végén (x=5678): `tileSprite` a vizuál (32px-es csempeszélességgel), külön
   `Zone` statikus bodyval a fizika (28px — a RAJZOLT létra szélessége). A scene `update()`-je
   **szinkron** `this.physics.overlap(player, ladderZone)`-t használ, NEM `physics.add.overlap`
@@ -2435,7 +2523,10 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
     elcsúszik a `sprite.x`-től. A `bodyCenterX` **levezetett** érték
     (`bodyOffsetX + bodyWidth / 2`), nem külön hangolható konstans. Ezt a
     `crowHarvesterAnimations.test.ts` és a `bossAnimations.test.ts` egyaránt őrzi.
-17. **(Ismert, még nem javított apró kockázat)** A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attack()`, `castFireball()`) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
+17. **(RÉSZBEN LEZÁRVA — 2026-09-02: a `PlayerController` kapott `setEnabled()`-et, ami a
+    J/F/pointer listenereket is elnémítja, tehát a „párbeszéd alatt is támadhat" ág megszűnt.
+    A `destroy()`/leiratkozás továbbra sincs, az alábbi duplikáció-kockázat tehát áll.)**
+    A `PlayerController`-nek nincs `destroy()`/leiratkozás metódusa — ha a `Level1Scene` scene-restart miatt újra lefut a `create()`, egy ÚJ `PlayerController` jön létre, ami újra regisztrálja a J/F billentyű- és pointerdown-listenereket. Mivel ezek a handlerek (`attack()`, `castFireball()`) saját maguk cooldown-gate-eltek, a duplikált hívás gyakorlatilag no-op-ra fut (nincs látható hiba), de tisztább lenne egy `destroy()` a régi controlleren scene-leállításkor. Nem blokkoló, de ha valaha furcsa dupla-támadás tünetet észlelsz, ez az első gyanús hely.
 18. **Egy élő entitás `destroy()`-a önmagában NEM állítja le a függő `delayedCall`-jait.**
     A `Level1Scene.resetEnemies()` menet közben, akár TÁMADÁS KÖZBEN semmisít meg egy
     `CrowHarvester`-t. A `startAttack()` `delayedCall`-ja viszont ettől még lefut, és a
@@ -2738,7 +2829,7 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   maradt a placeholder; valódi asset az `assets/effects/` iterációban.)*
 - A Level 2 **létrája (`ladder-placeholder`) és boss-ajtaja (`door-placeholder`)** még kódból generált: a GothicVania Town csomagban nincs létra, a cathedral `door-gate` geometriája (`DOOR_APERTURE`, `DOOR_THRESHOLD_PX`) pedig ahhoz a konkrét PNG-hez van mérve. Olcsó részleges javítás a Level 1 `tile-ladder`-ének újrahasználata (már be van töltve)
 - A `BootScene.START_SCENE` NORMÁL értéke 2026-09-02 óta **`'PreScene'`** (korábban `'Level1Scene'`). Fejlesztéshez bármelyik pálya/aréna kulcsára átírható (`'Level1Scene'`, `'Level2Scene'`, `'Boss2Scene'`, `'FinalBossScene'`, ...), hogy az adott szakasz a lánc végigjátszása nélkül tesztelhető legyen — **de commit előtt mindig vissza `'PreScene'`-re**. *(A PreScene beszúrásakor az érték `'BossScene'`-en állt, committolva — tehát a játék a Boss 1 arénában indult. Pont ez a hibaosztály, amiért ez a sor itt van.)*
-- **NYOLC placeholder lore-szöveg** van a kódban, mind a Phase 9 – Lore-ban cserélendő (mindegyik egy tömb-szerkesztés): a `PreSceneLayout.GODDESS_DIALOGUE` (A LÁNGŐRZŐ nyitó párbeszéde — az EGYETLEN, ami nem a scene-jében lakik, lásd a PreScene szakaszt), a `BossScene` `WING_BREAKER_DIALOGUE`-ja és `BOSS_VICTORY_NARRATION`-ja, a `Level2Scene.LEVEL2_END_NARRATION`, a `Boss2Scene` `KING_DIALOGUE`-ja és `KING_VICTORY_NARRATION`-ja, valamint a `FinalBossScene` `DEMON_DIALOGUE`-ja és `ENDING_NARRATION`-ja (utóbbi a JÁTÉK ZÁRÓ SZÖVEGE). A `CreditsScene` `CREDITS` listája szintén placeholder, de az nem lore, hanem attribúció
+- **KILENC placeholder lore-szöveg** van a kódban, mind a Phase 9 – Lore-ban cserélendő (mindegyik egy tömb-szerkesztés): a `PreSceneLayout.GODDESS_DIALOGUE` (A LÁNGŐRZŐ nyitó párbeszéde) és a `Level1Layout.HOUSE_DIALOGUE` (a ház lakója az A szakaszban) — **a KETTŐ az, ami nem a scene-jében lakik**, mindkettő ugyanabból az okból: a `fakePhaser` nem ad `Scene` osztályt, tehát a scene-jük unit tesztből nem importálható, a layout-moduljuk viszont igen. Továbbá a `BossScene` `WING_BREAKER_DIALOGUE`-ja és `BOSS_VICTORY_NARRATION`-ja, a `Level2Scene.LEVEL2_END_NARRATION`, a `Boss2Scene` `KING_DIALOGUE`-ja és `KING_VICTORY_NARRATION`-ja, valamint a `FinalBossScene` `DEMON_DIALOGUE`-ja és `ENDING_NARRATION`-ja (utóbbi a JÁTÉK ZÁRÓ SZÖVEGE). A `CreditsScene` `CREDITS` listája szintén placeholder, de az nem lore, hanem attribúció
 - A `BootScene` "Betöltés..." szövege + progress-sávja nyers `add.text` / `Graphics` — a `ui/` modulba költözik, amint több asset (sprite-ok) is betöltendő lesz
 - `main.ts`-ben `arcade.debug` — jelenleg **`false`**. `true`-ra állítva kirajzolja a physics
   bodykat és a létra zónáját; a layout hangolásához hasznos, a látvány megítéléséhez zavaró
@@ -2769,9 +2860,9 @@ egészéből hátravan:
 
 - **A `CreditsScene` TARTALMA** (user: későbbi iteráció) — és ugyanott a nyitott
   licenc-tételek lezárása. **A church csomag PDF-licence új tétel**, lásd lentebb.
-- **Phase 9 – Lore:** immár **KILENC** placeholder szöveg cseréje (a Level 3 ajtó-átvezetője,
-  a Beast Master párbeszéde + győzelmi narrációja, majd a Wing-Breaker
-  `WING_BREAKER_DIALOGUE`-ja jött hozzá).
+- **Phase 9 – Lore:** immár **TÍZ** placeholder szöveg cseréje (a Level 3 ajtó-átvezetője,
+  a Beast Master párbeszéde + győzelmi narrációja, a Wing-Breaker
+  `WING_BREAKER_DIALOGUE`-ja, majd a Level 1 házának `HOUSE_DIALOGUE`-ja jött hozzá).
 - **Phase 8 maradéka:** a Level 2 **és a Level 3** SFX-ei, a hazard-/lövedék-placeholderek,
   a Level 2 létra/ajtó grafikája, az `ui/` modul (valódi HUD).
 

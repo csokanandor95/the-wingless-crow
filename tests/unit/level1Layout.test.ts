@@ -10,6 +10,10 @@
 // buknak — ugyanaz a szerep, mint a parallaxBackground.test.ts réteg-invariánsainál.
 import { describe, it, expect, vi } from 'vitest';
 import {
+  BACKDROP_BUILDINGS,
+  BUILDING_ASSETS,
+  BUILDING_SINK_PX,
+  buildingFootprint,
   DECOR_PROPS,
   decorPropFootprint,
   DOOR,
@@ -25,6 +29,11 @@ import {
   GROUND_TOP,
   groundGaps,
   horizontalReachForRise,
+  HOUSE_DIALOGUE,
+  HOUSE_DIALOGUE_PANEL_TOP,
+  HOUSE_INTERACT,
+  HOUSE_PROMPT,
+  HOUSE_PROMPT_Y,
   LADDER,
   MAX_JUMP_DISTANCE,
   MAX_JUMP_HEIGHT,
@@ -63,6 +72,10 @@ import {
   LADDER_TILE_WIDTH,
   PLATFORM_TILE_HEIGHT,
 } from '../../src/levels/LevelTileset';
+import { PANEL_RESERVE_PX } from '../../src/ui/Dialogue';
+import { HINT_HOLD_MS } from '../../src/ui/TutorialHint';
+import { MOVE_SPEED } from '../../src/player/Player';
+import { DETECTION_RANGE as HARVESTER_DETECTION_RANGE } from '../../src/enemies/CrowHarvester';
 import {
   DETECTION_RANGE as GRAVECALLER_DETECTION_RANGE,
   PROJECTILE_SIZE as GRAVECALLER_PROJECTILE_SIZE,
@@ -187,9 +200,11 @@ describe('szakadékok', () => {
       if (gap.width <= MAX_SAFE_GAP) continue;
 
       // Szélesebb szakadék CSAK akkor megengedett, ha a benne álló platformokon
-      // VÉGIG lehet jutni a bal partról a jobbra. Nem elég EGY áthidaló platform: az
-      // A szakasz 640px-es tutorial-gödrét három platform lánca hidalja át (A1->A2->A3),
-      // a gap4-et a Swinging Reaper alatt viszont egyetlen (F1).
+      // VÉGIG lehet jutni a bal partról a jobbra. A BFS ezért lánc-kereső, nem egyetlen
+      // platformot keres — jelenleg viszont pontosan egy ilyen szakadék van: a gap4 (400 px)
+      // a Swinging Reaper alatt, amit egyetlen lap (F1) hidal át.
+      // (Az A szakasz 640 px-es tutorial-gödre — A1->A2->A3 lánccal — 2026-09-02-án
+      //  megszűnt: a helyén folyamatos talaj van, rajta a házzal.)
       const leftBank: Span = { left: gap.startX - 1, right: gap.startX, top: GROUND_TOP };
       const rightBank: Span = { left: gap.endX, right: gap.endX + 1, top: GROUND_TOP };
       const stones = PLATFORMS.map(platformSpan).filter(
@@ -859,6 +874,276 @@ describe('DECOR_PROPS', () => {
   });
 });
 
+// --- Háttér-épület: az A szakasz háza ---------------------------------------
+//
+// A ház NEM ütközik és nincs physics bodyja (mint a propok), tehát a járhatóságot nem tudja
+// elrontani. Amit el TUD: kitakarni egy hazardot vagy egy interakciós pontot — 168 px széles
+// és 183 magas, tehát a pálya legnagyobb sziluettje. Ez a blokk erre való, a
+// `level2Layout.test.ts` azonos blokkjának mintájára.
+
+describe('BACKDROP_BUILDINGS', () => {
+  it('minden id egyedi', () => {
+    const ids = BACKDROP_BUILDINGS.map((b) => b.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('minden ház EGYETLEN talaj-szegmensen belül áll', () => {
+    expect(BACKDROP_BUILDINGS.length).toBeGreaterThan(0);
+
+    for (const building of BACKDROP_BUILDINGS) {
+      const footprint = buildingFootprint(building);
+      const segment = GROUND_SEGMENTS.find((g) => g.id === building.surfaceId);
+
+      expect(segment, `${building.id} nem talaj-szegmensen áll`).toBeDefined();
+      expect(footprint.left, building.id).toBeGreaterThanOrEqual(segment!.startX);
+      expect(footprint.right, building.id).toBeLessThanOrEqual(segment!.endX);
+    }
+  });
+
+  it('egyetlen ház sem takar tüskemezőt vagy kasza-söprést', () => {
+    for (const building of BACKDROP_BUILDINGS) {
+      const { left, right } = buildingFootprint(building);
+
+      for (const field of SPIKE_FIELDS) {
+        const overlaps = right >= field.startX && field.endX >= left;
+        expect(overlaps, `${building.id} takarja a(z) ${field.id} mezőt`).toBe(false);
+      }
+
+      for (const def of REAPERS) {
+        const sweep = reaperSweep(def);
+        const overlaps =
+          right >= sweep.left - REAPER_ENEMY_CLEARANCE &&
+          sweep.right + REAPER_ENEMY_CLEARANCE >= left;
+        expect(overlaps, `${building.id} a(z) ${def.id} söprési sávjában van`).toBe(false);
+      }
+    }
+  });
+
+  it('egyetlen ház sem takarja a létrát, az ajtót vagy a checkpointokat', () => {
+    const interactives = [
+      { id: 'létra', left: LADDER.x - LADDER.width / 2, right: LADDER.x + LADDER.width / 2 },
+      { id: 'boss-ajtó', left: DOOR.x - DOOR.width / 2, right: DOOR.x + DOOR.width / 2 },
+      {
+        id: 'köztes checkpoint',
+        left: MID_CHECKPOINT.x - MID_CHECKPOINT.zoneWidth / 2,
+        right: MID_CHECKPOINT.x + MID_CHECKPOINT.zoneWidth / 2,
+      },
+    ];
+
+    for (const building of BACKDROP_BUILDINGS) {
+      const { left, right } = buildingFootprint(building);
+
+      for (const zone of interactives) {
+        const overlaps = right >= zone.left && zone.right >= left;
+        expect(overlaps, `${building.id} átfedi: ${zone.id}`).toBe(false);
+      }
+    }
+  });
+
+  it('egyetlen ház sem ütközik egy hangulati prop lábnyomával', () => {
+    // A ház a BUILDING_DEPTH-en (-15) HÁTRÉBB van a propoknál (-10), tehát egy előtte álló
+    // láda önmagában nem hiba — a 168 px-es homlokzat viszont pont az a felület, aminek
+    // szabadon kell olvasnia (előtte jelenik meg az `E` prompt).
+    for (const building of BACKDROP_BUILDINGS) {
+      const house = buildingFootprint(building);
+
+      for (const prop of DECOR_PROPS) {
+        const { left, right } = decorPropFootprint(prop);
+        const overlaps = right >= house.left && house.right >= left;
+        expect(overlaps, `${prop.id} a(z) ${building.id} homlokzata előtt áll`).toBe(false);
+      }
+    }
+  });
+
+  it('a talp a felszín ALÁ kerül, nem fölé', () => {
+    // A BUILDING_SINK_PX MÉRT érték a csomag preview-jából: ettől "a földben áll" a ház.
+    expect(BUILDING_SINK_PX).toBeGreaterThan(0);
+  });
+
+  it('egyetlen ház sem lóg bele a fölötte lévő platformba', () => {
+    // A ház hátrébb van a terrainnél, tehát egy ELŐTTE álló lap takarhatja — de átdöfnie
+    // nem szabad, mert a 183 px-es tető a talajtól 235-ig ér fel.
+    for (const building of BACKDROP_BUILDINGS) {
+      const surface = surfaceSpan(building.surfaceId);
+      const top = surface.top + BUILDING_SINK_PX - BUILDING_ASSETS[building.texture].height;
+      const { left, right } = buildingFootprint(building);
+
+      for (const platform of PLATFORMS) {
+        const span = platformSpan(platform);
+        if (right < span.left || span.right < left) continue;
+
+        expect(
+          top,
+          `${building.id} beleér a(z) ${platform.id} platformba`
+        ).toBeGreaterThanOrEqual(span.top + PLATFORM_TILE_HEIGHT);
+      }
+    }
+  });
+});
+
+// --- A ház párbeszéde -------------------------------------------------------
+//
+// Ugyanaz a szerep, mint a `preSceneLayout.test.ts` párbeszéd-blokkjának: a `Level1Scene.ts`
+// unit tesztből NEM importálható (a fakePhaser nem ad `Scene` osztályt), ezért él a párbeszéd
+// és a zóna a layout-modulban — így viszont bizonyítható, hogy elfér és jó helyen van.
+
+describe('a ház párbeszéde', () => {
+  // A `Dialogue` a belső panel-geometriáját nem exportálja, csak a `PANEL_RESERVE_PX`-et.
+  // A MÉRT végeredmény: 800 - 2*40 (margó) - 2*9 (padding) = 702 px.
+  const VIEW_WIDTH = 800;
+  const PANEL_TEXT_WIDTH_PX = VIEW_WIDTH - 2 * 40 - 2 * 9;
+  /** 15px monospace ~0.6em karakterszélesség; KONZERVATÍVAN felfelé kerekítve. */
+  const CHAR_WIDTH_PX = 9.5;
+  const MAX_CHARS_PER_LINE = Math.floor(PANEL_TEXT_WIDTH_PX / CHAR_WIDTH_PX);
+  /** A panel magassága két szövegsorra van méretezve (lásd a DialogueLine doc-kommentjét). */
+  const MAX_PANEL_LINES = 2;
+
+  const houseZone = {
+    left: HOUSE_INTERACT.x - HOUSE_INTERACT.width / 2,
+    right: HOUSE_INTERACT.x + HOUSE_INTERACT.width / 2,
+  };
+
+  it('a panel a képernyőn BELÜL marad — ezért nem a GROUND_TOP a horgonya', () => {
+    // EZ a kényszer viszi a panelt a képernyő TETEJÉRE. A boss-arénákban a GROUND_TOP (369)
+    // a horgony, mert 369 + 75 = 444 <= 450; egy PÁLYA padlója viszont 418, és
+    // 418 + 75 = 493 > 450 — ott a panel kilógna a képből.
+    expect(GROUND_TOP + PANEL_RESERVE_PX).toBeGreaterThan(WORLD_HEIGHT);
+    expect(HOUSE_DIALOGUE_PANEL_TOP + PANEL_RESERVE_PX).toBeLessThanOrEqual(WORLD_HEIGHT);
+  });
+
+  it('a panel a player TESTE FÖLÖTT végződik — nem takarja ki', () => {
+    // A talajon álló player teste [GROUND_TOP - 46, GROUND_TOP]. Bármilyen 343 fölötti
+    // horgony belelógna ebbe; a képernyő tetejéről viszont bőven fölötte marad.
+    const playerBodyTop = GROUND_TOP - PLAYER_BODY_HEIGHT;
+    expect(HOUSE_DIALOGUE_PANEL_TOP + PANEL_RESERVE_PX).toBeLessThan(playerBodyTop);
+  });
+
+  it('minden sor elfér a panelen', () => {
+    expect(HOUSE_DIALOGUE.length).toBeGreaterThan(0);
+
+    for (const line of HOUSE_DIALOGUE) {
+      expect(line.speaker.length, `beszélő: ${line.speaker}`).toBeLessThanOrEqual(
+        MAX_CHARS_PER_LINE
+      );
+      expect(line.text.length, `sor: ${line.text}`).toBeLessThanOrEqual(
+        MAX_CHARS_PER_LINE * MAX_PANEL_LINES
+      );
+    }
+  });
+
+  it('a prompt a repó konvenciója szerint kezdődik', () => {
+    expect(HOUSE_PROMPT.startsWith('E: ')).toBe(true);
+  });
+
+  it('az interakciós zóna a ház HOMLOKZATÁN belül van', () => {
+    // Enélkül a prompt akkor is megjelenne, amikor a player láthatóan még nem a háznál áll.
+    const house = BACKDROP_BUILDINGS.find((b) => b.id === 'A-house');
+    expect(house, 'nincs A-house a BACKDROP_BUILDINGS-ben').toBeDefined();
+
+    const footprint = buildingFootprint(house!);
+    expect(houseZone.left).toBeGreaterThanOrEqual(footprint.left);
+    expect(houseZone.right).toBeLessThanOrEqual(footprint.right);
+  });
+
+  it('a zóna a ház talaj-szegmensén áll', () => {
+    expect(() => groundSegmentIdAt(HOUSE_INTERACT.x)).not.toThrow();
+  });
+
+  it('a zóna függőlegesen a talajon álló player TESTÉT fedi', () => {
+    // A player teste [GROUND_TOP - 46, GROUND_TOP]; a zónának ezzel át kell fednie, hogy az
+    // ugráló player is kiváltsa, de a talaj alá se lógjon értelmetlenül mélyen.
+    const zoneTop = HOUSE_INTERACT.y - HOUSE_INTERACT.height / 2;
+    const zoneBottom = HOUSE_INTERACT.y + HOUSE_INTERACT.height / 2;
+
+    expect(zoneTop).toBeLessThan(GROUND_TOP);
+    expect(zoneBottom).toBeGreaterThan(GROUND_TOP - PLAYER_BODY_HEIGHT);
+  });
+
+  it('a prompt a player FEJE FÖLÖTT lebeg, nem rajta', () => {
+    // REGRESSZIÓ (kézi teszt, 2026-09-02): a felirat eredetileg `setScrollFactor(0)`-val a
+    // (400, 400) képernyő-pontra ült, mint az ajtóé. Az ajtónál ez működik, mert a pálya
+    // VÉGÉN a kamera nekiütközik a jobb bounds-nak; a ház viszont a pálya közepén van, ahol a
+    // kamera szabadon követ — tehát a player PONTOSAN a képernyő közepén áll, és a felirat
+    // egybevágott vele.
+    const playerHeadY = GROUND_TOP - PLAYER_BODY_HEIGHT;
+    expect(HOUSE_PROMPT_Y, 'a prompt a player testébe lóg').toBeLessThan(playerHeadY);
+
+    // De ne is ússzon el a ház tetejéig: maradjon a fej közelében, olvasható közelségben.
+    expect(playerHeadY - HOUSE_PROMPT_Y).toBeLessThanOrEqual(40);
+  });
+
+  it('a prompt NEM villan fel a spawn pillanatában', () => {
+    // A PreScene és a Level 3 `A` előcsarnokának azonos invariánsa: a szakasz elveszítené a
+    // "sétálj oda" lépését, ha a prompt már a betöltéskor ott lenne. A player teste is
+    // számít, nem csak a középpontja.
+    expect(houseZone.left - PLAYER_BODY_WIDTH / 2).toBeGreaterThan(START_X);
+  });
+
+  it('a zóna nem ütközik semelyik másik interakciós ponttal', () => {
+    // Kritikus: mindkettő ugyanazt az `E` billentyűt használja, és a scene EGYETLEN
+    // `JustDown` élt oszt szét közöttük.
+    const others = [
+      { id: 'boss-ajtó', left: DOOR.x - DOOR.width / 2, right: DOOR.x + DOOR.width / 2 },
+      { id: 'létra', left: LADDER.x - LADDER.width / 2, right: LADDER.x + LADDER.width / 2 },
+      {
+        id: 'köztes checkpoint',
+        left: MID_CHECKPOINT.x - MID_CHECKPOINT.zoneWidth / 2,
+        right: MID_CHECKPOINT.x + MID_CHECKPOINT.zoneWidth / 2,
+      },
+    ];
+
+    for (const zone of others) {
+      const overlaps = houseZone.right >= zone.left && zone.right >= houseZone.left;
+      expect(overlaps, `a ház zónája átfedi: ${zone.id}`).toBe(false);
+    }
+  });
+
+  it('SZAKADÉK választja el a háztól az első ellenfelet', () => {
+    // User-kérés (2026-09-02): a párbeszéd legyen egy tiszta, zavartalan beat. Nem elég, hogy
+    // az enemy detektálási körén kívül van (azt a következő teszt őrzi) — a szándék az, hogy
+    // FIZIKAILAG se érhessen oda, tehát MÁS talaj-szegmensen álljon, egy szakadékon túl.
+    const firstEnemy = [...ENEMY_SPAWNS].sort((a, b) => a.x - b.x)[0];
+    const houseSegment = groundSegmentIdAt(HOUSE_INTERACT.x);
+
+    expect(
+      firstEnemy.surfaceId,
+      `${firstEnemy.id} ugyanazon a szegmensen áll, mint a ház`
+    ).not.toBe(houseSegment);
+
+    const separating = groundGaps().filter(
+      (gap) => gap.startX >= HOUSE_INTERACT.x && gap.endX <= firstEnemy.x
+    );
+    expect(separating.length, 'nincs szakadék a ház és az első ellenfél között').toBeGreaterThan(
+      0
+    );
+  });
+
+  it('a zónában ÁLLÓ playert egyetlen enemy sem VESZI ÉSZRE', () => {
+    // A player a párbeszéd idejére teljesen befagy (a controller inputja néma), az enemyk
+    // viszont tovább mozognak. Ha egy lény felébredne a zónában álló playerre, védtelenül
+    // kapna sebzést egy opcionális, átugorható jelenet alatt.
+    //
+    // A mérték a DETEKTÁLÁSI hatótáv a PATROL-körzettől, NEM az üldözési póráz: utóbbi a
+    // G1/G2 összevonása óta a teljes, 1660 px-es szegmens (helyesen — a `B-1` a szakadék
+    // pereméig követi a playert), de az enemy csak akkor indul el, ha előbb ÉSZREVETTE.
+    // A védett sáv a LEGNAGYOBB hatótáv, hogy egy jövőbeli caster se kerülhessen ide.
+    const safeRadius = Math.max(HARVESTER_DETECTION_RANGE, GRAVECALLER_DETECTION_RANGE);
+
+    for (const enemy of ENEMY_SPAWNS) {
+      const patrolDistance = Math.max(
+        houseZone.left - enemy.patrolMaxX,
+        enemy.patrolMinX - houseZone.right,
+        0
+      );
+
+      expect(
+        patrolDistance,
+        `${enemy.id} felébredhet a ház párbeszéd-zónájában álló playerre`
+      ).toBeGreaterThan(safeRadius);
+    }
+  });
+});
+
 // --- Zuhanás-halál ----------------------------------------------------------
 
 describe('zuhanás-halál', () => {
@@ -889,6 +1174,28 @@ describe('TUTORIAL_HINTS', () => {
     for (const hint of TUTORIAL_HINTS) {
       expect(() => groundSegmentIdAt(hint.triggerX), `${hint.id} szakadék fölött van`).not.toThrow();
     }
+  });
+
+  it('a harc-súgó az ELSŐ ellenféllel egy időben van a képernyőn', () => {
+    // A user kérése (2026-09-02): a súgó „pont az első CrowHarvester előtti harc előtt"
+    // jelenjen meg. Két végből fogjuk közre, tehát sem az enemy áthelyezése, sem a
+    // triggerX hangolása nem csúszhat el csendben a másiktól:
+    //   - a súgó a harc ELŐTT induljon (különben már benne állunk, mire elolvashatnánk);
+    //   - és MÉG A KÉPEN legyen, amikor a harc elkezdődik.
+    const combat = TUTORIAL_HINTS.find((h) => h.id === 'combat');
+    expect(combat, 'nincs `combat` súgó').toBeDefined();
+
+    const firstEnemyEngagement = Math.min(...ENEMY_SPAWNS.map((e) => e.patrolMinX));
+    // Amennyit a player a felirat állása alatt megtesz, ha végig fut.
+    const hintReach = MOVE_SPEED * (HINT_HOLD_MS / 1000);
+
+    expect(combat!.triggerX, 'a súgó csak a harc KÖZBEN jelenne meg').toBeLessThan(
+      firstEnemyEngagement
+    );
+    expect(
+      combat!.triggerX + hintReach,
+      'a súgó már lejár, mire a player az első ellenfélhez ér'
+    ).toBeGreaterThan(firstEnemyEngagement);
   });
 
   it('mind az első valódi HAZARD (spike-mező) előtt vannak', () => {

@@ -857,8 +857,9 @@ Főbb elemek:
 > kapott, ami korábban nem volt a kódban: **szakadék + zuhanás-halál**, **spike**, és egy
 > **lengő kaszás (Swinging Reaper)** időzítés-alapú hazard.
 >
-> A szakaszsorrend: `A start/mozgás-tutorial · B első enemy · C platforming + gap ·
-> D spike-tutorial · E kombinált kihívás · F Swinging Reaper · G záró harc · H boss-ajtó`.
+> A szakaszsorrend: `A start + a ház (NPC) · B csendes átvezetés · C első enemy +
+> platforming + gap · D spike-tutorial · E kombinált kihívás · F Swinging Reaper ·
+> G záró harc · H boss-ajtó`.
 >
 > **1. iteráció — KÉSZ:** layout-váz, öt talaj-szegmens + négy szakadék, 13 platform,
 > 8 CrowHarvester, zuhanás-halál, enemy-respawn, köztes checkpoint, tutorial feliratok.
@@ -866,18 +867,41 @@ Főbb elemek:
 > Swinging Reaper (F szakasz), lásd lentebb. **A blokk ettől még nyitva marad:** a Phase 8-ra
 > visszatérés előtt finomhangolási körök futnak a teljes pályán.
 >
-> **Finomhangolás, 1. kör — az A szakasz mostantól VALÓDI ugrás-tutorial.** Az eredeti
-> változatban a három lebegő platform folyamatos talaj FÖLÖTT lógott, tehát a player
-> egyszerűen alattuk elfutott, és a pálya soha nem kényszerítette ugrásra — a tutorial
-> dekoráció volt. Most egy 640 px-es szakadék van alattuk (start pad 0–320, talaj újra
-> 960-tól), és a három platform hidalja át.
+> **Finomhangolás, 1. kör — az A szakasz VALÓDI ugrás-tutorial lett.**
+> ⚠️ **EZT A DÖNTÉST A 2. KÖR VISSZAVONTA — lásd közvetlenül alább.** Ami történt: az
+> eredeti változatban a három lebegő platform folyamatos talaj FÖLÖTT lógott, a player
+> alattuk elfutott, tehát a tutorial dekoráció volt; erre került egy 640 px-es szakadék
+> (start pad 0–320, talaj újra 960-tól), amit a három platform hidalt át.
 >
-> **Ez ELTÉR a `level1-layout.md` specifikációjától**, ami az A szakaszra *„No environmental
-> hazards"*-t és *„Player can safely test movement"*-et ír elő. Tudatos user-döntés: a lecke
-> csak akkor tanít, ha az elvétett ugrásnak következménye van. A büntetés szándékosan
-> minimális — a checkpoint a pálya eleje, tehát egy hibázás ~1,2 mp respawn + ~1,1 mp
-> visszafutás. Következmény a spec szakasz-szerepeire: **az első platforming-kihívás
-> mostantól az A szakasz**, a C pedig az első SZÉLES, talajszintű szakadék.
+> **Finomhangolás, 2. kör — az A szakasz mégsem tutorial, hanem HANGULAT (2026-09-02).**
+> A gödör és mind a három platform (`A1`–`A3`) TÖRÖLVE; a helyükön **folyamatos talaj** van
+> (a `G1` és a `G2` szegmens EGYETLEN, 0–1660-as szegmenssé olvadt), rajta egy **háttérben
+> álló házzal** (`house-a.png`, GothicVania Town). A ház előtt **opcionális `E`** indít egy
+> egysoros párbeszédet: *„Veszély közeleg. Ne menj tovább, ha jót akarsz...!"* A ház tisztán
+> díszlet — nincs physics bodyja, és a `BUILDING_DEPTH` miatt a player **elmegy előtte**.
+>
+> **Ezzel az 1. kör spec-eltérése MEGSZŰNIK:** a `level1-layout.md` az A szakaszra
+> *„No environmental hazards"*-t és *„Player can safely test movement"*-et ír elő, és
+> mostantól megint pontosan ez teljesül. **Következmény a szakasz-szerepekre: az első
+> platforming-kihívás újra a C szakasz** (a `gap1`, 1660–1820, 160 px) — az A már nem
+> mechanikát tanít, hanem a `PreScene` párbeszéde után egy második, opcionális
+> figyelmeztetést ad, mielőtt a B szakaszban jön az első ellenfél.
+>
+> *Ismert, elfogadott mellékhatás:* a `movement` tutorial-felirat („Space / W — ugrás")
+> a spawntól 4000 ms-ig áll (~x=800-ig), az első KÉNYSZERŰ ugrás viszont csak x=1660-nál
+> jön — a felirat nem hibás (a billentyűt közli), de a lecke és a gyakorlat szétcsúszik.
+>
+> A párbeszéd alatt a player **teljesen befagy** (user-döntés): ehhez a `PlayerController`
+> kapott egy `setEnabled()` kapcsolót — az `update()` kihagyása önmagában nem elég, mert a
+> konstruktor a `J`/`F`/`pointerdown` listenereket regisztrálja. A párbeszéd **ismételhető**
+> (a prompt utána visszatér), tehát se `DialogueMemory`, se registry-kulcs nem kell.
+>
+> **Kézi teszt utáni javítások (ugyanaznap):** az `E: Kopogás` prompt VILÁG-koordinátás lett
+> (a player feje fölött) — képernyő-fixen a pálya közepén pont a player MÖGÉ került, mert ott
+> a kamera szabadon követ; az **első CrowHarvester átkerült a `G1`-ről a `G3`-ra**
+> (`B-1` → `C-1`, x 1250 → 2080), tehát a `gap1` VÁLASZTJA EL a háztól — **ezért lett a `B`
+> szakasz csendes átvezetés, és az első ellenfél a `C`-é**; a harc-súgó `triggerX`-e pedig
+> 1000 → 1560, hogy pont az így áthelyezett harc előtt villanjon fel.
 >
 > **Finomhangolás, 1. kör — a földi enemyk üldözési modellje.** A Redesign 1. iterációjában
 > minden enemy szűk patrol-határt + `clampChaseToBounds`-ot kapott; ez megakadályozta a
@@ -1719,8 +1743,10 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 > 6000 px-es pálya részletei a 14. pontnál. Az 1. iteráció (layout-váz + gap + zuhanás-halál
 > + enemy-respawn + köztes checkpoint + tutorial feliratok), a 2. iteráció (spike-ok + a
 > minden hazardra közös i-frame kapu) és a 3. iteráció (Swinging Reaper) **kész**, ahogy a
-> finomhangolás 1. köre is (A szakasz gödre + a földi enemyk üldözési modellje). A blokk
-> **nyitva marad** további hangolásra, mielőtt a Phase 8 folytatódna.
+> finomhangolás 1. köre is (A szakasz gödre + a földi enemyk üldözési modellje) és a
+> 2. köre (2026-09-02: az A szakasz gödre és három platformja TÖRÖLVE, helyette folyamatos
+> talaj + egy háttér-ház opcionális `E`-párbeszéddel). A blokk **nyitva marad** további
+> hangolásra, mielőtt a Phase 8 folytatódna.
 
 ## Phase 7 – Boss
 

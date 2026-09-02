@@ -69,6 +69,12 @@ const PANEL_HEIGHT = 72;
  *
  * A `BossScene` (Boss 1) volt az egyetlen kivétel, 418-cal — ott a padlóvonalat kellett
  * 369-re vinni (és a hátteret újragenerálni), amikor 2026-09-01-en párbeszédet kapott.
+ *
+ * **PÁLYÁN (nem arénában) a `groundTop` NEM a padlóvonal.** Egy pálya padlója 418, és
+ * `418 + 75 = 493 > 450`; bármilyen 343 fölötti horgony pedig a player TESTÉT (372..418)
+ * takarná ki. Ezért adja a `Level1Scene` a ház párbeszédéhez a képernyő TETEJÉT
+ * (`HOUSE_DIALOGUE_PANEL_TOP = 8`) — a paraméter valójában „a panel horgonya", a `groundTop`
+ * név csak az első (arénás) hívói helyről ragadt rajta.
  */
 export const PANEL_RESERVE_PX = PANEL_GAP_ABOVE + PANEL_HEIGHT; // 75
 const PANEL_PADDING = 9;

@@ -6,6 +6,12 @@ export default class PlayerController {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private keys: { [key: string]: Phaser.Input.Keyboard.Key };
 
+  /**
+   * Ki lehet-e kapcsolni az inputot menet közben (párbeszéd alatt) — lásd `setEnabled()`.
+   * Alapból `true`, tehát minden meglévő hívó viselkedése változatlan.
+   */
+  private enabled = true;
+
   constructor(scene: Phaser.Scene, player: Player) {
     this.player = player;
 
@@ -18,18 +24,45 @@ export default class PlayerController {
       [key: string]: Phaser.Input.Keyboard.Key;
     };
 
-    this.keys.J.on('down', () => this.player.attack());
-    this.keys.F.on('down', () => this.player.castFireball());
+    this.keys.J.on('down', () => {
+      if (this.enabled) this.player.attack();
+    });
+    this.keys.F.on('down', () => {
+      if (this.enabled) this.player.castFireball();
+    });
 
     // A jobb gomb már nem támad, de a context menü letiltása marad: a canvas fölött
     // felugró böngésző-menü akkor is zavaró, ha a kattintásnak nincs játékbeli hatása.
     scene.input.mouse?.disableContextMenu();
     scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (pointer.leftButtonDown()) this.player.attack();
+      if (this.enabled && pointer.leftButtonDown()) this.player.attack();
     });
   }
 
+  /**
+   * Az input teljes ki-/bekapcsolása — a `Level1Scene` ezzel fagyasztja be a playert a ház
+   * előtti párbeszéd idejére.
+   *
+   * **Az `update()` kihagyása önmagában NEM elég**, ezért kell ez: a konstruktor a `J` / `F`
+   * billentyűre és a `pointerdown`-ra listenereket regisztrál, tehát a player a monológ alatt
+   * is kardot suhinthatna és tűzgolyót dobhatna. A `Boss2Scene` trükkje ("a controllert csak a
+   * harc előtt hozzuk létre") itt nem alkalmazható, mert a player a párbeszéd ELŐTT és UTÁN is
+   * sétál; a `PreScene`-é (saját, minimális input) sem, mert ez harci pálya.
+   *
+   * A kapcsoló egyben lezárja a CLAUDE.md 17. tanulságában dokumentált nyitott kockázatot is:
+   * a listenerek élettartamát nem kell kezelni, mert nem jönnek-mennek.
+   *
+   * **A hívó feladata**, hogy kikapcsolt állapotban maga hívja a `player.stopMoving()`-ot és a
+   * `player.updateState()`-et — enélkül a player a futó animáción ragadna (a `PreScene`
+   * `DIALOGUE` fázisának azonos mintája).
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+  }
+
   update(): void {
+    if (!this.enabled) return;
+
     const left = this.cursors.left.isDown || this.keys.A.isDown;
     const right = this.cursors.right.isDown || this.keys.D.isDown;
     const up = this.cursors.up.isDown || this.keys.W.isDown;

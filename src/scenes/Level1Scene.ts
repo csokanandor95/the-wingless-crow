@@ -17,10 +17,12 @@ import TutorialHint from '../ui/TutorialHint';
 import HazardDamageGate from '../hazards/HazardDamage';
 import SpikeField, { SPIKE_DAMAGE, SPIKE_KNOCKBACK_Y } from '../hazards/SpikeField';
 import SwingingReaper, { REAPER_DAMAGE } from '../hazards/SwingingReaper';
-import createDecorProps from '../levels/LevelDecor';
+import createDecorProps, { createBackdropBuildings } from '../levels/LevelDecor';
 import { createGroundSegments, createPlatforms } from '../levels/LevelTerrain';
 import LevelEnemies from '../levels/LevelEnemies';
+import Dialogue from '../ui/Dialogue';
 import {
+  BACKDROP_BUILDINGS,
   DECOR_PROPS,
   DOOR,
   DOOR_CHECKPOINT,
@@ -29,6 +31,11 @@ import {
   FALL_DEPTH,
   GROUND_SEGMENTS,
   GROUND_TOP,
+  HOUSE_DIALOGUE,
+  HOUSE_DIALOGUE_PANEL_TOP,
+  HOUSE_INTERACT,
+  HOUSE_PROMPT,
+  HOUSE_PROMPT_Y,
   LADDER,
   LEVEL1_GEOMETRY,
   MID_CHECKPOINT,
@@ -78,6 +85,11 @@ export default class Level1Scene extends Phaser.Scene {
   private doorZone!: Phaser.GameObjects.Zone;
   private interactKey!: Phaser.Input.Keyboard.Key;
   private checkpointPromptText!: Phaser.GameObjects.Text;
+
+  /** Az A szakasz házának opcionális párbeszéde — `null`, ha épp nem fut. */
+  private houseZone!: Phaser.GameObjects.Zone;
+  private housePromptText!: Phaser.GameObjects.Text;
+  private houseDialogue: Dialogue | null = null;
   private isTransitioning = false;
   private respawnScheduled = false;
   /** Egyszeri kapu: enélkül a HURT-lock alatt frame-enként újraindulna a zuhanás-halál. */
@@ -120,6 +132,7 @@ export default class Level1Scene extends Phaser.Scene {
     this.respawnScheduled = false;
     this.fallDeathTriggered = false;
     this.midCheckpointActivated = false;
+    this.houseDialogue = null;
     // A hazardGate class field initializer — az is csak a Scene ELSŐ létrehozásakor fut le
     // (lásd fent), ezért egy scene-restart után örökölné az előző futás i-frame-jeit.
     this.hazardGate.reset();
@@ -168,6 +181,7 @@ export default class Level1Scene extends Phaser.Scene {
     }
     this.createLadder();
     this.createDoorZone();
+    this.createHouseZone();
     this.createMidCheckpoint();
 
     // A checkpoint a registry-ben perzisztál a scene-váltásokon át (pl. BossScene ->
@@ -264,6 +278,12 @@ export default class Level1Scene extends Phaser.Scene {
       .setScrollFactor(0)
       .setVisible(false);
 
+    // A ház párbeszédének gyorsítása. ITT kötjük be, EGYSZER — nem a startHouseDialogue()-ban,
+    // mint a PreScene teszi: az a párbeszéd végigjátszásonként egyszer fut, ez viszont
+    // ismételhető, tehát ott minden újraindításkor egy új listener gyűlne fel. Az optional
+    // chaining teszi párbeszéden kívül no-oppá.
+    this.input.keyboard?.on('keydown-RIGHT', () => this.houseDialogue?.advance());
+
     // A billentyű-súgók CSAK friss játékban jelennek meg. Boss-vereség után a player az
     // ajtó-checkpointon éled újra (x ~5918), ahol mindkét trigger azonnal átlépettnek
     // számítana — értelmetlen lenne ott a mozgás-tutorialt felvillantani.
@@ -301,6 +321,11 @@ export default class Level1Scene extends Phaser.Scene {
   private createDecor(): void {
     // A korábbi 5 parallax háttéroszlop (pillar-placeholder, scrollFactor 0.6) törölve:
     // a mélység-illúziót most a ParallaxBackground három valódi rétege adja.
+
+    // Az A szakasz háza. A propok ELŐTT jön létre, hogy a display listán is mögöttük legyen —
+    // a BUILDING_DEPTH (-15) ezt amúgy is garantálja, de így a sorrend olvasható
+    // (a Level2Scene azonos mintája).
+    createBackdropBuildings(this, BACKDROP_BUILDINGS, LEVEL1_GEOMETRY);
 
     // Hangulati propok: nem ütköznek, és a DECOR_DEPTH miatt a player/enemyk előttük mennek el.
     createDecorProps(this, DECOR_PROPS, LEVEL1_GEOMETRY);
@@ -345,6 +370,35 @@ export default class Level1Scene extends Phaser.Scene {
 
     this.doorZone = this.add.zone(DOOR.x, zoneY, DOOR.width, DOOR.openingHeight);
     this.physics.add.existing(this.doorZone, true);
+  }
+
+  /**
+   * Az A szakasz házának interakciós zónája — az ajtóéval AZONOS minta (zóna + szinkron
+   * `physics.overlap()` + `E`), csak a célja más: nem checkpoint, hanem egy opcionális
+   * párbeszéd. A kettő sosem versenyezhet, mert 5300 px választja el őket.
+   */
+  private createHouseZone(): void {
+    this.houseZone = this.add.zone(
+      HOUSE_INTERACT.x,
+      HOUSE_INTERACT.y,
+      HOUSE_INTERACT.width,
+      HOUSE_INTERACT.height
+    );
+    this.physics.add.existing(this.houseZone, true);
+
+    // VILÁG-koordinátás felirat a ház fölött, NEM `setScrollFactor(0)` — a köztes checkpoint
+    // feliratának mintája. Az ajtó promptja azért lehet képernyő-fix, mert a pálya VÉGÉN a
+    // kamera nekiütközik a jobb bounds-nak, tehát a player a képernyő szélére csúszik; a ház
+    // viszont a pálya közepén van, ahol a kamera szabadon követ, és a player pontosan a
+    // képernyő közepén (400) áll — ott a felirat pont mögé kerülne.
+    this.housePromptText = this.add
+      .text(HOUSE_INTERACT.x, HOUSE_PROMPT_Y, HOUSE_PROMPT, {
+        fontFamily: 'monospace',
+        fontSize: '16px',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
   }
 
   /**
@@ -414,7 +468,17 @@ export default class Level1Scene extends Phaser.Scene {
       !this.player.isDead() && this.physics.overlap(this.player, this.ladderZone);
     this.player.setLadderContact(touchingLadder ? this.ladderContact : null);
 
-    this.controller.update();
+    if (this.houseDialogue) {
+      // Teljes befagyasztás a párbeszéd idejére. A controller inputja a setEnabled(false)-tól
+      // néma (a J/F is, lásd ott), de az updateState()-et ITT kell hívni: enélkül a player a
+      // futó animáción ragadna. Ugyanaz a minta, mint a PreScene DIALOGUE fázisában.
+      this.houseDialogue.update(delta);
+      this.player.stopMoving();
+      this.player.updateState();
+    } else {
+      this.controller.update();
+    }
+
     this.tutorialHint.update(this.player.x);
 
     // Debug kijelzés (Phase 8 / ui modul cseréli le): HP + aktuális player state.
@@ -452,10 +516,22 @@ export default class Level1Scene extends Phaser.Scene {
       this.activateMidCheckpoint();
     }
 
+    // A JustDown egy EGYSZER kiolvasható ÉL, és ebből KÉT szabály következik (mindkettő a
+    // PreScene-ben már megtanult hiba):
+    //   1. a második hívás ugyanabban a frame-ben már `false`, tehát két interakciós pont
+    //      (ház + ajtó) mellett egyszer kell kiolvasni és szétosztani — inline hívva a ház
+    //      némán elnyelné az ajtó E-jét;
+    //   2. a párbeszéd alatt IS ki kell olvasni, a fázistól függetlenül. Enélkül egy
+    //      türelmetlenül E-t nyomkodó player leütése "felgyűlne", és a párbeszéd végén
+    //      azonnal újraindítaná — a player egyetlen frame-re sem kapná vissza az irányítást.
+    const interactPressed = Phaser.Input.Keyboard.JustDown(this.interactKey);
+
+    this.updateHousePrompt(interactPressed);
+
     const nearDoor = !this.player.isDead() && this.physics.overlap(this.player, this.doorZone);
     this.checkpointPromptText.setVisible(nearDoor && !this.isTransitioning);
 
-    if (nearDoor && !this.isTransitioning && Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+    if (nearDoor && !this.isTransitioning && interactPressed) {
       this.activateCheckpointAndTransition();
     }
 
@@ -533,6 +609,56 @@ export default class Level1Scene extends Phaser.Scene {
       this.player.takeDamage(REAPER_DAMAGE);
       return;
     }
+  }
+
+  /**
+   * Az A szakasz házának OPCIONÁLIS párbeszéde. Szinkron `physics.overlap()`, mint a létránál
+   * és az ajtónál — nem `physics.add.overlap` callback, ami csak a scene update()-je UTÁN
+   * futna le.
+   *
+   * A párbeszéd ISMÉTELHETŐ: a prompt utána magától visszatér, mint egy újraolvasható tábla.
+   * Ezért nincs se flag, se `DialogueMemory`, se registry-kulcs — nincs mit elmenteni.
+   */
+  private updateHousePrompt(interactPressed: boolean): void {
+    if (this.houseDialogue) {
+      this.housePromptText.setVisible(false);
+      return;
+    }
+
+    const nearHouse =
+      !this.player.isDead() &&
+      !this.isTransitioning &&
+      this.physics.overlap(this.player, this.houseZone);
+
+    this.housePromptText.setVisible(nearHouse);
+
+    if (nearHouse && interactPressed) this.startHouseDialogue();
+  }
+
+  private startHouseDialogue(): void {
+    this.housePromptText.setVisible(false);
+
+    // Teljes befagyasztás. A setEnabled(false) a J/F/kattintás listenereket IS elnémítja —
+    // a controller.update() kihagyása önmagában nem tenné (CLAUDE.md 17. tanulság).
+    this.controller.setEnabled(false);
+    this.player.stopMoving();
+
+    this.houseDialogue = new Dialogue(
+      this,
+      HOUSE_DIALOGUE,
+      {
+        // A panel horgonya a képernyő TETEJE, nem a GROUND_TOP: egy PÁLYA padlója 418, és
+        // 418 + PANEL_RESERVE_PX (75) = 493 > 450 — lásd HOUSE_DIALOGUE_PANEL_TOP.
+        groundTop: HOUSE_DIALOGUE_PANEL_TOP,
+        // A KAMERA szélessége (800), NEM a WORLD_WIDTH (6000): a panel setScrollFactor(0),
+        // tehát képernyő-koordinátás.
+        viewportWidth: this.cameras.main.width,
+      },
+      () => {
+        this.houseDialogue = null;
+        this.controller.setEnabled(true);
+      }
+    );
   }
 
   private activateCheckpointAndTransition(): void {

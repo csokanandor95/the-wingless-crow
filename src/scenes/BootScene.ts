@@ -393,7 +393,7 @@ const LOADING_BAR_HEIGHT = 14;
  * fejlesztés közben ez a leggyorsabb út. **Commit előtt mindig állítsd vissza
  * `'PreScene'`-re.**
  */
-const START_SCENE = 'PreScene';
+const START_SCENE = 'Level1Scene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a

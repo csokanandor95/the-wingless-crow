@@ -1,13 +1,17 @@
 import {
+  BUILDING_TEXTURES,
   GROUND_TOP,
+  PLAYER_BODY_HEIGHT,
   PLAYER_HALF_HEIGHT,
   PROP_TEXTURES,
+  PROP_TINT_COOL_SOURCE,
   enemyChaseBounds as enemyChaseBoundsIn,
   groundGaps as groundGapsIn,
   groundSegmentById as groundSegmentByIdIn,
   platformById as platformByIdIn,
   platformTop,
   surfaceSpan as surfaceSpanIn,
+  type BuildingDef,
   type DecorPropDef,
   type EnemySpawnDef,
   type GapDef,
@@ -24,6 +28,9 @@ import {
   DOOR_TILE_HEIGHT,
   DOOR_TILE_WIDTH,
 } from './LevelTileset';
+// A párbeszéd SZÁNDÉKOSAN `import type`: a típus fordításkor eltűnik, tehát ez a modul
+// futásidőben továbbra sem húz be Phasert — ugyanaz a fogás, mint a `PreSceneLayout.ts`-ben.
+import type { DialogueLine } from '../ui/Dialogue';
 
 /**
  * Level 1 – Cathedral Ruins: a pálya TELJES geometriája, egyetlen forrásból.
@@ -50,6 +57,8 @@ import {
 // --- Megosztott geometria (re-export, hogy a hívók importlistája ne törjön) ---
 
 export {
+  BUILDING_ASSETS,
+  BUILDING_SINK_PX,
   EDGE_INSET,
   FALL_DEATH_Y,
   FALL_DEPTH,
@@ -82,6 +91,7 @@ export {
   SPIKE_HITBOX_INSET_X,
   SPIKE_TILE_WIDTH,
   WORLD_HEIGHT,
+  buildingFootprint,
   decorPropFootprint,
   enemyHalfBodyWidth,
   enemySpawnOffset,
@@ -95,6 +105,7 @@ export {
 } from './LevelGeometry';
 
 export type {
+  BuildingDef,
   DecorPropDef,
   EnemySpawnDef,
   EnemyType,
@@ -125,11 +136,15 @@ export const START_Y = 300;
  * elmozdítása automatikusan átméretezi a szomszédos szakadékot.
  */
 export const GROUND_SEGMENTS: GroundSegmentDef[] = [
-  // A start pad SZÁNDÉKOSAN rövid: a mögötte nyíló gödör és mind a három tutorial-platform
-  // belefér a kezdőképernyőbe (a kamera x=0..800-at mutat), tehát a player egy pillantásra
-  // érti a feladatot — nem egy váratlan lyukba sétál bele.
-  { id: 'G1', startX: 0, endX: 320 }, // A — start pad (mozgás-tutorial)
-  { id: 'G2', startX: 960, endX: 1660 }, // A vége + B (első enemy) — gapA mögött
+  // A + B, EGYETLEN, folyamatos szegmens. A korábbi `G2` (960–1660) ebbe olvadt bele, amikor
+  // az A szakasz 640 px-es tutorial-gödre betemetődött — az id-hézag (G1, G3, G4, ...) ennek
+  // a nyoma, a G3–G6 minden hivatkozása változatlan maradhatott.
+  //
+  // KÉT, EGYMÁSHOZ ÉRŐ szegmens (0–320 + 320–1660) NEM jó megoldás, pedig a `groundGaps()`
+  // attól sem adna szakadékot: a `LevelTerrain` a `cathedral` skinnél MINDEN szegmens belső
+  // peremére kirak egy 16 px-es végzárót, tehát a sík talaj közepén két, egymásnak háttal
+  // álló szakadék-perem látszana.
+  { id: 'G1', startX: 0, endX: 1660 }, // A (start + a ház) + B (első enemy)
   { id: 'G3', startX: 1820, endX: 2260 }, // C
   { id: 'G4', startX: 2420, endX: 3120 }, // D (spike-tutorial) + köztes checkpoint
   { id: 'G5', startX: 3250, endX: 4300 }, // E (kombinált kihívás)
@@ -139,13 +154,11 @@ export const GROUND_SEGMENTS: GroundSegmentDef[] = [
 // --- Platformok -------------------------------------------------------------
 
 export const PLATFORMS: PlatformDef[] = [
-  // --- A: mozgás- és UGRÁS-tutorial ---
-  // A három platform a `gapA` (320–960) fölött lóg, tehát nem lehet alattuk elfutni: a
-  // player kénytelen végigugrálni rajtuk. Minden ugrás bőven a hatótávon belül van (lásd
-  // a level1Layout.test.ts elérhetőség-BFS-ét) — itt a KÉNYSZERÍTÉS a cél, nem a nehézség.
-  { id: 'A1', x: 460, y: 350, tiles: 3 }, // széles, megbocsátó első célpont (+76)
-  { id: 'A2', x: 700, y: 292, tiles: 2 }, // magasabb lépés (+58)
-  { id: 'A3', x: 910, y: 340, tiles: 2 }, // 14px-t ÁTLÓG a G2 fölé -> biztonságos kilépés
+  // --- A: NINCS platform (user-döntés) ---
+  // Itt korábban három lap (`A1`–`A3`) hidalta át a 640 px-es tutorial-gödröt. A szakasz
+  // szerepe megváltozott: nem mechanikát tanít, hanem hangulatot ad — sík talaj, rajta a
+  // háttérben álló házzal (`BACKDROP_BUILDINGS`), ami előtt `E`-vel megszólal valaki.
+  // Következmény: az első KÉNYSZERŰ ugrás mostantól a C szakasz `gap1`-e (1660–1820).
 
   // --- C: első platforming-kihívás ---
   { id: 'C1', x: 1740, y: 356, tiles: 1 }, // lépőkő a gap1-ben (alternatív útvonal)
@@ -254,8 +267,18 @@ export const REAPERS: SwingingReaperDef[] = [
  * és a player lehagyásakor oda tér vissza.
  */
 export const ENEMY_SPAWNS: EnemySpawnDef[] = [
-  // B — az első, magányos enemy: tágas, sík terep a harc megtanulásához.
-  { id: 'B-1', x: 1250, surfaceId: 'G2', patrolMinX: 1120, patrolMaxX: 1400 },
+  // C — az első, magányos enemy: tágas, sík terep a harc megtanulásához, a `C2`/`C3` lebegő
+  // platformok ALATT.
+  //
+  // **A `G3`-on áll, nem a `G1`-en** (user-döntés, 2026-09-02): korábban `B-1` néven a
+  // 1250-en, tehát UGYANAZON a szegmensen, mint a ház — a `DETECTION_RANGE` (220) így
+  // ugyan nem érte el a párbeszéd-zónát, de a lény látótávolságon belülre sétált, amíg a
+  // player a házzal beszélgetett. Most a `gap1` (1660–1820) VÁLASZTJA EL a háztól: a
+  // párbeszéd garantáltan zavartalan, és a harc egy külön, tiszta beat lett.
+  //
+  // A `patrolMinX` (2000) a landolási zónától is ~150 px-re van: a 160 px-es szakadékot
+  // átugró player nem egy már támadó lény ölébe érkezik, hanem látja közeledni.
+  { id: 'C-1', x: 2080, surfaceId: 'G3', patrolMinX: 2000, patrolMaxX: 2160 },
 
   // D — a spike-mező ELŐTT áll. Az üldözési határát az enemyChaseBounds() vágja el a
   // tüskéknél, így a spec "CrowHarvester does not walk into spikes" pontja akkor is
@@ -354,7 +377,13 @@ export const TUTORIAL_HINTS: TutorialHintDef[] = [
   // lenne: a mozgás-súgó csak azután jelenne meg, hogy a játékos magától már elindult —
   // pont akkor, amikor már nincs rá szüksége.
   { id: 'movement', triggerX: 0, text: '← → / A D  — mozgás      Space / W  — ugrás' },
-  { id: 'combat', triggerX: 1000, text: 'J / bal klikk  — kard      F  — tűzgolyó' },
+  // A harc-súgó a `gap1` (1660) ELŐTT villan fel, tehát a player a szakadék átugrása KÖZBEN
+  // és az első ellenfélhez (`C-1`, patrol 2000-től) érve is olvassa. A `HINT_HOLD_MS` (4000)
+  // alatt `MOVE_SPEED` (200) mellett 800 px tehető meg, tehát a felirat 1560..2360-ig van a
+  // képen — a harc ebbe az ablakba esik. Korábban 1000 volt, ami az akkori `B-1`-hez tartozott;
+  // az enemy áthelyezésével EGYÜTT kellett jobbra tolni, különben a súgó jóval a harc előtt
+  // lejárna (user-kérés). A `level1Layout.test.ts` mindkét végét őrzi.
+  { id: 'combat', triggerX: 1560, text: 'J / bal klikk  — kard      F  — tűzgolyó' },
 ];
 
 // --- Hangulati propok -------------------------------------------------------
@@ -368,13 +397,16 @@ export const TUTORIAL_HINTS: TutorialHintDef[] = [
  * `REAPER_ENEMY_CLEARANCE`-es biztonsági sávjába lógna.
  */
 export const DECOR_PROPS: DecorPropDef[] = [
-  // A — start: a lámpa a spawntól balra keretezi a pálya elejét.
+  // A — start: a lámpa a spawntól balra keretezi a pálya elejét. A szakasz többi díszlete
+  // maga a HÁZ (lásd `BACKDROP_BUILDINGS`), ami elé nem kerül prop: a homlokzatnak és az
+  // előtte megjelenő `E` promptnak szabadon kell olvasnia.
   { id: 'A-lamp', texture: PROP_TEXTURES.STREET_LAMP, x: 52, surfaceId: 'G1' },
 
-  // B — első enemy: tágas, sík terep. A szekér a szegmens KÖZEPÉN ((960+1660)/2), nem a
-  // peremén: a nagy sziluett így nem a szakadék-átmenetre esik.
-  { id: 'B-crates', texture: PROP_TEXTURES.CRATE_STACK, x: 1010, surfaceId: 'G2' },
-  { id: 'B-wagon', texture: PROP_TEXTURES.WAGON, x: 1310, surfaceId: 'G2' },
+  // B — első enemy: tágas, sík terep. A két prop a szegmens jobb felén marad, jóval a ház
+  // lábnyoma (536–704) után — a nagy sziluettek így nem a házra és nem a szakadék-átmenetre
+  // esnek.
+  { id: 'B-crates', texture: PROP_TEXTURES.CRATE_STACK, x: 1010, surfaceId: 'G1' },
+  { id: 'B-wagon', texture: PROP_TEXTURES.WAGON, x: 1310, surfaceId: 'G1' },
 
   // D — spike-tutorial. A tüskemező (2740–2868) KÖRNYÉKE szándékosan üres, hogy a hazard
   // tisztán olvasható legyen; a láda a mező ELŐTT, a láda-halom UTÁNA, a köztes
@@ -399,4 +431,105 @@ export const DECOR_PROPS: DecorPropDef[] = [
   // ~8 px-re marad tőle.
   { id: 'H-lamp-left', texture: PROP_TEXTURES.STREET_LAMP, x: 5638, surfaceId: 'G6' },
   { id: 'H-lamp-right', texture: PROP_TEXTURES.STREET_LAMP, x: 5718, surfaceId: 'G6' },
+];
+
+// --- Háttér-épület: az A szakasz háza -----------------------------------------
+
+/**
+ * A pálya EGYETLEN háttér-épülete, a betemetett tutorial-gödör helyén. Ez tölti be az A
+ * szakasz új szerepét: nem mechanikát tanít, hanem lakott világot mutat, mielőtt a B
+ * szakaszban jön az első ellenfél.
+ *
+ * A `createBackdropBuildings()` szerződése adja a user kérésének a lényegét: **nincs physics
+ * bodyja**, és a `BUILDING_DEPTH` (-15) a parallax rétegek (-30..-20) ELŐTT, de a hangulati
+ * propok (-10) és a terrain (-5) MÖGÖTT van — tehát **a player és az enemyk elmennek előtte**.
+ * A talpa `BUILDING_SINK_PX`-szel a felszín ALÁ kerül, így a földben áll, nem rá van ragasztva.
+ *
+ * **x = 620** — a gödör (320–960) közepe táján. A lábnyom `536..704`: a `G1`-en belül, és nem
+ * ér hozzá sem az `A-lamp`-hez (34,5..69,5), sem a `B-crates`-hez (973,5..1046,5). A háza
+ * teteje `418 + 2 - 183 = 237`, fölötte nincs platform.
+ *
+ * **A tint MÉRT, nem tippelt** (a projekt bevett módszere a Level 1 cathedral-tónusához):
+ * a `house-a.png` nyers átlagszíne `(68,45,60)`, amit a `PROP_TINT_COOL_SOURCE` `(68,39,27)`-re
+ * visz — fényességben **44,7**, ami PONT a `03-ruins` háttérréteg (52,7) és a hangulati propok
+ * (41,7) KÖZÖTT van. Ez egybeesik a mélységsorrenddel is: a ház a kettő között ül (-15 a -20 és
+ * a -10 között). A fa-tint 39-et adna, tehát a propoknál is sötétebbet — a rétegzéssel
+ * ellentétesen. A ház ráadásul kategóriailag kő/vakolat, nem fa.
+ */
+export const BACKDROP_BUILDINGS: BuildingDef[] = [
+  {
+    id: 'A-house',
+    texture: BUILDING_TEXTURES.HOUSE_A,
+    x: 620,
+    surfaceId: 'G1',
+    tint: PROP_TINT_COOL_SOURCE,
+  },
+];
+
+// --- A ház párbeszéde ---------------------------------------------------------
+
+/**
+ * Az interakciós zóna a ház előtt. A mérete a `PreScene`-ével azonos, és az `y` levezetése is:
+ * a player teste `[GROUND_TOP-46, GROUND_TOP]`, a zóna közepe ennek a közepére néz, hogy az
+ * ugráló player is kiváltsa.
+ *
+ * A `x` = a ház vízszintes középpontja, a szélessége pedig bőven a lábnyomán (536..704) belül
+ * marad — a prompt tehát akkor jelenik meg, amikor a player láthatóan a homlokzat előtt áll.
+ * A `START_X`-től (100) messze van, tehát a spawn pillanatában nem villan fel (a `PreScene` és
+ * a Level 3 `A` előcsarnokának azonos invariánsa).
+ */
+export const HOUSE_INTERACT = {
+  x: 620,
+  width: 110,
+  height: 60,
+  y: GROUND_TOP - 60 / 2 + 7,
+} as const;
+
+/**
+ * A `ui/Dialogue` panel horgonya — és **a képernyő TETEJE, nem a padló alja. Ez KÉNYSZER,
+ * nem ízlés.**
+ *
+ * A `Dialogue` a horgony ALÁ rajzol, `PANEL_RESERVE_PX` (75) px-t foglalva; a négy
+ * boss-arénában ezért van a `GROUND_TOP` 369-en (`369 + 75 = 444 <= 450`). Egy PÁLYA padlója
+ * viszont 418, és `418 + 75 = 493 > 450` — ott a panel kilógna a képből. Bármilyen 343 fölötti
+ * horgonynál pedig a panel a player TESTÉT (372..418) takarná ki.
+ *
+ * A 8-cal a panel a `11..83` sávot foglalja: a játéktér fölött, senkit nem takarva. A panel
+ * `setScrollFactor(0)`, tehát a görgő pályán is a képernyőhöz rögzül.
+ */
+export const HOUSE_DIALOGUE_PANEL_TOP = 8;
+
+/** A prompt-szövegek konvenciója a repóban: magyar, `E: `-vel kezdve. */
+export const HOUSE_PROMPT = 'E: Kopogás';
+
+/**
+ * A prompt függőleges helye — **VILÁG-koordinátában, a player feje fölött**, nem a képernyő
+ * közepén rögzítve.
+ *
+ * Ez hibajavítás, nem stílus. A boss-ajtó promptja `setScrollFactor(0)`-val a (400, 400)
+ * képernyő-pontra ül, és ott működik, mert a pálya VÉGÉN a kamera nekiütközik a jobb
+ * bounds-nak (`scrollX` 5200-nál megáll), tehát a player a képernyő jobb szélére csúszik.
+ * A ház viszont x=620-nál van, a pálya közepén: ott a kamera SZABADON követ, tehát a player
+ * pontosan a képernyő közepén (400) áll — vagyis a felirat pont MÖGÉ került.
+ *
+ * A megoldás a köztes checkpoint feliratának mintája: világ-koordinátás szöveg a helyszín
+ * fölött. A `HOUSE_PROMPT_GAP` a player feje FÖLÖTTI hézag, tehát az érték LEVEZETETT — egy
+ * jövőbeli, magasabb karakter-sheet nem hagyja itt a régi számot.
+ */
+const HOUSE_PROMPT_GAP = 24;
+export const HOUSE_PROMPT_Y = GROUND_TOP - PLAYER_BODY_HEIGHT - HOUSE_PROMPT_GAP;
+
+/**
+ * PLACEHOLDER lore (Phase 9-ben cserélendő) — de már a meglévő szálra fűzve: A LÁNGŐRZŐ a
+ * nyitó szentélyben útnak indította Lazarust, itt pedig egy névtelen lakó próbálja
+ * visszatartani. A beszélő neve NAGYBETŰS, mint minden párbeszédben.
+ *
+ * A párbeszéd SZÁNDÉKOSAN egyetlen sor, és a scene-en kívül él (nem a `Level1Scene.ts`-ben):
+ * a `fakePhaser` nem ad `Scene` osztályt, tehát a scene unit tesztből nem importálható — így
+ * viszont bizonyítható, hogy a sor elfér a panelen.
+ */
+export const HOUSE_SPEAKER = 'HANG A HÁZBÓL';
+
+export const HOUSE_DIALOGUE: DialogueLine[] = [
+  { speaker: HOUSE_SPEAKER, text: 'Veszély közeleg. Ne menj tovább, ha jót akarsz...!' },
 ];

@@ -3,6 +3,7 @@ import { DECOR_DEPTH } from './LevelTileset';
 import { BUILDING_DEPTH } from './GothicTownTileset';
 import {
   BUILDING_SINK_PX,
+  backdropBuildingTint,
   decorPropTint,
   surfaceSpan,
   type BuildingDef,
@@ -60,7 +61,9 @@ export default function createDecorProps(
  *    MÖGÖTT. Ettől áll össze a mélységsor: sziluett -> ház -> szekér/láda -> player.
  *  - **`BUILDING_SINK_PX`** — a ház talpa 2 px-rel a felszín ALÁ kerül. MÉRT érték a csomag
  *    saját preview-jából; ettől "a földben áll" a ház, nem rá van ragasztva.
- *  - **tint NINCS** — a Level 2 a házak natív palettája.
+ *  - **tint alapból NINCS** — a Level 2 a házak natív palettája. A Level 1 az egyetlen hívó,
+ *    ami korrigál (`BuildingDef.tint`), pontosan úgy, ahogy a propoknál: ott is a placement
+ *    dönt, mert ugyanaz a textúra két pályán két palettába kerül.
  *
  * A `flipX` három textúrából hatféle sziluettet ad, ami egy 7200 px-es pályán érezhető.
  */
@@ -76,6 +79,7 @@ export function createBackdropBuildings(
       .image(def.x, surface.top + BUILDING_SINK_PX, def.texture)
       .setOrigin(0.5, 1)
       .setFlipX(def.flipX === true)
+      .setTint(backdropBuildingTint(def))
       .setDepth(BUILDING_DEPTH);
   });
 }
