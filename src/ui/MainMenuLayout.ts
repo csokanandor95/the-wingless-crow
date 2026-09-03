@@ -186,6 +186,10 @@ export const CONTROLS_ROWS: readonly ControlRow[] = [
   { label: 'Heavy slash', value: 'K  or right mouse   —   22 dmg, longer reach' },
   { label: '', value: 'Charged by 3 landed sword hits, not a timer' },
   { label: 'Fireball', value: 'F   —   15 dmg, 2 charges, 5 s recharge each' },
+  // Játék-szintű, nem a PlayerControlleré: a `systems/Fullscreen.ts` egyetlen window-listenere
+  // köti be, tehát minden jelenetben él. Azért ITT szerepel, és nem menüpontként, mert a teljes
+  // képernyő harc közben is kell — és mert a `MENU_ITEMS` háromelemű volta unit teszttel rögzített.
+  { label: 'Fullscreen', value: 'F11   —   toggle; Esc leaves fullscreen' },
 ];
 
 // ---------------------------------------------------------------------------------------

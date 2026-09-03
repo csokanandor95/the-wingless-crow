@@ -3,9 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <title>The Wingless Crow</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      body { margin: 0; background: #000; }
-      #game-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
+      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+
+      /* A Phaser `Scale.FIT`-je a SZÜLŐ méretéig nagyítja a 800x450-es vásznat, arányt tartva,
+         ezért a konténernek a teljes viewportot ki kell töltenie. A flexbox csak azért marad,
+         hogy a `create()` előtti pillanatban se ugorjon a vászon; a végleges középre igazítást
+         a `CENTER_BOTH` végzi. */
+      #game-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      /* Pixel art: a vásznat a böngésző nyújtja fel a `FIT` által számolt CSS-méretre. Enélkül
+         azt bilineárisan interpolálná, és a sprite-ok elmosódnának — a `pixelArt: true` csak a
+         Phaseren BELÜLI textúraszűrésre hat, erre az utolsó lépésre nem. */
+      #game-container canvas {
+        /* Sorrend: a régebbi `crisp-edges` a tartalék, a szabványos `pixelated` írja felül ott,
+           ahol ismert. Fordítva a Firefox a tartalékon ragadna. */
+        image-rendering: crisp-edges;
+        image-rendering: pixelated;
+      }
     </style>
   </head>
   <body>

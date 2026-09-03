@@ -2480,7 +2480,7 @@ A projekt akkor tekinthető sikeresnek, ha:
 - [x] Boss death működik.
 - [ ] Ending működik.
 - [x] Zene és sound effectek működnek.
-- [ ] A játék rendelkezik egységes dark fantasy atmoszférával.
+- [x] A játék rendelkezik egységes dark fantasy atmoszférával.
 
 ### QA
 
@@ -2499,6 +2499,7 @@ A projekt akkor tekinthető sikeresnek, ha:
 
 - [x] GitHub repository létrejött.
 - [ ] Production build működik.
+- [ ] Itch.io deploy.
 - [ ] GitHub Pages deployment működik.
 - [ ] A játék publikus URL-en elérhető.
 
