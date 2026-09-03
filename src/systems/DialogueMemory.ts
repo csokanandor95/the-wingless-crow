@@ -12,9 +12,10 @@
  * **EGYETLEN kulcs alatt egy scene-kulcs lista**, nem bossonként külön registry-bejegyzés: így
  * egy új boss felvétele nem jár se új kulccsal, se a takarítás bővítésével.
  *
- * FIGYELEM: a registry a végigjátszást is túléli — a `CreditsScene` új játéknál ezért törli a
- * `DIALOGUE_SEEN_REGISTRY_KEY`-t is (a `PROGRESS_REGISTRY_KEYS` listában). Enélkül egy második
- * végigjátszásból NÉMÁN eltűnne az összes boss-párbeszéd.
+ * FIGYELEM: a registry a végigjátszást is túléli — a `MainMenuScene` „Start Game"-je ezért
+ * törli a `DIALOGUE_SEEN_REGISTRY_KEY`-t is (a `systems/GameProgress.ts`
+ * `PROGRESS_REGISTRY_KEYS` listájában). Enélkül egy második végigjátszásból NÉMÁN eltűnne az
+ * összes boss-párbeszéd.
  */
 
 /** A registry-kulcs, ami alatt a már látott párbeszédek scene-kulcsai ülnek (`string[]`). */

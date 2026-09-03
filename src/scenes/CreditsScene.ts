@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { DIALOGUE_SEEN_REGISTRY_KEY } from '../systems/DialogueMemory';
 
 /**
  * A játék záró képernyője: köszönet + a felhasznált assetek és zenék szerzői.
@@ -8,8 +7,10 @@ import { DIALOGUE_SEEN_REGISTRY_KEY } from '../systems/DialogueMemory';
  * A lista a `2D helper/Credits.txt` gyűjtéséből indul; a végleges szöveg — és a még nyitott
  * licenc-tételek lezárása — külön kör. A csere ennek az egyetlen tömbnek a szerkesztése.
  *
- * Ez a scene zárja a lánccal a kört is: innen a `Space` TISZTA regisztryvel indít új játékot,
- * tehát a végigjátszott állapot (legyőzött bossok, checkpointok) nem szivárog át.
+ * Ez a scene zárja a lánccal a kört is: a végén a `Space` a FŐMENÜBE tesz vissza. **Új játékot
+ * innen már NEM indítunk**, és a registryt sem ez takarítja: mindkettő a `MainMenuScene`
+ * „Start Game"-jének a dolga (`systems/GameProgress.ts`) — ott kezdődik ténylegesen egy futás,
+ * és a menübe a credits felől is, a menüből indítva is ugyanaz az út vezet.
  */
 
 const SCROLL_SPEED_PX_PER_SEC = 26;
@@ -17,23 +18,6 @@ const FADE_MS = 700;
 const TITLE_FONT_SIZE = '26px';
 const LINE_FONT_SIZE = '14px';
 const SECTION_FONT_SIZE = '13px';
-
-/**
- * A registry GAME-szintű, tehát túléli a scene-váltásokat — pont ezért kell új játéknál
- * explicit törölni. Ha valaha új, játékon átívelő kulcs jön, ide is fel kell venni.
- */
-const PROGRESS_REGISTRY_KEYS = [
-  'bossDefeated',
-  'kingDefeated',
-  'beastMasterDefeated',
-  'demonDefeated',
-  'checkpoint',
-  'level2Checkpoint',
-  'level3Checkpoint',
-  // A már látott boss-párbeszédek listája (systems/DialogueMemory). Enélkül egy második
-  // végigjátszásból NÉMÁN eltűnne az összes boss-átvezető: mindegyik "már láttam"-ra futna.
-  DIALOGUE_SEEN_REGISTRY_KEY,
-] as const;
 
 interface CreditLine {
   /** Szakasz-fejléc (kiemelt), vagy sima sor. */
@@ -68,6 +52,7 @@ const CREDITS: CreditLine[] = [
   // kerülhet sor, ha a forrásuk tisztázódott — kitalált attribúció rosszabb a hiánynál.
   { text: '' },
   { section: true, text: 'MUSIC' },
+  { text: 'Ashen Path — cloud1789 (Ashfall: Dark Fantasy Stream Pack)' },
   { text: 'Elkmire Keep — Lisette Amago (Free Dark Fantasy Music)' },
   { text: 'Library of Veles — Lisette Amago (Free Dark Fantasy Music)' },
   { text: 'Whispers of the Abyss — AlkaKrab' },
@@ -172,36 +157,32 @@ export default class CreditsScene extends Phaser.Scene {
     if (this.content.y <= this.scrollEndY) this.skipToEnd();
   }
 
-  /** Space/Enter: görgetés közben a végére ugrik, a végén új játékot indít. */
+  /** Space/Enter: görgetés közben a végére ugrik, a végén a főmenübe tesz vissza. */
   private advance(): void {
     if (!this.finished) {
       this.skipToEnd();
       return;
     }
-    this.restartGame();
+    this.returnToMenu();
   }
 
   private skipToEnd(): void {
     if (this.finished) return;
     this.finished = true;
     this.content.y = this.scrollEndY;
-    this.hintText.setText('Space: New game');
+    this.hintText.setText('Space: Main menu');
   }
 
   /**
-   * Új játék TISZTA lappal. A registry game-szintű, tehát a legyőzött bossok flagjei és a
-   * checkpointok különben átszivárognának — a Level 1 ajtaja például azonnal a Level 2-re
-   * vinne, és a player a pálya végén éledne.
+   * Vissza a főmenübe — akkor is, ha a játékos a menüből nyitotta meg a creditset, és akkor is,
+   * ha a végigjátszás után jutott ide. Az ÚJ JÁTÉK (és vele a registry takarítása) onnan indul,
+   * a `Start Game`-mel.
    */
-  private restartGame(): void {
-    for (const key of PROGRESS_REGISTRY_KEYS) this.registry.remove(key);
-
+  private returnToMenu(): void {
     // FADE_OUT_COMPLETE, nem a fadeOut() callbackje: utóbbi a fade MINDEN frame-jén lefutna
     // (CLAUDE.md 4. tanulság).
-    // A PreScene-re, NEM a Level 1-re: az új játéknak a nyitó szentélyben kell kezdődnie,
-    // különben a második végigjátszásból kimaradna a felvezetés.
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start('PreScene');
+      this.scene.start('MainMenuScene');
     });
     this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
   }

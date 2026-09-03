@@ -38,6 +38,17 @@ export const MUSIC_KEYS = {
    * tételt. A csomag másik, addig kihasználatlan sávja.
    */
   PRESCENE_THEME: 'prescene-theme',
+  /**
+   * A főmenü (`MainMenuScene`). `Ashen Path`, az "Ashfall – Dark Fantasy Stream Pack"-ból
+   * (cloud1789) — a projekt ELSŐ zene-csomagja, amihez VAN licencszöveg, és az be is van
+   * másolva (`assets/audio/ashen-path-license.txt`).
+   *
+   * Az asset SZÁRMAZTATOTT: a nyers sáv első ~10 másodperce csak halk zúgás, ezért a fájl
+   * frame-határon VÁGVA került a repóba (t=10..130 s). A `seek` itt nem lett volna elég — a
+   * Phaser `createAndStartLoopBufferSource()`-a `offset = marker ? marker.start : 0`-val
+   * indít, tehát a második loop-fordulótól újra a zúgás szólna. Lásd a BootScene importját.
+   */
+  MENU_THEME: 'menu-theme',
 } as const;
 
 export const SFX_KEYS = {
@@ -117,20 +128,28 @@ export const DEFAULT_FADE_OUT_MS = 1500;
  */
 export const LEVEL_MUSIC_VOLUME = 0.35;
 /**
- * Ambient sávhoz hosszabb belépő, mint a boss theme 800ms-a. Ez itt nem esztétikai
- * finomság: a Level 1 közvetlenül az oldalbetöltés után indul, tehát az audio context
- * MINDIG zárolt, és a zene csak az első billentyűlenyomásnál kezd szólni — egy hirtelen
- * berobbanó sáv ott zavaró lenne. Lásd a Level1Scene.create() kommentjét.
+ * Ambient sávhoz hosszabb belépő, mint a boss theme 800ms-a.
+ *
+ * Az eredeti indoklás az volt, hogy a Level 1 közvetlenül az oldalbetöltés után indul, tehát
+ * az audio context MINDIG zárolt. **Ez már NEM a Level 1-re igaz**: előbb a `PreScene`, majd
+ * 2026-09-03 óta a `MainMenuScene` került a lánc elejére — az autoplay-zárat MOST A FŐMENÜ
+ * oldja fel, és ezért kapja ugyanezt a hosszú fade-int (ott a zene tényleg csak az első
+ * billentyűleütésnél/kattintásnál szólal meg).
+ *
+ * A Level 1-en a hosszabb belépő ettől függetlenül helyes: a fekete képernyőből érkező sáv így
+ * sem robban be hirtelen.
  */
 export const LEVEL_MUSIC_FADE_IN_MS = 2000;
 /**
  * A Level 2 belépője SZÁNDÉKOSAN hosszabb a Level 1-énél, és ez nem ízlés kérdése, hanem a
  * két belépés különbsége:
- *  - a Level 1 közvetlenül az oldalbetöltés után indul, tehát az audio context ZÁROLT — a
- *    sáv ott amúgy is csak az első billentyűlenyomásnál kezd szólni (az UNLOCKED-ág);
+ *  - a Level 1-be a nyitó szentélyen át érkezünk, tehát a sáv ott a hosszú fade-in ELLENÉRE is
+ *    viszonylag korán hallható;
  *  - a Level 2-be a NarrationScene felől érkezünk, MÁR FELOLDOTT contexttel, tehát a zene
  *    valóban a create() pillanatában indul. Itt a fade-in az EGYETLEN dolog, ami tompítja
  *    a belépést — a nyers sáv különben teljes intenzitással ütne be a fekete képernyőből.
+ *
+ * (Az audio contextet a lánc elején a `MainMenuScene` oldja fel — lásd fentebb.)
  */
 export const LEVEL2_MUSIC_FADE_IN_MS = 4000;
 

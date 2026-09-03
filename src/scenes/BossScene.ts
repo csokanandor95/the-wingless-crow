@@ -199,7 +199,7 @@ export default class BossScene extends Phaser.Scene {
    *
    * VÉGIGJÁTSZÁSONKÉNT EGYSZER fut le: a végén a `markDialogueSeen()` elteszi a scene
    * kulcsát, tehát egy bukott próbálkozás után a harc egyből a cím-kártyával nyit. Új
-   * játéknál a `CreditsScene` törli ezt az emlékezetet.
+   * játéknál a `MainMenuScene` „Start Game"-je törli ezt az emlékezetet.
    */
   private startDialogue(): void {
     this.dialogue = new Dialogue(

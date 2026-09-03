@@ -36,6 +36,12 @@ export const BACKGROUND_TEXTURES = {
    * SZÁRNYAS angyalszobor: pont az, amit Lazarus elvesztett.
    */
   PRE_SCENE: 'bg-pre-scene',
+  /**
+   * A főmenü (`MainMenuScene`) — szintén egyetlen álló kép, fix kamerával. A festményen a
+   * koronás lovag és egy szárnyas szobor áll; a menüblokk ezért ül a képernyő JOBB felén
+   * (lásd `ui/MainMenuLayout.ts` `PAINTING`).
+   */
+  MAIN_MENU: 'bg-main-menu',
   /** Level 2 (GothicVania Town) — lásd `LEVEL2_BACKGROUND_LAYERS`. */
   TOWN_SKY: 'bg-town-sky',
   TOWN: 'bg-town',

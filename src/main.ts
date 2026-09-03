@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import BootScene from './scenes/BootScene';
+import MainMenuScene from './scenes/MainMenuScene';
 import PreScene from './scenes/PreScene';
 import Level1Scene from './scenes/Level1Scene';
 import BossScene from './scenes/BossScene';
@@ -31,12 +32,14 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  // A lánc sorrendben: PreScene -> Level 1 -> Boss 1 -> Level 2 -> Boss 2 -> Level 3 ->
-  // Boss 3 -> Final -> ending -> credits. A regisztráció ÉLESÍTI a korábbi scene-ek
-  // feltételes ágait: a Boss2Scene győzelme a Level3Scene-t keresi, a Level3Scene ajtaja a
-  // Boss3Scene-t, a Boss3Scene győzelme pedig a FinalBossScene-t.
+  // A lánc sorrendben: MainMenu -> PreScene -> Level 1 -> Boss 1 -> Level 2 -> Boss 2 ->
+  // Level 3 -> Boss 3 -> Final -> ending -> credits -> vissza a MainMenu-be. A regisztráció
+  // ÉLESÍTI a korábbi scene-ek feltételes ágait: a Boss2Scene győzelme a Level3Scene-t keresi,
+  // a Level3Scene ajtaja a Boss3Scene-t, a Boss3Scene győzelme pedig a FinalBossScene-t.
+  // A BootScene marad ELSŐ: a Phaser azt indítja automatikusan.
   scene: [
     BootScene,
+    MainMenuScene,
     PreScene,
     Level1Scene,
     BossScene,

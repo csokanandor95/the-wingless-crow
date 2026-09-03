@@ -563,13 +563,77 @@ megismételné). Részletek lentebb, a „PreScene" szakaszban.
   *Mellékesen: az érték a beszúrás előtt `'BossScene'`-en állt, committolva — tehát a játék
   a Boss 1 arénában indult. Ez most rendeződött.*
 - **A `CreditsScene` új játéka is a `PreScene`-re megy**, nem a Level 1-re: különben a
-  második végigjátszásból némán kimaradna a nyitány.
+  második végigjátszásból némán kimaradna a nyitány. *(2026-09-03 óta a credits a FŐMENÜBE tesz
+  vissza, és az új játékot a menü `Start Game`-je indítja — de a PreScene így is az első
+  állomás.)*
 - **`DialogueMemory` NEM kell hozzá**: a PreScene végigjátszásonként pontosan egyszer fut le
-  (nincs olyan út, ami visszavezetne rá), a `CreditsScene` pedig úgyis törli a registryt.
+  (nincs olyan út, ami visszavezetne rá), az új játék pedig úgyis törli a registryt.
 - **Együtt járó KOMMENT-JAVÍTÁS a `Level1Scene`-ben**: az „a Level 1 közvetlenül az
   oldalbetöltés után indul, tehát az audio context GARANTÁLTAN zárolt" megjegyzés elavult —
   az autoplay-zárat mostantól a PreScene oldja fel (ott kell `E`-t nyomni). A viselkedés és a
-  2000 ms-os fade-in NEM változott.
+  2000 ms-os fade-in NEM változott. *(2026-09-03 óta a FŐMENÜ oldja fel, még eggyel előrébb.)*
+
+**FŐMENÜ — `MainMenuScene` KÉSZ (2026-09-03). A LÁNC ELEJE ÚJRA MEGVÁLTOZOTT, ÉS BEZÁRULT A
+KÖR.** A játékot innentől egy fogadóképernyő nyitja, és a `CreditsScene` ide tér vissza:
+
+```
+Boot → MainMenu → (Start Game) → PreScene → … → Final Boss → ending → Credits ─┐
+          ↑        (Credits)    → CreditsScene ──────────────────────────────────┤
+          └────────────────────────────────────────────────────────────────────┘
+                   (Controls)   → IN-SCENE lap, vissza a menübe
+```
+
+Új modulok: `scenes/MainMenuScene.ts`, `ui/MainMenuLayout.ts`, `systems/GameProgress.ts`.
+
+- **HÁROM menüpont: `Start Game` · `Controls` · `Credits`. `Exit Game` SZÁNDÉKOSAN NINCS**
+  (user-döntés): a böngésző a `window.close()`-t egy sima fülre letiltja, tehát az a gomb vagy
+  nem csinálna semmit, vagy csak annyit üzenne, hogy „zárd be a fület". Unit teszt rögzíti a
+  hiányát, hogy ne kelljen újratárgyalni.
+- **A menüblokk a képernyő JOBB felén ül, és ez MÉRÉS, nem ízlés.** A festményen a koronás
+  lovag (`x 196..320`) és a szárnyas szobor (`x 310..385`) áll; a user kérése az volt, hogy a
+  menüpontok ne takarják ki őket. A `MENU_PANEL.x = 410` tehát a `PAINTING.statue.right`-ból
+  (385) van levezetve, és **három unit teszt őrzi** (a panel a szobortól jobbra, a lovagtól
+  jobbra, ÉS a `VIEW_WIDTH / 2` fölött van).
+- **A CONTROLS lap SZÁNDÉKOSAN megszegi ezt a korlátot** (x=40, majdnem teljes szélesség), és
+  erre is van teszt — hogy egy későbbi „legyen konzisztens" refaktor ne szűkítse le. Az x>385
+  szabály a NYUGALMI menüre vonatkozik; a Controls egy kérésre előhívott, modális olvasólap,
+  aminek a kilenc soros billentyű-táblázathoz szélesség kell (a menüpanel 318 px-es belső
+  szélességébe ~38 karakteres sorok férnének, ami olvashatatlan).
+- **A CONTROLS IN-SCENE nézetváltás, NEM külön scene.** Kényszer, nem ízlés: az `AudioManager`
+  scene-hatókörű és a SHUTDOWN-on megsemmisül (6. tanulság), tehát egy külön Controls-scene
+  minden be- és kilépéskor levágná és elölről indítaná a menüzenét.
+- **A panel nem dísz, hanem a kontraszt eszköze.** A blokk a katedrális elé kerül, ami a kép
+  legvilágosabb ÉS legrészletgazdagabb eleme (mért csúcs-fényesség 124). A `Dialogue` receptje
+  (`0x000000` @ 0,72 + `0x6a5a6a` keret) ezt 34,7-re nyomja le → az arany kijelölés kontrasztja
+  **6,6:1**, a törtfehér sorooké **10,9:1**. **Unit teszt SZÁMOLJA VISSZA** a mért
+  fényességből, és külön teszt rögzíti, hogy panel NÉLKÜL ugyanez 1,7:1 lenne (tehát megbukna)
+  — így egy későbbi „hadd látsszon jobban a kép" alfa-hangolás a CI-ban bukik el.
+- **MINDEN szöveg BALRA IGAZÍTOTT, egész x-en** (`setOrigin(0, 0.5)`). Ez a **29. tanulság
+  megkerülése FOGALMI szinten**: nincs `setOrigin(0.5)`, tehát nincs mit kerekíteni — erősebb
+  javítás a `TutorialHint.centerText()` `Math.round()`-jánál. A kijelölő `▶` is KÜLÖN
+  szövegobjektum fix x-en, nem a címke elé fűzött prefix: prefixként minden címke elmozdulna
+  vízszintesen a léptetéskor (a klasszikus monospace-menü „imbolygás").
+- **Billentyűzet ÉS egér** (user-döntés). A `pointerover`/`pointerdown` LÁTHATATLAN `Zone`-okra
+  megy, nem a `Text` saját bounds-ára: a sorok balra igazítottak és eltérő hosszúak, tehát a
+  szöveg-bounds egy rövid címkénél bosszantóan kicsi céltábla lenne.
+- **`update()` SZÁNDÉKOSAN NINCS** — a projekt egyetlen ilyen scene-je. A menü tisztán
+  eseményvezérelt: nincs benne se animáció, se időzítés, amit frame-enként léptetni kellene.
+- **A `BootScene.START_SCENE` normál értéke `'MainMenuScene'` lett** (a doc-komment is).
+- **A `CreditsScene` már NEM indít új játékot**: a `restartGame()` helyére `returnToMenu()`
+  lépett, a súgója `Space: New game` → `Space: Main menu`. Ezzel a credits mindkét irányból
+  (menüből megnyitva ÉS a végigjátszás után) ugyanoda visz.
+
+**`systems/GameProgress.ts` — a `PROGRESS_REGISTRY_KEYS` KÖLTÖZÉSE.** A nyolc játékon átívelő
+registry-kulcs és az új `resetProgress()` a `CreditsScene`-ből egy Phaser-mentes modulba került
+(a `DialogueMemory` precedense: csak a registry `remove` felületét várja strukturálisan).
+
+- **A hívás helye ÉRDEMBEN változott: a menü `Start Game`-je takarít, nem a credits vége.**
+  Ott kezdődik ténylegesen egy futás — és a menübe a credits felől IS visszajutunk, tehát a
+  reset akkor is lefut, ha a játékos a credits után indít újat.
+- A `DIALOGUE_SEEN_REGISTRY_KEY` továbbra is **importtal** kerül a listába, nem beírt
+  sztringként: így a kulcs átnevezése nem hagyhatja árván a takarítást.
+- **A `CreditsScene`-ből a `DialogueMemory` importját is törölni KELLETT**, nem csak a listát:
+  a `tsconfig` `noUnusedLocals: true`, tehát az árván maradt import a CI-t buktatta volna.
 
 **BOSS-PÁRBESZÉD MEMÓRIA (`src/systems/DialogueMemory.ts`) — 2026-09-01.** Mind a NÉGY aréna
 párbeszéde **végigjátszásonként EGYSZER** fut le: ha a player egy boss-harcot ismételten kezd
@@ -590,8 +654,9 @@ az arénát.
   tehát ez az egyetlen pont, ahol a szöveg biztosan lement.
 - **A modul NEM importál Phasert** (csak a registry `get`/`set` felületét várja
   strukturálisan) — ezért mockolás nélkül unit-tesztelhető, mint a `Level*Layout` adatmodulok.
-- **A `CreditsScene` új játéknál törli** (a kulcs importtal kerül a `PROGRESS_REGISTRY_KEYS`
-  listába). Enélkül egy második végigjátszásból NÉMÁN eltűnne az összes boss-átvezető.
+- **Új játéknál törlődik** (a kulcs importtal kerül a `PROGRESS_REGISTRY_KEYS` listába, ami
+  2026-09-03 óta a `systems/GameProgress.ts`-ben él, és a főmenü `Start Game`-je hívja).
+  Enélkül egy második végigjátszásból NÉMÁN eltűnne az összes boss-átvezető.
 - **HAT háttér-ház** világ-koordinátásan (`BACKDROP_BUILDINGS`, `BUILDING_DEPTH = -15`) és
   **17 hangulati prop** (`DECOR_PROPS`, tint nélkül), mind unit-tesztelt elhelyezéssel.
 - Ami a Level 2-n MÉG placeholder: a **létra** és a **boss-ajtó** (a csomagban nincs létra,
@@ -720,7 +785,7 @@ Atmosphere folytatása is: a Level 1 első valódi „lakott világ" eleme.
   KÉTOLDALI** (a harc előtt induljon, de még a képen legyen, amikor a harc kezdődik), tehát
   sem az enemy, sem a trigger nem csúszhat el csendben a másiktól.
 
-**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a NÉGY Boss** le van fedve a Project_plan.md §23 bontása szerint (**32 fájl, 925 teszt** — ebből 12 az animáció-/háttér-/VFX-vezérlést, 4 a **pálya-geometriát** (Level 1–3 + a nyitó szentély), 1 a **mozgó platformot**, 1 a **hazardokat**, 2 a **párbeszéd-rendszert** (a pure mag + a „már láttam" memória), 1 a **végső boss idézett lidérceit**, 1 a **harci HUD-ot**, 1 pedig a **billentyű-súgót** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
+**Phase 10 (QA) elindult:** unit teszt infra (`vitest`, `npm run test`, zero-config — nincs `vitest.config.ts`), a Player + Combat + Enemy (CrowHarvester, **Gravecaller**, **Beast**) + **mind a NÉGY Boss** le van fedve a Project_plan.md §23 bontása szerint (**34 fájl, 967 teszt** — ebből 12 az animáció-/háttér-/VFX-vezérlést, 4 a **pálya-geometriát** (Level 1–3 + a nyitó szentély), 1 a **mozgó platformot**, 1 a **hazardokat**, 2 a **párbeszéd-rendszert** (a pure mag + a „már láttam" memória), 1 a **végső boss idézett lidérceit**, 1 a **harci HUD-ot**, 1 a **billentyű-súgót**, 1 a **főmenüt** (geometria + kontraszt + a Controls lap tartalma), 1 pedig az **új játék registry-takarítását** fedi). Game state / Utility logic unit tesztek még hátravannak. **A CI/CD első mérföldköve KÉSZ** — lásd a „CI” szakaszt lentebb.
 - A `level1Layout.test.ts` külön eset: nem viselkedést tesztel, hanem **pálya-geometriát**. A `Level1Layout.ts` Phaser-mentes adatmodul, ezért mockolás nélkül bizonyítható vele, hogy minden felület elérhető (BFS a start szegmensről, ballisztikus hatótáv-számítással), egyetlen enemy patrol-tartománya sem lóg le a felületéről, és a szakadékok átugorhatók. Ez a layout-spec elfogadási kritériumait futtatható állítássá teszi. A `Player.ts`, `CrowHarvester.ts` és `GraftedWingBreaker.ts` tuning-konstansai exportáltak, hogy a tesztek ne nyers számokat égessenek be (`Player`: `MOVE_SPEED, JUMP_VELOCITY, MAX_HP, CLIMB_SPEED, CAST_DELAY_MS`; `CrowHarvester`: `MAX_HP, PATROL_SPEED, CHASE_SPEED, PATROL_RANGE, DETECTION_RANGE, LOSE_RANGE, ATTACK_RANGE, ATTACK_DAMAGE, ATTACK_STARTUP_MS, ATTACK_COOLDOWN_MS, VERTICAL_DETECTION_RANGE, DIRECTION_DEADZONE`; `GraftedWingBreaker`: `MAX_HP, PHASE2_HP_RATIO, MOVE_SPEED_P1/P2, SLASH_*, PROJECTILE_*, SPELL_*, CHARGE_*, ACTION_COOLDOWN_MS, DIRECTION_DEADZONE, ATTACK_ROTATION`), és mindháromnak van `getHP()`/`getMaxHP()`-ja.
 - A `'phaser'` modult minden teszt fájl egy teljesen önálló fake névtérre cseréli (`tests/unit/helpers/fakePhaser.ts` `createFakePhaserModule()`) — a valódi Phaser csomag már betöltéskor `window is not defined`-del elszáll Node alatt.
 - **`vi.mock()` hoisting csapda**: a vitest a `vi.mock()` hívást a fájl IMPORT sorai fölé mozgatja, ezért a factory nem hivatkozhat statikusan importált binding-ra (TDZ hiba). Emiatt a `createFakePhaserModule` megosztása **dinamikus** `import()`-tal történik a factory testén belül: `vi.mock('phaser', async () => { const { createFakePhaserModule } = await import('./helpers/fakePhaser'); return createFakePhaserModule(); });` — ezt minden teszt fájl elején meg kell ismételni (globális `setupFiles`-es próbálkozás NEM működött, ugyanezen hoisting-ok miatt).
@@ -767,6 +832,18 @@ the-wingless-crow/
 │   │   ├── dread-march.mp3       # Boss 3 (Beast Master) theme. UGYANAZ az AlkaKrab csomag:
 │   │   │                         # `5. Dread March (Loop)`
 │   │   ├── library-of-veles.mp3  # Level 1 ambient (Free Dark Fantasy Music) — licenc TISZTÁZANDÓ
+│   │   ├── ashen-path.mp3        # A FŐMENÜ sávja. "Ashfall – Dark Fantasy Stream Pack"
+│   │   │                         # (cloud1789) — az EGYETLEN zene-csomag, amihez VAN licenc,
+│   │   │                         # és az be is van másolva -> NEM nyitott jogi tétel.
+│   │   │                         # SZÁRMAZTATOTT: a nyers sáv 253,18 s / 5,60 MB, és az első
+│   │   │                         # ~10 mp-e csak halk zúgás. Itt a t=10,008..130,008 s szelet
+│   │   │                         # van, FRAME-HATÁRON vágva = pontosan 5000 MPEG frame /
+│   │   │                         # 120,00 s / 2 638 560 bájt (az ID3v2 tag és a Xing fejléc
+│   │   │                         # is lemarad). ÚJRAKÓDOLÁS NINCS.
+│   │   │                         # A `seek` NEM lett volna elég: a Phaser loop-forrása
+│   │   │                         # `offset = marker ? marker.start : 0`-val indul, tehát a
+│   │   │                         # 2. fordulótól újra a zúgás szólna
+│   │   ├── ashen-path-license.txt # a csomag LICENSE.txt-je, változatlan másolatban
 │   │   └── sfx/                  # Free Fantasy SFX Pack (TomMusic), WAV — licenc TISZTÁZANDÓ
 │   │       ├── sword-attack-2.wav      # player kardsuhintás (a sorszám a kapocs a csomaghoz)
 │   │       ├── sword-attack-3.wav      # CrowHarvester + boss közelharc (közös hang)
@@ -836,6 +913,15 @@ the-wingless-crow/
 │   │                             # gyakorlatilag azonos a 800/450-ével (1.7778), pontosan a
 │   │                             # final-arena.png receptje. A mozaikpadló lapja a 345-397.
 │   │                             # sor (a 398.-ban -21,06 a zuhanás) -> GROUND_TOP = 369
+│   │   └── menu/
+│   │       └── main-menu.png     # 800x450, a FŐMENÜ háttere. CSAK ÁTMÉRETEZVE (nincs
+│   │                             # kivágás), UGYANAZ a recept: a forrás
+│   │                             # (`2D helper/level/Menu.png`) szintén 1672x941.
+│   │                             # A MÉRT kompozíciója szabja meg a menü geometriáját:
+│   │                             # koronás lovag x196..320, szárnyas szobor x310..385 ->
+│   │                             # a menüblokk x=410-nél kezdődik (ui/MainMenuLayout.ts
+│   │                             # PAINTING). Licenc nélkül érkezett, mint a négy
+│   │                             # boss-aréna háttere -> nyitott jogi tétel
 │   ├── tiles/
 │   │   └── cathedral/            # Level 1 terrain. PixelPlatformerSet1 v1.1 (Szadi art) —
 │   │       │                     # PUBLIC DOMAIN. Kivágások, ÁTMÉRETEZÉS NÉLKÜL; a
@@ -1015,10 +1101,16 @@ the-wingless-crow/
 │   ├── ui/
 │   │   ├── TutorialHint.ts       # egyszer megjelenő billentyű-súgó (ez nyitja meg az ui/ mappát)
 │   │   ├── Dialogue.ts           # in-scene párbeszéd-panel: MAGÁTÓL megy, nyíllal gyorsítható
-│   │   └── CombatHud.ts          # HP + tűzgolyó-töltetek + heavy slash töltés. KIVÁLTOTTA a
-│   │                             # 7 scene-ben duplikált playerHpText blokkot
+│   │   ├── CombatHud.ts          # HP + tűzgolyó-töltetek + heavy slash töltés. KIVÁLTOTTA a
+│   │   │                         # 7 scene-ben duplikált playerHpText blokkot
+│   │   └── MainMenuLayout.ts     # a FŐMENÜ geometriája/palettája/szövegei, Phaser-MENTESEN
+│   │                             # (a fakePhaser nem ad Scene osztályt -> a MainMenuScene.ts
+│   │                             #  maga nem importálható unit tesztből). A menüblokk bal
+│   │                             #  korlátja a festmény MÉRT kompozíciójából jön (PAINTING)
 │   ├── scenes/
 │   │   ├── BootScene.ts          # placeholder textúrák + audio betöltés + loading kijelzés
+│   │   ├── MainMenuScene.ts      # A FŐMENÜ: Start Game / Controls / Credits. A Controls
+│   │   │                         # IN-SCENE lap (külön scene levágná a menüzenét)
 │   │   ├── PreScene.ts           # A NYITÓ SZENTÉLY: zuhanás -> séta -> párbeszéd -> Level 1
 │   │   ├── Level1Scene.ts        # 6000px pálya; a geometria a levels/Level1Layout.ts-ből jön
 │   │   ├── BossScene.ts          # 800x450 fix aréna, boss entrance, HP-bar, victory/defeat ágak
@@ -1028,7 +1120,7 @@ the-wingless-crow/
 │   │   ├── Level3Scene.ts        # 4200px pálya; LAPOS háttér (nincs parallax), church skin
 │   │   ├── Boss3Scene.ts         # 800x450 fix aréna, SCENE-BEN ÖSSZERAKOTT háttérrel
 │   │   ├── FinalBossScene.ts     # 800x450 fix aréna: párbeszéd -> belépő -> harc + lidércek
-│   │   └── CreditsScene.ts       # "Thanks for playing" + szerzők; a végén ÚJ JÁTÉK tiszta registryvel
+│   │   └── CreditsScene.ts       # "Thanks for playing" + szerzők; a végén vissza a FŐMENÜBE
 │   ├── npc/
 │   │   └── GoddessAnimations.ts  # A LÁNGŐRZŐ (PreScene): 13 frame-es idle, MÉRT talp-offset.
 │   │                             # A projekt első NEM HARCOLÓ szereplője -> új mappa
@@ -1056,6 +1148,9 @@ the-wingless-crow/
 │   │   └── ShadeMinionAnimations.ts  # 50x50-as geometria (KÜLÖN modul: más frame-méret)
 │   ├── systems/
 │   │   ├── CheckpointSystem.ts   # egyetlen aktív respawn-pont tárolása
+│   │   ├── GameProgress.ts       # a 8 játékon átívelő registry-kulcs + resetProgress().
+│   │                             # A CreditsScene-ből költözött ide; a FŐMENÜ Start Game-je
+│   │                             # hívja — ott kezdődik ténylegesen egy új futás
 │   │   ├── LevelCheckpoint.ts    # a köztes checkpoint jelölője + zónája (mindkét pályán)
 │   │   ├── AudioManager.ts       # egy zenesáv (loop + fade) + állapot nélküli one-shot SFX
 │   │   ├── DialogueMemory.ts     # „melyik boss párbeszédét látta már?" — registry, Phaser-mentes
@@ -1068,7 +1163,7 @@ the-wingless-crow/
 │       └── DamageSystem.ts       # Damageable interface + PhysicsOverlapObject típus-alias
 ```
 
-Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `MenuScene`, `enemies/Archer.ts`, `systems/GameState.ts`, és az `assets/` alatt az `effects/` mappa. *(Az `Archer.ts` szerepét a `Gravecaller.ts`, a tervezett `Beast.ts`-ét pedig a `Beast.ts` tölti be — utóbbi 2026-08-31 óta KÉSZ.)* Az `ui/` mappában megvan a `TutorialHint.ts`, a `Dialogue.ts` és — 2026-09-02 óta — a `CombatHud.ts` (a HP + a két erőforrás-mérő, a 7 scene duplikációja helyett). Az `ui/`-ból még hátravan a **boss HP-bar** átköltöztetése, a **valódi, ikonos HUD-kijelző** és a **Menu**.
+Még NEM létezik (a Project_plan.md 20. pontjában tervezett, de nem implementált): `enemies/Archer.ts`, `systems/GameState.ts`, és az `assets/` alatt az `effects/` mappa. *(A tervezett `MenuScene` szerepét 2026-09-03 óta a `scenes/MainMenuScene.ts` tölti be; a `systems/GameState.ts`-ből annyi valósult meg, amennyire tényleg szükség volt: a `systems/GameProgress.ts` az új játék registry-takarítására.)* *(Az `Archer.ts` szerepét a `Gravecaller.ts`, a tervezett `Beast.ts`-ét pedig a `Beast.ts` tölti be — utóbbi 2026-08-31 óta KÉSZ.)* Az `ui/` mappában megvan a `TutorialHint.ts`, a `Dialogue.ts` és — 2026-09-02 óta — a `CombatHud.ts` (a HP + a két erőforrás-mérő, a 7 scene duplikációja helyett). Az `ui/`-ból még hátravan a **boss HP-bar** átköltöztetése és a **valódi, ikonos HUD-kijelző**. *(A **Menu** 2026-09-03 óta KÉSZ — `ui/MainMenuLayout.ts` + `scenes/MainMenuScene.ts`.)*
 
 > **A tervezett `EndingScene.ts` szerepét TÉNYLEG a `NarrationScene` töltötte be** (a korábbi
 > jóslat bevált): a játék záró narrációja ugyanaz az adatvezérelt scene, változtatás nélkül,
@@ -2556,26 +2651,30 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   szól, ezért marad háttérben; a boss theme érezhetően felerősödik hozzá képest; az SFX
   mindkettő fölött átvág. Egy „csak feljebb veszem egy kicsit" hangolás nem fordíthatja
   meg észrevétlenül a sorrendet
-- **ÖT sáv van** (`MUSIC_KEYS`): `BOSS_THEME` (a `BossScene` belépőjétől), `BOSS2_THEME`
-  (a `Boss2Scene` belépőjétől — a PÁRBESZÉD UTÁN), `FINAL_BOSS_THEME` (a `FinalBossScene`
-  belépőjétől — szintén a párbeszéd után), `LEVEL1_THEME` (a `Level1Scene` teljes hosszán) és
-  `LEVEL2_THEME` (a `Level2Scene` teljes hosszán). Egyszerre sosem szól kettő: a
+- **KILENC sáv van** (`MUSIC_KEYS`), és mind a kilenc zenét játszó scene-nek saját kulcsa van:
+  `MENU_THEME` (a `MainMenuScene` teljes hosszán), `PRESCENE_THEME`, `LEVEL1..3_THEME`,
+  `BOSS_THEME` (a `BossScene` belépőjétől), `BOSS2_THEME` és `BOSS3_THEME`, valamint
+  `FINAL_BOSS_THEME` (a `FinalBossScene` belépőjétől — a PÁRBESZÉD UTÁN). Egyszerre sosem szól
+  kettő: a
   `playMusic()` hard-stoppolja az előzőt, mindkét pálya már az ajtó-fade alatt felszabadítja a
   sávját, és a Phaser a régi scene SHUTDOWN-ját a következő scene `create()`-je ELŐTT futtatja
 - **A KÉT pálya-sáv fade-inje SZÁNDÉKOSAN eltér**, és ez nem ízlés, hanem a két belépés
   különbsége (unit teszt őrzi a sorrendet):
-  - `LEVEL_MUSIC_FADE_IN_MS` (2000) — a Level 1 közvetlenül az oldalbetöltés után indul,
-    tehát az audio context ZÁROLT, és a sáv úgyis csak az első billentyűleütésnél szólal meg;
+  - `LEVEL_MUSIC_FADE_IN_MS` (2000) — az „ambient" belépő. *Az eredeti indoklása („a Level 1
+    közvetlenül az oldalbetöltés után indul") a PreScene, majd a FŐMENÜ beszúrásával elavult;
+    a hosszabb fade ettől még helyes, és MOST A MENÜ kapja ugyanezt az értéket, ahol az
+    indoklás szó szerint igaz;*
   - `LEVEL2_MUSIC_FADE_IN_MS` (4000) — a Level 2-be a `NarrationScene` felől érkezünk, MÁR
     FELOLDOTT contexttel, tehát a zene tényleg a `create()` pillanatában indul. Itt a
     fade-in az EGYETLEN dolog, ami tompítja a belépést (user-kérés: „ne ilyen intenzíven
     üssön be a zene a kezdéskor")
-- **AUTOPLAY: a `sound.locked` ág a Level 1-nél a FŐ út, nem élhelyzet.** A `Level1Scene`
-  közvetlenül az oldalbetöltés után indul, bármilyen user-interakció előtt — ott az audio
-  context GARANTÁLTAN zárolt, tehát a `playMusic()` az `UNLOCKED` eseményre halasztja a
-  lejátszást, és a zene **az első billentyűlenyomásnál** kezd szólni. Ez helyes
-  böngésző-viselkedés, nem megkerülhető, és **nem hiba** — ezért kapott a level-sáv
-  hosszabb (2000ms) fade-int, hogy ne robbanjon be hirtelen az első leütésre
+- **AUTOPLAY: a `sound.locked` ág a FŐMENÜNÉL a FŐ út, nem élhelyzet.** A `MainMenuScene` az
+  első scene a Boot után, bármilyen user-interakció előtt — ott az audio context GARANTÁLTAN
+  zárolt, tehát a `playMusic()` az `UNLOCKED` eseményre halasztja a lejátszást, és a zene **az
+  első billentyűlenyomásnál/kattintásnál** kezd szólni. Ez helyes böngésző-viselkedés, nem
+  megkerülhető, és **nem hiba** — ezért kapja a menü-sáv is a hosszabb (2000ms) fade-int, hogy
+  ne robbanjon be hirtelen az első leütésre. *(Korábban ez a Level 1-re, majd a PreScene-re
+  volt igaz — a lánc eleje kétszer csúszott előrébb.)*
 - **Az `AudioManager` scene-hatókörű, és ez a Level 1-nél ELŐNY**: a zenének pont a scene
   leállásakor (az ajtón átlépve) kell véget érnie. Game-szintűvé emelni csak akkor kell,
   ha valaha scene-eken ÁTÍVELŐ ambient (pl. menü → pálya) lesz
@@ -2937,6 +3036,24 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   ChatGPT-vel készítette). A `CreditsScene` így is nevezi meg. Nem nyitott jogi tétel a fenti
   értelemben, de a publikálás előtti credit-körben érdemes egy sorban rögzíteni a többi
   `2D helper/level/` háttér mellett — azoké viszont TOVÁBBRA IS tisztázatlan.
+- **A FŐMENÜ ZENÉJÉNEK licence RENDBEN VAN, ÉS A REPÓBAN IS.** A forráscsomag
+  (`2D helper/sounds/Ashfall – Dark_Fantasy_Stream_Pack`, szerző **cloud1789**) `LICENSE.txt`-je:
+  *"All music tracks included in this pack are royalty-free. You are allowed to use these tracks
+  in: … personal and commercial projects. No additional payment or royalties are required. You
+  may NOT: resell the music tracks / redistribute the music files / upload the tracks as
+  standalone music content / claim the music as your own work."* Egy játékba beépítve ez a
+  megengedett eset. **Ez NEM nyitott jogi tétel** — a licenc be van másolva
+  (`assets/audio/ashen-path-license.txt`), a knight/goddess/mad-king mintájára, és a
+  `CreditsScene` MUSIC szakasza is kreditálja. **Ez a projekt ELSŐ zene-csomagja, amihez
+  egyáltalán van licencszöveg** (a Free Dark Fantasy Musicnak nincs, az AlkaKrab-é olvasatlan
+  PDF).
+- **NYITOTT JOGI TÉTEL — a FŐMENÜ HÁTTERE** (`assets/backgrounds/menu/main-menu.png`). A forrás
+  a `2D helper/level/Menu.png`, ami — a négy boss-aréna hátteréhez hasonlóan — **önálló
+  fájlként, szerző és licenc nélkül érkezett**, és 1672x941-es, mint a `Pre-scene.png` meg a
+  boss-hátterek. **NEM új tétel**, ugyanaz a licenc nélküli `2D helper/level/` gyűjtés fedi.
+  *(Ha kiderül, hogy — a `Pre-scene.png`-hez hasonlóan — AI-generált, akkor a `CreditsScene`-be
+  ugyanolyan sor kell, mint amilyet a nyitó szentély kapott. Addig SZÁNDÉKOSAN nincs
+  attribúciója: kitalált credit rosszabb a hiánynál.)*
 - **A Mad King sprite licence RENDBEN VAN, ÉS A REPÓBAN IS.** A forráscsomag
   (`2D helper/enemy/Medieval King Pack 2`) `License.txt`-je: *"This pack - Medieval King
   Pack 2 is Creative Commons Zero (CC-0). Can be used in commercial and non-commercial
@@ -2994,7 +3111,7 @@ a ZENE exkluzív, élettartam-kezelt és fade-elt; az SFX állapot nélküli one
   szerint az egy szétfoszló BECSAPÓDÁS — 30→4 px —, nem loopolható repülő bolt, ezért
   maradt a placeholder; valódi asset az `assets/effects/` iterációban.)*
 - A Level 2 **létrája (`ladder-placeholder`) és boss-ajtaja (`door-placeholder`)** még kódból generált: a GothicVania Town csomagban nincs létra, a cathedral `door-gate` geometriája (`DOOR_APERTURE`, `DOOR_THRESHOLD_PX`) pedig ahhoz a konkrét PNG-hez van mérve. Olcsó részleges javítás a Level 1 `tile-ladder`-ének újrahasználata (már be van töltve)
-- A `BootScene.START_SCENE` NORMÁL értéke 2026-09-02 óta **`'PreScene'`** (korábban `'Level1Scene'`). Fejlesztéshez bármelyik pálya/aréna kulcsára átírható (`'Level1Scene'`, `'Level2Scene'`, `'Boss2Scene'`, `'FinalBossScene'`, ...), hogy az adott szakasz a lánc végigjátszása nélkül tesztelhető legyen — **de commit előtt mindig vissza `'PreScene'`-re**. *(A PreScene beszúrásakor az érték `'BossScene'`-en állt, committolva — tehát a játék a Boss 1 arénában indult. Pont ez a hibaosztály, amiért ez a sor itt van.)*
+- A `BootScene.START_SCENE` NORMÁL értéke 2026-09-03 óta **`'MainMenuScene'`** (korábban `'Level1Scene'`, majd `'PreScene'`). Fejlesztéshez bármelyik pálya/aréna kulcsára átírható (`'Level1Scene'`, `'Level2Scene'`, `'Boss2Scene'`, `'FinalBossScene'`, ...), hogy az adott szakasz a lánc végigjátszása nélkül tesztelhető legyen — **de commit előtt mindig vissza `'MainMenuScene'`-re**. *(A PreScene beszúrásakor az érték `'BossScene'`-en állt, committolva — tehát a játék a Boss 1 arénában indult. Pont ez a hibaosztály, amiért ez a sor itt van.)*
 - **KILENC placeholder lore-szöveg** van a kódban, mind a Phase 9 – Lore-ban cserélendő (mindegyik egy tömb-szerkesztés): a `PreSceneLayout.GODDESS_DIALOGUE` (A LÁNGŐRZŐ nyitó párbeszéde) és a `Level1Layout.HOUSE_DIALOGUE` (a ház lakója az A szakaszban) — **a KETTŐ az, ami nem a scene-jében lakik**, mindkettő ugyanabból az okból: a `fakePhaser` nem ad `Scene` osztályt, tehát a scene-jük unit tesztből nem importálható, a layout-moduljuk viszont igen. Továbbá a `BossScene` `WING_BREAKER_DIALOGUE`-ja és `BOSS_VICTORY_NARRATION`-ja, a `Level2Scene.LEVEL2_END_NARRATION`, a `Boss2Scene` `KING_DIALOGUE`-ja és `KING_VICTORY_NARRATION`-ja, valamint a `FinalBossScene` `DEMON_DIALOGUE`-ja és `ENDING_NARRATION`-ja (utóbbi a JÁTÉK ZÁRÓ SZÖVEGE). A `CreditsScene` `CREDITS` listája szintén placeholder, de az nem lore, hanem attribúció
 - A `BootScene` "Betöltés..." szövege + progress-sávja nyers `add.text` / `Graphics` — a `ui/` modulba költözik, amint több asset (sprite-ok) is betöltendő lesz
 - `main.ts`-ben `arcade.debug` — jelenleg **`false`**. `true`-ra állítva kirajzolja a physics
@@ -3098,10 +3215,12 @@ A hangolás a user vezetésével történik. Amit az eddigi végigjátszások FE
   A csomagban ezután is maradt kihasználatlan elem: a `stairs*` lépcső-készlet (16×32-es
   fokok — a projektben nincs átlós járható elem), a `window`/`roof`/`wall` házépítő csempék,
   és a `Music/rpg_village02_loop` sáv.
-- **Menü / átvezető ambient.** MIND AZ ÖT sáv KÉSZ: Level 1, Level 2 és mind a három boss
-  aréna. Már csak a `NarrationScene` és a `CreditsScene` néma. Figyelem: az `AudioManager`
-  **scene-hatókörű** (a scene shutdownja elvágja) — ez a pálya-zenéknél előny, de egy
-  scene-eken ÁTÍVELŐ sávhoz (pl. menü → pálya megszakítás nélkül) game-szintűvé kell emelni.
+- **Menü / átvezető ambient.** MIND A KILENC sáv KÉSZ: **a főmenü**, a nyitó szentély, mind a
+  három pálya és mind a négy boss aréna. Már csak a `NarrationScene` és a `CreditsScene` néma.
+  Figyelem: az `AudioManager` **scene-hatókörű** (a scene shutdownja elvágja) — ez a
+  pálya-zenéknél előny, és ez a fő oka annak, hogy a menü Controls lapja IN-SCENE nézetváltás,
+  nem külön scene. Egy scene-eken ÁTÍVELŐ sávhoz (pl. menü → pálya megszakítás nélkül) viszont
+  game-szintűvé kellene emelni.
 - Megmaradt `TODO (Phase 8)` kommentek a kódban: fázisváltás sting (`BossScene.registerBossEvents()`),
   narration ambient (`NarrationScene.create()`), victory sting (`BossScene.scheduleVictory()`).
 - A maradék kódból generált placeholder téglalapok cseréje valódi pixel art sprite-okra

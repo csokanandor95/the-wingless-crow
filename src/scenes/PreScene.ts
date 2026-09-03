@@ -94,8 +94,8 @@ export default class PreScene extends Phaser.Scene {
 
   create(): void {
     // A class field initializerek CSAK a Scene első létrehozásakor futnak le (CLAUDE.md
-    // "Fontos technikai tanulságok" 3.). A CreditsScene új játéka ugyanezen a példányon hívja
-    // újra a create()-et, tehát itt explicit alaphelyzet kell.
+    // "Fontos technikai tanulságok" 3.). A főmenü „Start Game"-je ugyanezen a példányon hívja
+    // újra a create()-et minden új játéknál, tehát itt explicit alaphelyzet kell.
     this.dialogue = null;
     this.phase = PreScenePhase.FALLING;
     this.isTransitioning = false;

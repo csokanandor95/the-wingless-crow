@@ -88,6 +88,22 @@ import boss3ThemeUrl from '../../assets/audio/dread-march.mp3';
 // csomag hiányzó licencfájlja már dokumentált tétel, lásd CLAUDE.md). Ez a csomag addig
 // kihasználatlan második sávja; a forrás-cím megtartása a fájlnévben a kapocs a csomaghoz.
 import presceneThemeUrl from '../../assets/audio/elkmire-keep.mp3';
+// Főmenü (MainMenuScene): `Ashen Path`, az "Ashfall – Dark Fantasy Stream Pack"-ból
+// (cloud1789). A projekt ELSŐ zene-csomagja, amiben VAN licencszöveg — be is van másolva
+// (`assets/audio/ashen-path-license.txt`): royalty-free, kereskedelmi felhasználás engedélyezett,
+// újraértékesítés/újraterjesztés nem. Tehát NEM nyitott jogi tétel.
+//
+// SZÁRMAZTATOTT ASSET. A nyers sáv 253,18 s / 5,60 MB, és az első ~10 másodperce csak halk
+// zúgás. A repóba egy FRAME-HATÁRON vágott szelet került: t=10,008..130,008 s, azaz pontosan
+// 5000 MPEG frame = 120,00 s / 2 638 560 bájt (a 17 934 bájtos ID3v2 tag és a Xing fejléc is
+// lemarad). A 120 s-os hossz user-döntés: a nyers sáv 2,2-szerese lett volna a repo legnagyobb
+// zenéjének, és itt MINDEN hang előre betöltődik.
+//
+// MIÉRT VÁGÁS ÉS NEM `seek`: a Phaser `WebAudioSound.createAndStartLoopBufferSource()`
+// `offset = marker ? marker.start : 0`-val indít, tehát a `seek` NEM éli túl az első
+// loop-fordulót — a második fordulótól újra a zúgás szólna. Így viszont a loop is a jó résznél
+// kezd újra. Precedens: `death-groan-17.wav`, `fatman-death.wav`.
+import menuThemeUrl from '../../assets/audio/ashen-path.mp3';
 // Boss 2 (Mad King) theme: UGYANAZ az AlkaKrab csomag, `6. Veil of Eternal Nightfall (Loop)`.
 // Nem nyit új jogi tételt — ugyanaz a `2D helper/music/Loops mp3/` mappa, amiből a boss theme
 // és a Level 2 sávja is jön (a licenc-PDF átolvasása továbbra is nyitott, lásd CLAUDE.md).
@@ -296,6 +312,19 @@ import bgTownUrl from '../../assets/backgrounds/gothic-town/02-town.png';
 // fényesség-zuhanás: ott van a lap első pereme), tehát a PreScene GROUND_TOP-ja (369) a
 // lapon belülre esik. TINT nem kerül rá, lásd a PreScene.createBackground() indoklását.
 import preSceneUrl from '../../assets/backgrounds/shrine/pre-scene.png';
+// A FŐMENÜ háttere (`MainMenuScene`): romos gótikus városkép, előtérben egy koronás lovag és
+// egy szárnyas szobor. SZÁRMAZTATOTT: a forrás (`2D helper/level/Menu.png`, 1672x941) sima
+// LANCZOS átméretezése 800x450-re, KIVÁGÁS NÉLKÜL — az aspektus (1,7768) gyakorlatilag azonos
+// a 800/450-ével (1,7778), tehát ugyanaz a recept, mint a `final-arena.png`/`pre-scene.png`.
+//
+// A festmény MÉRT kompozíciója szabja meg a menü geometriáját: a lovag és a szobor együtt az
+// x<=385 sávot foglalja, ezért ül a menüblokk a képernyő jobb felén (`ui/MainMenuLayout.ts`
+// `PAINTING`). TINT nem kerül rá — a menüsáv nyers fényessége mean 32,2, a helyi fényes
+// foltokat a szöveg mögötti panel fedése kezeli.
+//
+// A forrás a `2D helper/level/` licenc nélküli gyűjtéséből való, mint a négy boss-aréna
+// háttere — publikálás előtt tisztázandó (lásd CLAUDE.md nyitott jogi tételek).
+import mainMenuBgUrl from '../../assets/backgrounds/menu/main-menu.png';
 // Level 1 terrain-csempék. Forrás: UGYANAZ a PixelPlatformerSet1 v1.1 csomag (Szadi art,
 // public domain), amiből a fenti parallax háttér is jön — ezért illeszkedik a paletta
 // korrekció nélkül. Származtatott assetek: kivágások a csomag `main_lev_build.png` és
@@ -385,15 +414,16 @@ const LOADING_BAR_HEIGHT = 14;
 /**
  * Melyik jelenettel induljon a játék a betöltés után.
  *
- * NORMÁL érték: `'PreScene'` — a nyitó szentély, ahonnan a lánc indul. (Korábban
- * `'Level1Scene'` volt; a PreScene beszúrásával az lett a második állomás.)
+ * NORMÁL érték: `'MainMenuScene'` — a főmenü fogadja a játékost, onnan a `Start Game` viszi a
+ * nyitó szentélyre. (Korábban `'Level1Scene'`, majd `'PreScene'` volt; mindkettő eggyel
+ * hátrébb csúszott a láncban.)
  *
  * Bármelyik másik kulcsra átírva (`'Level2Scene'`, `'Boss2Scene'`, `'FinalBossScene'`, ...)
  * az adott szakasz KÖZVETLENÜL tesztelhető, anélkül hogy végig kellene játszani a láncot —
  * fejlesztés közben ez a leggyorsabb út. **Commit előtt mindig állítsd vissza
- * `'PreScene'`-re.**
+ * `'MainMenuScene'`-re.**
  */
-const START_SCENE = 'PreScene';
+const START_SCENE = 'MainMenuScene';
 
 /**
  * A boss-ajtó mögötti folyosó két végpontja (R, G, B) — a küszöbnél még megcsillanó kőé és a
@@ -435,6 +465,7 @@ const MUSIC_TRACKS: Array<{ key: string; url: string }> = [
   { key: MUSIC_KEYS.LEVEL3_THEME, url: level3ThemeUrl },
   { key: MUSIC_KEYS.BOSS3_THEME, url: boss3ThemeUrl },
   { key: MUSIC_KEYS.PRESCENE_THEME, url: presceneThemeUrl },
+  { key: MUSIC_KEYS.MENU_THEME, url: menuThemeUrl },
 ];
 
 const SFX_SOUNDS: Array<{ key: string; url: string }> = [
@@ -506,6 +537,7 @@ const BACKGROUND_IMAGES: Array<{ key: string; url: string }> = [
   { key: BACKGROUND_TEXTURES.TOWN_SKY, url: bgTownSkyUrl },
   { key: BACKGROUND_TEXTURES.TOWN, url: bgTownUrl },
   { key: BACKGROUND_TEXTURES.PRE_SCENE, url: preSceneUrl },
+  { key: BACKGROUND_TEXTURES.MAIN_MENU, url: mainMenuBgUrl },
 ];
 
 // Level 1 terrain. A `GROUND_FLOOR`, a `PLATFORM_MID` és a `LADDER` tileSprite-ként
