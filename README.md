@@ -3,3 +3,13 @@
 [![CI](https://github.com/csokanandor95/the-wingless-crow/actions/workflows/ci.yml/badge.svg)](https://github.com/csokanandor95/the-wingless-crow/actions/workflows/ci.yml)
 
 2D dark fantasy action platformer with QA testing strategy
+
+License
+
+© 2026 Nándor Csóka. All rights reserved.
+
+This repository is publicly available for portfolio, educational and reference purposes. The source code, game assets, artwork, music, narrative content and other original project materials may not be copied, redistributed, relicensed, modified and redistributed, or used in another project without explicit permission from the author.
+
+Public visibility of this repository does not grant permission to use, reproduce, distribute, or create derivative works from the project.
+
+Third-party assets included in this repository are subject to their respective licenses. See the relevant asset directories and license files for details.
