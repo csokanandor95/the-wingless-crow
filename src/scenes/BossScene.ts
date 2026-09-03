@@ -86,16 +86,16 @@ const FADE_MS = 700;
  * NÉGY sor — a többi bossnál hat —, mert ez a játék ELSŐ harca: itt még nincs mit felidézni.
  */
 const WING_BREAKER_DIALOGUE: DialogueLine[] = [
-  { speaker: 'THE WING-BREAKER', text: 'Wingless. At last. Yours are hanging from my back.' },
+  { speaker: 'THE WING-BREAKER', text: 'Wingless. At last. Your crows are gone. Our master has arrived.' },
   {
     speaker: 'LAZAR',
-    text: 'Those are not your wings. You stitched them on because none ever grew for you.',
+    text: 'I will free them. You will be sent back to where you belong.',
   },
   {
     speaker: 'THE WING-BREAKER',
-    text: 'The king gave me the needle. I only gather what flies out of the gate.',
+    text: 'Confident one, I like that. My beasts have already started to pluck your guardians.',
   },
-  { speaker: 'LAZAR', text: 'Then put them down. Or I will take them off you.' },
+  { speaker: 'LAZAR', text: 'This ends now.'},
 ];
 
 // Placeholder lore-szöveg: a végleges narrációt a Phase 9 – Lore írja meg,

@@ -104,7 +104,7 @@ const KING_DIALOGUE: DialogueLine[] = [
 const KING_VICTORY_NARRATION = [
   'The crown slides from his head and stops on the throne steps.\nThe king does not reach for it.',
   'Further off, in the half-dark, something goes slack.\nWhat lay there in place of the queen finally stops moving.',
-  'The ceiling of the throne room opens.\nNot onto the sky — onto something deeper.',
+  'The throne room floor opens.\nSomething changes, something evil, and it is dark.',
   'The demon is not in the castle.\nIt waits at the gate Lazar was meant to keep.',
 ];
 
