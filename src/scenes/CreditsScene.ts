@@ -51,9 +51,6 @@ const CREDITS: CreditLine[] = [
   { text: 'Wing-Breaker Boss Arena — AI-generated background (ChatGPT)' },
   { text: 'Mad King Boss Room — AI-generated background (ChatGPT)' },
   { text: 'Final boss Chamber — AI-generated background  (ChatGPT)' },
-  // A NÉGY boss-aréna háttere SZÁNDÉKOSAN hiányzik innen: azok a képek önálló fájlként,
-  // szerző és licenc nélkül érkeztek (nyitott jogi tétel, lásd CLAUDE.md). Ide csak akkor
-  // kerülhet sor, ha a forrásuk tisztázódott — kitalált attribúció rosszabb a hiánynál.
   { text: '' },
   { section: true, text: 'MUSIC' },
   { text: 'Ashen Path — cloud1789 (Ashfall: Dark Fantasy Stream Pack)' },
