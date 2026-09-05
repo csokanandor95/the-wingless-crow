@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <title>The Wingless Crow</title>
+    <!-- A `public/` tartalma változatlan néven a `dist/` gyökerébe kerül, tehát a fájl a build
+         után is itt van. A hivatkozás RELATÍV (`./`), nem root-abszolút: az itch.io a HTML5
+         buildet egy alútvonalról szolgálja ki, ahol a `/favicon.svg` a domain gyökerére mutatna.
+         Enélkül a böngésző a szabvány szerinti `/favicon.ico` fallbacket kérné le, ami 404. -->
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
