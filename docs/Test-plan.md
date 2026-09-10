@@ -116,7 +116,8 @@ Naming what is *not* tested is part of the strategy, not an omission.
 - **Test cases belong in the test code.** A separately maintained case list drifts from the
   suite within weeks, and a QA document that lies is worse than none.
 - `game-design.md` and `architecture.md` already exist in substance as `Project_plan.md`,
-  `docs/level*-layout.md` and `CLAUDE.md`.
+  `docs/level*-layout.md` and `CLAUDE.md`. The phase-by-phase development history — decisions,
+  discarded alternatives, measurements — lives in `docs/devlog.md`.
 
 *One maintained document beats seven decaying ones* — and that judgement is itself a QA
 statement. Project_plan §33 has been updated to match.

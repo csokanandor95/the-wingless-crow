@@ -3,10 +3,6 @@ import Phaser from 'phaser';
 /**
  * A játék záró képernyője: köszönet + a felhasznált assetek és zenék szerzői.
  *
- * A TARTALOM EGYELŐRE PLACEHOLDER (user-döntés: "a részleteit majd egy későbbi iterációban").
- * A lista a `2D helper/Credits.txt` gyűjtéséből indul; a végleges szöveg — és a még nyitott
- * licenc-tételek lezárása — külön kör. A csere ennek az egyetlen tömbnek a szerkesztése.
- *
  * Ez a scene zárja a lánccal a kört is: a végén a `Space` a FŐMENÜBE tesz vissza. **Új játékot
  * innen már NEM indítunk**, és a registryt sem ez takarítja: mindkettő a `MainMenuScene`
  * „Start Game"-jének a dolga (`systems/GameProgress.ts`) — ott kezdődik ténylegesen egy futás,
