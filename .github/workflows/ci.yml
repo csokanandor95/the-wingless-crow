@@ -1,14 +1,35 @@
 name: CI
 
-# Az elso, minimalis CI merfoldko (Project_plan.md 31. pont).
-# Szandekosan CSAK a mar letezo ellenorzeseket futtatja: typecheck + unit teszt + build.
-# NINCS integration / E2E / visual regression / cross-browser / performance lepes, es
-# NINCS deploy (se artifact, se GitHub Pages) — azok kesobbi merfoldkovek.
+# A Project_plan.md 31. pontjanak pipeline-ja. A korabbi, minimalis merfoldko
+# (typecheck + unit teszt + build) kibovult a Phase 10 QA retegeivel:
+# integration teszt, deploy sanity check es Playwright E2E.
+#
+# Quality gate-ek (31. pont, egy sorral kiegeszitve):
+#   Unit tests        PASS
+#   Integration       PASS
+#   Build             PASS
+#   Deploy sanity     PASS   <- uj: a vite.config base:'./' ore
+#   E2E               PASS
+#   Critical errors   0      <- a Playwright fixture minden teszten figyeli
+#
+# Ami SZANDEKOSAN nincs benne, es hogy miert:
+#   - visual regression PIXELDIFF-kapukent: meressel megbukott (hamis bukasok + a valodi
+#     valtozast elvetette) - helyette kepcsatolas emberi atnezesre, lasd tests/e2e/visual.spec.ts;
+#   - performance: a meres egyedul futtatva ervenyes, ezert on-demand;
+#   - WebKit: a Playwright buildjeben nincs Web Audio API, igy a jatek be sem tolt
+#     (reszletek a playwright.config.ts-ben es a docs/Test-plan.md-ben);
+#   - GitHub Pages deploy: Phase 11.
 
 on:
   push:
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_performance:
+        description: 'Teljesitmenymeres futtatasa (kulon, 1 workerrel)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -20,7 +41,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Typecheck, test, build
+    name: Typecheck, unit, integration, build
     runs-on: ubuntu-latest
 
     steps:
@@ -42,10 +63,91 @@ jobs:
       # build tehat nem bizonyitja, hogy a tsc tiszta. Ezert kell kulon lepesnek lennie.
       # A tsconfig include-ja ["src", "tests"], tehat a teszteket is tipusellenorzi.
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Unit tests
         run: npm run test
 
+      - name: Integration tests
+        run: npm run test:integration
+
       - name: Production build
         run: npm run build
+
+      # A build UTAN: az egyetlen hibaosztaly, amit sem a typecheck, sem a teszt, sem a
+      # build nem fog meg — a root-abszolut asset-utvonalak nemán elrontanak az itch.io
+      # es a GitHub Pages deployt, mikozben minden mas zold marad.
+      - name: Deploy sanity check
+        run: npm run check:build
+
+  e2e:
+    name: E2E (Chromium + Firefox smoke)
+    needs: verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # A bongeszok ~400 MB-ja verziohoz kotve cache-elheto: a Playwright csomag
+      # verzioja a kulcs, tehat egy frissites automatikusan uj cache-t huz.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # A WebKit KIMARAD (lasd a fejlec-kommentet). A `--with-deps` a Linux
+      # rendszerkonyvtarakat teszi fel, amik nelkul a headless bongeszo nem indul.
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox
+
+      # Az `npm run e2e` maga futtatja a buildet a Playwright ELOTT (a webServer csak
+      # kiszolgal) — igy nem versenyezhet a build a tesztinditassal. Reszletek a
+      # playwright.config.ts webServer kommentjeben.
+      - name: E2E tests
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # --- On-demand jobok (workflow_dispatch) ------------------------------------------
+
+  performance:
+    name: Teljesitmenymeres
+    needs: verify
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_performance }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+
+      # `--workers=1`: a meres egyedul futtatva ervenyes. Parhuzamos terheles mellett a
+      # p95 kepkocka-ido 16,7 ms-rol 51,7-re ugrott — a jatek valtozatlanul.
+      - name: Performance
+        run: npm run e2e:perf

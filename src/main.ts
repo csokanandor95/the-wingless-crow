@@ -75,4 +75,28 @@ const config: Phaser.Types.Core.GameConfig = {
   ],
 };
 
-registerFullscreenToggle(new Phaser.Game(config));
+const game = new Phaser.Game(config);
+
+registerFullscreenToggle(game);
+
+/**
+ * TESZT-SEAM — a Playwright E2E ezen keresztül lát bele a játékba.
+ *
+ * **Miért kell:** a HUD, a HP, a menü és minden felirat a CANVASRA rajzolódik, nem a DOM-ba,
+ * tehát egy böngészőteszt önmagában semmit nem tud állítani a játék állapotáról — legfeljebb
+ * képernyőképet hasonlítgatni. A `window.game`-mel viszont a `game.scene`, a `game.registry`,
+ * a `game.textures` és a `game.anims` mind lekérdezhető, és a `game.loop` léptethető, amitől a
+ * vizuális tesztek determinisztikusak lesznek.
+ *
+ * **Miért nincs env-flag mögé rejtve:** így az E2E PONTOSAN azt a buildet vizsgálja, ami
+ * kimegy itch.io-ra — egy `import.meta.env`-es kapcsoló mellett a tesztelt és a publikált
+ * bundle nem lenne azonos. Egy offline, egyjátékos játéknál a `window.game` amúgy sem ad
+ * hozzáférést semmihez, amit a játékos a devtools konzoljából ne érne el egy perc alatt.
+ */
+declare global {
+  interface Window {
+    game: Phaser.Game;
+  }
+}
+
+window.game = game;

@@ -170,15 +170,15 @@ A cél nem egy meglévő játék lemásolása, hanem 1–2 kedvelt core concept 
 
 # 5. Játék alapvető koncepciója
 
-A játékos **Lazarus, the Crowmarked**-ot irányítja, aki a föld őrzője a halál és élet közötti kapunál.
+A játékos **Lazar, the Crowmarked**-ot irányítja, aki a föld őrzője a halál és élet közötti kapunál.
 
-Lazarus a varjak segítségével látja az egész világ eseményeit — a varjak a suttogói. Ezáltal tartja fenn a rendet, biztosítva, hogy aki meghal, átjusson az alvilágba, és aki már ott van, ne térhessen vissza.
+Lazar a varjak segítségével látja az egész világ eseményeit — a varjak a suttogói. Ezáltal tartja fenn a rendet, biztosítva, hogy aki meghal, átjusson az alvilágba, és aki már ott van, ne térhessen vissza.
 
 Az őrült király felesége haldoklik. A király lepaktál egy ősi démonnal, hogy feltámassza a feleségét. A démon teljesíti a kérést, de a saját ördögi célját is véghezviszi: elfogja a varjakat, felborítva az élő és halott világ rendjét, hiszen nincs, aki őrizze a kaput. A démon megpróbálja átvenni az irányítást az élők világa felett. Démoni harcosok törnek elő az alvilágból, miközben a földi halottak nagy része nem tud távozni, vagy rossz helyre távozik.
 
-Lazarust nem sikerül elzárni, de elveszíti a szárnyait — innen a *Wingless Crow* cím.
+Lazaru nem sikerül elzárni, de elveszíti a szárnyait — innen a *Wingless Crow* cím.
 
-Lazarus útnak indul, hogy legyőzze a démont és a királyt, és helyreállítsa a varjakat és a két világ közötti rendet.
+Lazar útnak indul, hogy legyőzze a démont és a királyt, és helyreállítsa a varjakat és a két világ közötti rendet.
 
 A végső cél a rend helyreállítása.
 
@@ -259,7 +259,7 @@ A játék fő erőssége nem a komplex mechanikai mélység, hanem:
 
 # 8. Player
 
-A játékos **Lazarus, the Crowmarked**, a halál és élet közötti kapu földi őrzője, aki elveszítette szárnyait.
+A játékos **Lazar, the Crowmarked**, a halál és élet közötti kapu földi őrzője, aki elveszítette szárnyait.
 
 ## Mozgás
 
@@ -429,7 +429,7 @@ REPOSITION
 > **Implementálva (2026-08-26) — a lény neve `Gravecaller`.** A választott archetípus a
 > **Caster** (nem az Archer): egyetlen távoli támadása egy árny-tűzgolyó. A név tematikus,
 > nem az asset csomagé (*Necromancer*) — a 16. pont lore-ja szerint pont az ilyen lény hívja
-> vissza a holtakat, vagyis azt sérti meg, amit Lazarus őriz. Ugyanaz a névadási elv, mint a
+> vissza a holtakat, vagyis azt sérti meg, amit Lazar őriz. Ugyanaz a névadási elv, mint a
 > `Hollow → CrowHarvester`-nél. Fájlok: `enemies/Gravecaller.ts`,
 > `enemies/GravecallerAnimations.ts`. **A fenti öt doboz 1:1 a state machine.**
 >
@@ -685,7 +685,7 @@ A cél egy olyan boss, amely:
 ## Boss 2 – The Mad King *(Phase: a döntési pont 3. iterációja, 2026-08-30)*
 
 Az őrült király (16. pont): a haldokló felesége miatt paktált a démonnal, és ezzel ő fogatta
-el a varjakat. A Level 2 (`The Crowless Quarter`) után, a saját tróntermében várja Lazarust.
+el a varjakat. A Level 2 (`The Crowless Quarter`) után, a saját tróntermében várja Lazart.
 
 **A harc előtt PÁRBESZÉD van** (`ui/Dialogue.ts`) — magától lemegy, a jobbra-nyíl gyorsítja.
 Ez a projekt első valódi dialógusa; a részletek a 20. pont helyesbítésénél.
@@ -1220,13 +1220,13 @@ A boss belépése és a zene fontos része a játékélménynek.
 
 ## Alapkoncepció
 
-Lazarus, the Crowmarked a föld őrzője a halál és élet közötti kapunál. A varjak segítségével látja az egész világ eseményeit — a varjak a suttogói. Ezáltal tartja fenn a rendet: biztosítja, hogy aki meghal, átjusson az alvilágba, és aki már ott van, ne térhessen vissza.
+Lazar, the Crowmarked a föld őrzője a halál és élet közötti kapunál. A varjak segítségével látja az egész világ eseményeit — a varjak a suttogói. Ezáltal tartja fenn a rendet: biztosítja, hogy aki meghal, átjusson az alvilágba, és aki már ott van, ne térhessen vissza.
 
 Az őrült király felesége haldoklik. A király lepaktál egy ősi démonnal, hogy feltámassza a feleségét. A démon teljesíti a kérést, de közben a saját ördögi célját is véghezviszi: elfogja a varjakat, felborítva az élő és halott világ rendjét, hiszen nincs, aki őrizze a kaput. A démon megpróbálja átvenni az irányítást az élők világa felett.
 
 Démoni harcosok törnek elő az alvilágból, miközben a földi halottak nagy része nem tud távozni, vagy rossz helyre távozik.
 
-Lazarust nem sikerül elzárni, de elveszíti a szárnyait.
+Lazart nem sikerül elzárni, de elveszíti a szárnyait.
 
 A célja:
 
@@ -1238,7 +1238,7 @@ A végső boss legyőzése után:
 
 - a király meghal, de feloldozást kap: a feltámasztott királyné már nem az volt, aki korábban, így együtt kerülhetnek nyugovóra és örökké együtt maradhatnak
 - a démont legyőzik, és visszakerül a pokolba
-- Lazarus visszanyeri szárnyait és a varjakat
+- Lazar visszanyeri szárnyait és a varjakat
 - helyreáll a rend az élők és holtak világa között
 - rövid narráció jelenik meg
 
@@ -1654,7 +1654,7 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 > innentől `PreScene → Level 1 → Boss 1 → …`. A `BootScene.START_SCENE` normál értéke ezért
 > `'PreScene'`, és a `CreditsScene` új játéka is ide tér vissza.
 >
-> **Mit csinál:** Lazarus a képernyő tetejéről bezuhan egy romos szentélybe (a háttéren egy
+> **Mit csinál:** Lazar a képernyő tetejéről bezuhan egy romos szentélybe (a háttéren egy
 > SZÁRNYAS angyalszobor — pontosan az, amit elvesztett), majd a jobb oldalon álló NPC-vel,
 > **A LÁNGŐRZŐVEL** kell `E`-vel beszédbe elegyednie. A párbeszédből derül ki, hogy valami
 > démoni jött át a kapun, a szárnyai FIZETSÉG voltak, és válaszokért az őrült király várába
@@ -1845,9 +1845,22 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 > **Előrehozott lépés (2026-08-25):** a Phase 8 lezárása és a fenti Döntési pont
 > között — a „Többi Enemy típus, Level és Bossok" irány választása ELŐTT — elkészült a
 > **CI/CD első, minimális mérföldköve**: `.github/workflows/ci.yml`, ami minden pushon
-> lefuttatja a typecheck + unit teszt + production build hármast. A Phase 10 többi
-> tétele (integration, E2E, visual regression, cross-browser, performance) és a
-> deployment változatlanul hátravan. Részletek a 31. pontnál.
+> lefuttatja a typecheck + unit teszt + production build hármast.
+>
+> **A PHASE 10 LEZÁRVA (2026-09-08).** A fenti nyolc tételből mind megvan, a piramis
+> felsőbb rétegei felépültek: integration (2 fájl / 23 teszt), Playwright E2E (5 spec /
+> 25 teszt), képrögzítéses vizuális ellenőrzés, cross-browser smoke (Chromium + Firefox),
+> teljesítménymérés, és a kibővített CI hat quality gate-tel. **A teljes QA egyetlen
+> dokumentumban él: `docs/Test-plan.md`** — stratégia, kockázati térkép, lefedettségi és
+> nyomonkövethetőségi mátrix, findings, ismert korlátok. (A 33. pont hét tervezett
+> dokumentuma helyett — az indoklás ott olvasható.)
+>
+> **A fázis legfontosabb eredménye nem a teszt-szám, hanem a lefedettség HELYE:** a
+> `src/scenes/` 6 023 sora (a forrás 30 %-a) addig teljesen fedetlen volt, és a projekt
+> MINDEN kézi teszten talált hibája oda esett. Ez most E2E-vel fedett.
+>
+> **Nyitva maradt:** a unit suite auditja (mind a 967 teszt indokolt-e?) és a deployment
+> (Phase 11 — a kapuk készen állnak mögötte).
 
 ## Phase 11 – Deployment
 
@@ -2228,7 +2241,47 @@ Critical errors   0
 
 Csak sikeres pipeline után történjen production deployment.
 
-> **Jelenlegi állapot (2026-08-25) — az ELSŐ, minimális CI mérföldkő KÉSZ.**
+> **JELENLEGI ÁLLAPOT (2026-09-08, Phase 10) — a pipeline lényegében KÉSZ.**
+>
+> ```text
+> Git push / PR → GitHub Actions (ubuntu-latest, Node 24)
+>     │
+>     ├─ job: verify
+>     │     npm ci → typecheck → unit (34 fájl / 967) → integration (2 / 23)
+>     │     → build → deploy sanity check
+>     │
+>     └─ job: e2e  (needs: verify)
+>           Playwright: Chromium teljes (18) + Firefox smoke (5)
+>           → playwright-report artifact
+>
+> workflow_dispatch: teljesítménymérés (külön, --workers=1)
+> ```
+>
+> **Quality gate-ek — a fenti lista, EGY sorral kiegészítve:**
+>
+> ```text
+> Unit tests        PASS
+> Integration       PASS   <- új
+> Build             PASS
+> Deploy sanity     PASS   <- ÚJ: a vite.config `base: './'` őre
+> E2E               PASS
+> Critical errors   0      <- az E2E fixture minden teszten figyeli
+> ```
+>
+> **Miért kellett a „deploy sanity" gate?** Mert ez az EGYETLEN hibaosztály, amit sem a
+> typecheck, sem a teszt, sem a build nem fog meg: ha a `base` visszaáll `'/'`-re, a build
+> ZÖLD marad, de a feltöltött itch.io-játék (ami generált alútvonalról szolgál ki) el sem
+> indul. Egy pár soros szkript ellenőrzi, hogy a `dist/` hivatkozásai relatívak.
+>
+> **Ami SZÁNDÉKOSAN kimaradt** (indoklással a `docs/Test-plan.md`-ben): a visual regression
+> PIXELDIFF-kapuként (méréssel megbukott — hamis bukások ÉS elvétett valódi változás; helyette
+> képrögzítés emberi átnézésre), a WebKit (a Playwright buildjében nincs Web Audio API, így a
+> játék be sem tölt — kézi Safari-teszt váltja ki), a teljesítménymérés (csak egyedül futtatva
+> érvényes → on-demand), és a GitHub Pages deploy (Phase 11).
+>
+> ---
+>
+> **Korábbi állapot (2026-08-25) — az ELSŐ, minimális CI mérföldkő.**
 >
 > A fenti a *végső* pipeline. Ebből ma a `.github/workflows/ci.yml` a következőket
 > valósítja meg, **minden pushon** (szűrő nélkül, tehát minden branchre) és a `main` felé
@@ -2241,7 +2294,7 @@ Csak sikeres pipeline után történjen production deployment.
 >     ↓
 > npx tsc --noEmit  (typecheck — src ÉS tests)
 >     ↓
-> npm run test      (vitest, 12 fájl / 265 teszt)
+> npm run test      (vitest — akkor 12 fájl / 265 teszt; ma 34 / 967)
 >     ↓
 > npm run build     (production build)
 > ```
@@ -2293,7 +2346,38 @@ A játék így telepítés nélkül, böngészőből játszható.
 
 # 33. QA dokumentáció
 
-A repositoryban érdemes dokumentálni:
+> **FELÜLVIZSGÁLVA (2026-09-08, Phase 10) — a hét dokumentumból EGY lett.**
+>
+> Az alábbi, eredetileg tervezett fastruktúra egy TÖBB CSAPATOS szervezet QA-dokumentációját
+> írja le. Egy fejlesztő + egy játék esetén a szétbontás nem áttekinthetőbbé tesz, hanem
+> karbantartási terhet és elavulást szül. A tényleges struktúra:
+>
+> ```text
+> README.md
+>
+> docs/
+> ├── Project_plan.md       # ez a dokumentum — egyben a game design is
+> ├── Test-plan.md          # A TELJES QA: stratégia, scope, kockázatok, lefedettség,
+> │                         # nyomonkövethetőség, automatizálás, CI, findings, korlátok
+> ├── level1-layout.md      # pálya-specifikációk elfogadási kritériumokkal
+> └── level2-layout.md
+>
+> CLAUDE.md                 # az architektúra és a technikai tanulságok tárháza
+> ```
+>
+> **Miért maradt ki külön fájlként:**
+> - **`test-strategy.md`** — a tesztstratégia SZERVEZETI szintű artifact (több csapat, több
+>   termék, hosszú távú irány). Itt egyetlen szakasz a test planben; külön fájlként üresen
+>   kongana.
+> - **`test-cases.md`** — a teszt-kód MAGA a test case. Egy kézzel karbantartott párhuzamos
+>   lista hetek alatt elcsúszik a suite-tól, és egy hazudó QA-dokumentum rosszabb a hiányzónál.
+> - **`automation.md`**, **`known-issues.md`** — szakaszok a `Test-plan.md`-ben.
+> - **`game-design.md`**, **`architecture.md`** — tartalmilag MÁR léteznek: ez a dokumentum,
+>   a `level*-layout.md`-k és a `CLAUDE.md`.
+>
+> *Egy karbantartott dokumentum jobb, mint hét elavuló.*
+
+Az EREDETILEG tervezett struktúra (a fenti indoklással felülvizsgálva):
 
 ```text
 README.md
@@ -2478,30 +2562,36 @@ A projekt akkor tekinthető sikeresnek, ha:
 - [x] Boss fight működik.
 - [x] Boss phase transition működik.
 - [x] Boss death működik.
-- [ ] Ending működik.
+- [x] Ending működik. *(2026-08-30 óta: `FinalBossScene.ENDING_NARRATION` → `CreditsScene`)*
 - [x] Zene és sound effectek működnek.
 - [x] A játék rendelkezik egységes dark fantasy atmoszférával.
 
 ### QA
 
-- [x] Unit test suite létrejött.
-- [ ] Integration tesztek létrejöttek.
-- [ ] Playwright E2E tesztek létrejöttek.
-- [ ] Visual regression tesztek létrejöttek.
-- [ ] Cross-browser tesztelés létrejött.
-- [ ] Console/runtime error monitoring működik.
-- [ ] Alap performance ellenőrzés létrejött.
-- [x] CI pipeline működik. *(első, minimális mérföldkő: typecheck + unit teszt + build)*
+- [x] Unit test suite létrejött. *(34 fájl / 967 teszt)*
+- [x] Integration tesztek létrejöttek. *(2 fájl / 23 teszt — a 24. pont Sword→Enemy,
+      Fireball→Enemy és Checkpoint→Respawn folyamatai)*
+- [x] Playwright E2E tesztek létrejöttek. *(5 spec / 25 teszt: smoke, scene sweep, haladás,
+      asset-integritás, képrögzítés)*
+- [x] Visual regression tesztek létrejöttek. *(KÉPRÖGZÍTÉS emberi átnézésre, NEM pixeldiff-kapu
+      — a pixeldiff mérésen megbukott, lásd `Test-plan.md` 10.2)*
+- [x] Cross-browser tesztelés létrejött. *(Chromium teljes + Firefox smoke automatizálva;
+      a Safari kézi, mert a Playwright WebKitjében nincs Web Audio API — `Test-plan.md` 7.1)*
+- [x] Console/runtime error monitoring működik. *(az E2E fixture MINDEN teszten figyeli a
+      console errort, az elkapatlan kivételt és a 404-eket)*
+- [x] Alap performance ellenőrzés létrejött. *(betöltési idő + Level 1 p95 képkocka-idő)*
+- [x] CI pipeline működik. *(typecheck + unit + integration + build + deploy sanity + E2E)*
 - [x] GitHub Actions futtatja a teszteket.
-- [ ] Sikeres pipeline után deployment történik.
+- [ ] Sikeres pipeline után deployment történik. *(a kapuk készen állnak, a deploy-job a
+      Phase 11 tétele)*
 
 ### Deployment
 
 - [x] GitHub repository létrejött.
-- [ ] Production build működik.
-- [ ] Itch.io deploy.
+- [x] Production build működik.
+- [x] Itch.io deploy.
 - [ ] GitHub Pages deployment működik.
-- [ ] A játék publikus URL-en elérhető.
+- [ ] A játék publikus URL-en elérhető. *Itch.io-n jelenleg titkos URL-en elérhető, draft módban.*
 
 ---
 

@@ -1,7 +1,15 @@
-// Megosztott mock-scene/body/segédfüggvények a unit tesztekhez. A 'phaser' modul
-// mockolása a vitest.config.ts setupFiles-ében (tests/unit/setup/phaserMock.ts)
-// történik globálisan — ez a fájl csak a Player/CrowHarvester/Fireball konstruktorai által
-// elvárt scene-felületet és néhány időzítés-vezérlő helpert ad.
+// Megosztott mock-scene/body/segédfüggvények a unit ÉS az integration tesztekhez. Ez a fájl
+// csak a Player/CrowHarvester/Fireball konstruktorai által elvárt scene-felületet és néhány
+// időzítés-vezérlő helpert ad.
+//
+// A 'phaser' modul mockolása NEM itt és NEM globálisan történik: minden teszt fájl a saját
+// elején hívja a `vi.mock('phaser', ...)`-t a helpers/fakePhaser.ts factoryjával. Globális
+// `setupFiles` NEM működött, a vitest `vi.mock()` hoisting-ja miatt (lásd a CLAUDE.md
+// Phase 10 szakaszát) — ezért nincs `vitest.config.ts` sem.
+//
+// (A fájl korábbi fejléce egy `vitest.config.ts` `setupFiles`-ét és egy
+// `tests/unit/setup/phaserMock.ts`-t emlegetett; EGYIK SEM LÉTEZETT soha. A Phase 10 QA
+// átvizsgálása találta meg, F-01 néven.)
 import { vi } from 'vitest';
 import type Phaser from 'phaser';
 

@@ -136,3 +136,10 @@ dist
 .pnp.*
 
 docs/story.md
+# Playwright (E2E) — a jelentes es a bukott futasok nyomai generalt tartalom.
+# A `visual.spec.ts-snapshots/` SZANDEKOSAN NEM szerepel itt: a baseline-ok
+# verziokovetett tesztadatok, nem build-kimenet.
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
