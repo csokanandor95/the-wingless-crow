@@ -1,22 +1,21 @@
 # Test Plan — The Wingless Crow
 
 **Single source of truth for this project's QA.** Strategy, scope, risk analysis, coverage,
-automation, CI, findings and limitations — one maintained document instead of seven decaying
-ones (see §3.3).
+automation, CI, findings and limitations.
 
 | | |
 |---|---|
 | **Product** | 2D dark fantasy action platformer, Phaser 4 + TypeScript + Vite |
 | **Playtime** | ~20 minutes, single session, single player, fully offline |
 | **Status** | Feature complete (Phases 1–9). Published in **draft** on itch.io, played by beta testers |
-| **QA phase** | Phase 10 |
-| **Last updated** | 2026-09-08 |
+| **QA phase** | Done |
+| **Last updated** | 2026-09-11 |
 
 ---
 
 ## 1. Purpose — the question this test suite answers
 
-> ### “Can I confidently publish this?”
+> ### “Can I confidently publish this?...*while applying a risk-based testing approach, and avoiding over-engineering*”
 
 Not *“is this game provably free of defects?”* — that question is unanswerable and, for a
 20-minute browser game, not worth asking. The suite is built to answer one practical question
@@ -104,24 +103,6 @@ Naming what is *not* tested is part of the strategy, not an omission.
 | **Phaser engine internals** | Third-party. |
 | **Game feel, difficulty balance** | The fairness *derivations* are unit-tested (e.g. “both dodge answers must work”). Whether it *feels* fair is a human question — §9. |
 
-### 3.3 Documentation scope — one file, not seven
-
-`Project_plan.md` §33 planned `test-strategy.md`, `test-plan.md`, `test-cases.md`,
-`automation.md`, `known-issues.md`, `game-design.md` and `architecture.md`. This project ships
-**one** document. Rationale:
-
-- **A test strategy is an organisational artifact** — multiple teams, multiple products, a
-  long-term direction to align on. With one developer and one game, “strategy” is a section,
-  not a file; as a standalone document it would be padding.
-- **Test cases belong in the test code.** A separately maintained case list drifts from the
-  suite within weeks, and a QA document that lies is worse than none.
-- `game-design.md` and `architecture.md` already exist in substance as `Project_plan.md`,
-  `docs/level*-layout.md` and `CLAUDE.md`. The phase-by-phase development history — decisions,
-  discarded alternatives, measurements — lives in `docs/devlog.md`.
-
-*One maintained document beats seven decaying ones* — and that judgement is itself a QA
-statement. Project_plan §33 has been updated to match.
-
 ---
 
 ## 4. Risk map — the backbone of this plan
@@ -178,7 +159,7 @@ placed exactly here.
 Deliberately **top-light**: E2E exists to reach what nothing else can, not to re-verify combat
 maths already proven deterministically below it.
 
-### 5.1 Unit — 34 files, 967 tests *(pre-existing, unchanged)*
+### 5.1 Unit — 34 files, 967 tests
 
 Covers Project_plan §23 in depth: player movement/health/damage/death, combat configs and
 cooldowns, all three enemies’ state machines, all four bosses (HP, phase transition, attack
@@ -419,7 +400,7 @@ Checklist derived from `level1-layout.md` §13 and `level2-layout.md` §23:
 
 ### 9.3 Beta feedback — real UAT
 
-The game is on itch.io in draft on a secret URL, played by friends. This is genuine user
+The game was first released on itch.io in draft mode on a secret URL, played by friends. This is genuine user
 acceptance testing and is treated as a first-class input: reported issues are triaged into §11,
 and anything reproducible that is also *cheaply automatable* gets a regression test at the
 lowest level that catches it.
@@ -481,36 +462,7 @@ will fail this spec loudly — an acceptable price over adding production test h
 
 ---
 
-## 11. QA findings
-
-### 11.1 Static review findings (before writing any test)
-
-| # | Finding | Severity | Status |
-|---|---|---|---|
-| F-01 | `phaserTestUtils.ts` documented a `vitest.config.ts` and a `tests/unit/setup/phaserMock.ts` that never existed — misleading for maintainers | Low | ✅ fixed |
-| F-02 | Project_plan §31 states “vitest, 12 files / 265 tests”; actual is 34 / 967 | Low | ✅ fixed |
-| F-03 | §38 “Ending works” unchecked although the ending shipped 2026-08-30 | Low | ✅ fixed |
-| F-04 | `src/assets/hero.png` is an orphan, referenced nowhere | Trivial | Open — safe to delete |
-| F-05 | 23.55 MB preloaded before the menu is reachable, 87 % of it audio | Medium | Open — measured (§5.5), accepted for now |
-| F-06 | No `typecheck` npm script; CI called `npx tsc --noEmit` inline, so local and CI gates could drift | Low | ✅ fixed |
-| F-07 | Scene-private constants (`CHECKPOINT_REGISTRY_KEY`, `NEXT_SCENE_KEY`, …) could silently drift from `PROGRESS_REGISTRY_KEYS` | Medium | ✅ verified consistent; now guarded by `progression.spec.ts` |
-
-### 11.2 Findings from building the suite
-
-| # | Finding | Severity | Status |
-|---|---|---|---|
-| F-08 | The game never finishes booting under Playwright WebKit — stalls at 91/106 files. Diagnosed to a missing Web Audio API in that build, **not** a game defect | Medium *(test env)* | ✅ documented, §7.1 |
-| F-09 | **False green:** an orphaned `vite preview` server made Playwright reuse a stale build, so an injected real bug passed. Found only because fault injection was run | **High** *(process)* | ✅ fixed — `reuseExistingServer: false` |
-| F-10 | **False green:** `build && preview` inside `webServer` let tests start against the previous build (results lagged one run) | **High** *(process)* | ✅ fixed — build is now a separate step before Playwright |
-| F-11 | Pixel-diff visual regression proved unreliable in both directions | Medium | ✅ redesigned, §10.2 |
-| F-12 | Treating every `console.warn` as fatal drowned the suite in headless GPU driver messages | Low | ✅ fixed — targeted Phaser-warning patterns |
-| F-13 | The scene sweep as 11 separate tests reloaded 23.5 MB eleven times and timed out | Low | ✅ fixed — one boot, per-scene steps |
-
-**No functional defect was found in the game itself during this phase.** The scene sweep, the
-progression matrix and the asset audit all pass on the first run — which, given that 6 023 lines
-of scene code had never been under test, is a meaningful result in its own right.
-
-### 11.3 Fault injection — proving the tests can fail
+## 11. Fault injection — proving the tests can fail
 
 A green suite proves nothing until it has been shown to go red. Each new layer was validated by
 deliberately reintroducing a realistic defect:
@@ -542,39 +494,7 @@ shipped green and useless.
 | Exploratory charters | — | 5 charters | ~30 min | before release |
 | **Total automated** | **43** | **1 015** | **~2 min** | |
 
-Last full run: **all green**, 2026-09-08.
+Last documented full run: **all green**, 2026-09-08.
 
 ---
 
-## 13. QA iteration history
-
-### Iteration 1 — Phase 10 foundation *(2026-09-08)*
-
-**Scope:** build the pyramid above the existing unit suite — integration, E2E, visual,
-cross-browser, performance, CI.
-
-**Added:** `window.game` test seam in `main.ts`; `scripts/check-build.mjs`; 2 integration files
-(23 tests); Playwright config plus 5 E2E specs and a shared fixture (25 tests); CI extended from
-3 steps to 2 jobs with 6 gates; npm scripts for every layer; this document.
-
-**Key findings:** F-08 (WebKit cannot run the game — test-environment limitation, not a defect),
-F-09 and F-10 (two independent *false green* mechanisms, both found by fault injection),
-F-11 (pixel-diff visual regression unreliable → redesigned as reviewed capture).
-
-**Fixed:** F-01, F-02, F-03, F-06, F-09, F-10, F-11, F-12, F-13.
-
-**Defects found in the game:** none. 6 023 previously untested scene lines now pass.
-
-**Remaining risk:** subtle visual drift (human review only, §10.2); Safari (manual, §7.1);
-`PlayerController` not unit-isolated (§10.5); 23.5 MB preload (F-05).
-
-**Next:** unit-test audit (are all 967 earning their place?); Phase 11 deploy job behind the
-existing gates.
-
----
-
-## 14. Document change history
-
-| Date | Change |
-|---|---|
-| 2026-09-08 | Created. Covers Phase 10 iteration 1. |

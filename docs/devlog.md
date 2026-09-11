@@ -1,9 +1,7 @@
 # The Wingless Crow — fejlesztési napló
 
 Ez a fájl a projekt **történetét** tartalmazza: fázisonként és iterációnként, hogy mi
-készült el, milyen döntést hoztunk, és — ami a legfontosabb — **miért úgy**. A szövegek
-változtatás nélkül kerültek ide a `CLAUDE.md`-ből, ahol korábban a „Jelenlegi állapot"
-szekcióban gyűltek.
+készült el, milyen döntést hoztunk, és — ami a legfontosabb — **miért úgy**.
 
 **A három dokumentum viszonya:**
 
