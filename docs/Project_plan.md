@@ -1403,10 +1403,14 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 > gate MÖGÜL, a 31. pont „csak sikeres pipeline után deployment" elve szerint. A kézi kiadási
 > kapu a push ELŐTT van (lokális build-teszt).
 >
-> **Előkészítés nem kellett:** a `vite.config.ts` `base: './'`-je (Phase 10) már az alútvonalas
-> kiszolgálásra készült, a Pages project-page (`/the-wingless-crow/`) pedig ugyanaz a
-> hibaosztály, mint az itch.io generált alútvonala. Részletek: `docs/devlog.md`,
-> „Phase 11 – Deployment".
+> **KÓDOLDALI előkészítés nem kellett:** a `vite.config.ts` `base: './'`-je (Phase 10) már az
+> alútvonalas kiszolgálásra készült, a Pages project-page (`/the-wingless-crow/`) pedig
+> ugyanaz a hibaosztály, mint az itch.io generált alútvonala.
+>
+> **Egy kézi lépés viszont KELLETT:** a Pages bekapcsolása a repo beállításaiban
+> (*Settings → Pages → Source: GitHub Actions*). Az ezt automatizáló `enablement: true`
+> megbukott — a Pages site létrehozása repo-admin jogot kíván, amivel a `GITHUB_TOKEN` nem
+> rendelkezik. Részletek: `docs/devlog.md`, „Phase 11 – Deployment".
 
 ---
 

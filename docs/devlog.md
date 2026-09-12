@@ -1287,10 +1287,9 @@ Egy Pages-deploynak ilyen módja nincs: nincs draft, nincs titkos URL, nincs vis
 csatorna. A Pages viszont **automatizálható és a repóhoz kötött**, ezért az lett a CI-ból
 deployolt, verziókövetett példány. Röviden: az itch.io a játékosoké, a Pages a bizonyítéké.
 
-**A fázis legfontosabb tanulsága: nem kellett előkészíteni SEMMIT.** A Pages deploy első
-próbálkozásra ment, és ez egy KORÁBBI döntés visszafizetése. A `vite.config.ts` `base: './'`-je
-(Phase 10) az itch.io generált alútvonala miatt született, a `scripts/check-build.mjs` pedig
-ennek az őre lett. A GitHub Pages project-page (`/the-wingless-crow/`) **pontosan ugyanaz a
+**KÓDOLDALI előkészítés nem kellett, és ez egy KORÁBBI döntés visszafizetése.** A
+`vite.config.ts` `base: './'`-je (Phase 10) az itch.io generált alútvonala miatt született, a
+`scripts/check-build.mjs` pedig ennek az őre lett. A GitHub Pages project-page (`/the-wingless-crow/`) **pontosan ugyanaz a
 hibaosztály**: root-abszolút asset-utak mellett a build zöld marad, az élő oldal viszont
 fekete. Vagyis az EGYETLEN deploy-célra megírt kapu a másodikat ingyen fedezte — és ez a
 `vite.config.ts` kommentjében előre le is volt írva („Ugyanez áll egy GitHub Pages
@@ -1320,6 +1319,43 @@ kézi gomb, amit el lehet felejteni megnyomni.
 **Jogosultságok:** a workflow top-level `permissions`-e marad `contents: read`; a Pages-hez
 szükséges `pages: write` + `id-token: write` **job-szinten** áll, tehát a `verify` és az `e2e`
 a legkisebb jogosultságon fut tovább.
+
+### Ami ELHASALT: az `enablement: true`
+
+A deploy **nem ment első próbálkozásra.** Az első futás a `Configure Pages` lépésnél állt meg:
+
+```text
+Warning: Get Pages site failed.    Error: Not Found
+Error:   Create Pages site failed. Error: Resource not accessible by integration
+```
+
+Az `actions/configure-pages` `enablement: true` opciója azt ígéri, hogy ha a repón még nincs
+bekapcsolva a Pages, ő bekapcsolja — ezért került be, hogy a workflow önellátó legyen. A `Get`
+jogosan adott `Not Found`-ot (tényleg nem volt bekapcsolva), a `Create` viszont elszállt: a
+Pages site **létrehozása** (`POST /repos/{owner}/{repo}/pages`) repo-**ADMIN** jogot kíván,
+amivel a `GITHUB_TOKEN` nem rendelkezik.
+
+**A csapda a jogosultság nevében van:** a `pages: write` a már LÉTEZŐ site-ra való *deployt*
+engedi, nem a *létrehozását*. A kettő ugyanazt a szót viseli, tehát a `permissions:` blokkra
+ránézve minden rendben lévőnek látszik — és a hiba nem is bővebb permission-nel javítható.
+*(A `Node 20 is being deprecated` sor ugyanebben a logban félrevezető: általános
+runner-értesítés, semmi köze a bukáshoz.)*
+
+**A javítás egyszeri, kézi repo-beállítás:** *Settings → Pages → Build and deployment →
+Source: **GitHub Actions*** (NEM „Deploy from a branch" — az a branch-alapú kiszolgálás,
+amivel a `deploy-pages` lépés szintén elhasalna). Utána a bukott futás **Re-run failed jobs**-szal
+újraindítva végigment, új commit nélkül.
+
+**Az `enablement: true` ezután KI IS KERÜLT a workflow-ból.** Bekapcsolt Pages mellett már
+no-op lett volna, tehát ártalmatlan — de **azt hazudná, hogy a pipeline önellátó**, holott
+bizonyítottan nem az. A helyére a kézi előfeltételt rögzítő komment került; ez az az
+információ, ami egy fork vagy egy újralétrehozott repo esetén ténylegesen kell.
+
+**A szélesebb tanulság:** a CI-jogosultságoknál a *művelet* és a *permission-scope* neve nem
+ugyanaz a tengely — „Pages írása" ≠ „Pages bekapcsolása", az utóbbi adminisztratív művelet.
+Egy `enablement`-szerű kényelmi kapcsolót érdemes eleve gyanakvással nézni: ha a happy path
+úgyis egyetlen egyszeri kézi lépés, a kapcsoló nem spórol meg semmit, csak a hibaüzenetet
+bonyolítja — ráadásul pont az első, „miért nem működik" pillanatban.
 
 ---
 

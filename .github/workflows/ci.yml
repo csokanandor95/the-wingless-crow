@@ -184,12 +184,21 @@ jobs:
       - name: Deploy sanity check
         run: npm run check:build
 
-      # `enablement: true`: ha a repon meg nincs bekapcsolva a Pages, ez a lepes
-      # bekapcsolja (ehhez kell a `pages: write`) es a forrast GitHub Actions-re allitja.
+      # EGYSZERI KEZI ELOFELTETEL: a repon a Pages-nek BEKAPCSOLVA KELL lennie —
+      #   Settings -> Pages -> Build and deployment -> Source: "GitHub Actions"
+      # (NEM "Deploy from a branch": az a branch-alapu, Jekyll-szeru kiszolgalas,
+      #  amivel az alabbi deploy-pages lepes elhasal).
+      #
+      # Az `actions/configure-pages` `enablement: true` opcioja SZANDEKOSAN NINCS itt:
+      # kiprobaltuk, es megbukott (2026-09-12) —
+      #   Get Pages site failed:    Not Found
+      #   Create Pages site failed: Resource not accessible by integration
+      # A Pages site LETREHOZASA (POST /repos/{owner}/{repo}/pages) repo-ADMIN jogot kivan,
+      # amivel a GITHUB_TOKEN nem rendelkezik. A `pages: write` a mar LETEZO site-ra valo
+      # deployt engedi, nem a letrehozasat — a ketto konnyen osszekeverheto, mert a
+      # jogosultsag neve ugyanaz. Tehat ez nem bovebb permission-nel javithato.
       - name: Configure Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload dist as Pages artifact
         uses: actions/upload-pages-artifact@v3

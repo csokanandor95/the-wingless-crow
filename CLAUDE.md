@@ -145,6 +145,15 @@ workflow_dispatch → job: performance  (on-demand, --workers=1)
     artifact-forgalom minden branch-pushon.
   A Pages-jogok (`pages: write`, `id-token: write`) **job-szinten** állnak, tehát a `verify`
   és az `e2e` a top-level `contents: read`-en marad.
+- **EGYSZERI KÉZI ELŐFELTÉTEL — a repón a Pages-nek BE KELL lennie kapcsolva:**
+  *Settings → Pages → Build and deployment → Source: **GitHub Actions*** (NEM „Deploy from a
+  branch" — azzal a `deploy-pages` lépés elhasal). Az `actions/configure-pages`
+  **`enablement: true` opciója erre NEM jó, és ezért nincs a workflow-ban**: a Pages site
+  LÉTREHOZÁSA (`POST /repos/{owner}/{repo}/pages`) repo-ADMIN jogot kíván, amivel a
+  `GITHUB_TOKEN` nem rendelkezik (`Resource not accessible by integration`). A `pages: write`
+  a már LÉTEZŐ site-ra való deployt engedi, nem a létrehozását — a kettő könnyen
+  összekeverhető, mert a jogosultság neve ugyanaz. **Fork vagy újralétrehozott repo esetén ez
+  az első lépés.**
 
 **Ami SZÁNDÉKOSAN nincs benne, és miért:**
 
@@ -2559,10 +2568,14 @@ Phase 11. Ami nyitva van:
   `.github/workflows/ci.yml` **`deploy-pages`** jobja, `needs: [verify, e2e]`, CSAK `main`
   pushra. A részletek a „CI" szakaszban.
 
-**Előkészítés nem kellett:** a `vite.config.ts` `base: './'`-je és a `npm run check:build`
-az itch.io alútvonala miatt született (Phase 10), a Pages project-page
+**KÓDOLDALI előkészítés nem kellett:** a `vite.config.ts` `base: './'`-je és a
+`npm run check:build` az itch.io alútvonala miatt született (Phase 10), a Pages project-page
 (`/the-wingless-crow/`) pedig ugyanaz a hibaosztály — a kapu ingyen fedezte a második
-deploy-célt is. A történet: `docs/devlog.md`, „Phase 11 – Deployment".
+deploy-célt is.
+
+**Egy kézi lépés viszont KELLETT:** a Pages bekapcsolása a repo beállításaiban — az
+`enablement: true` automatizálási kísérlet megbukott. Lásd a „CI" szakasz `deploy-pages`
+pontját, a teljes történetet pedig: `docs/devlog.md`, „Phase 11 – Deployment".
 
 ---
 
