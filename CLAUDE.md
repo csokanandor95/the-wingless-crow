@@ -97,9 +97,12 @@ Git push / PR → GitHub Actions (ubuntu-latest, Node 24)
     ├─ job: verify
     │     npm ci → typecheck → unit → integration → build → deploy sanity check
     │
-    └─ job: e2e  (needs: verify)
-          Playwright: Chromium teljes + Firefox smoke
-          → playwright-report artifact (7 nap)
+    ├─ job: e2e  (needs: verify)
+    │     Playwright: Chromium teljes + Firefox smoke
+    │     → playwright-report artifact (7 nap)
+    │
+    └─ job: deploy-pages  (needs: verify + e2e)   ← CSAK main pushra
+          npm ci → build → deploy sanity → GitHub Pages
 
 workflow_dispatch → job: performance  (on-demand, --workers=1)
 ```
@@ -129,6 +132,19 @@ workflow_dispatch → job: performance  (on-demand, --workers=1)
   `package-lock.json` hash-e, tehát egy Playwright-frissítés automatikusan új cache-t húz.
   Az `npm run e2e` maga futtatja a buildet a Playwright ELŐTT (a `webServer` csak kiszolgál),
   így a build nem versenyezhet a tesztindítással.
+- **A `deploy-pages` job CSAK a `main`-re érkező pushra fut** (`needs: [verify, e2e]`), tehát
+  a hat quality gate MÖGÜL — egy feature branch zöld pipeline-ja nem írhatja felül az élő
+  oldalt, és a `workflow_dispatch` sem deployol. Három döntés, ami nem véletlen:
+  - **saját `concurrency: pages` csoport, `cancel-in-progress: false`** — NEM örökli a
+    workflow-szintű `ci-${{ github.ref }}`-et. Egy megszakított TESZT-futás ártalmatlan;
+    egy félbeszakított DEPLOY az élő oldalt hagyná félkész állapotban;
+  - **a `check:build` MEGISMÉTLŐDIK itt** — a `verify`-beli futás egy MÁSIK job MÁSIK
+    `dist/`-jét nézte; ez az a példány, ami ténylegesen felkerül;
+  - **a job ÚJRABUILDEL** a `verify` artifactja helyett (determinisztikus build ugyanarról a
+    commitról, és az `e2e` job már eddig is újrabuildelt) — cserébe nincs 23,5 MB-os
+    artifact-forgalom minden branch-pushon.
+  A Pages-jogok (`pages: write`, `id-token: write`) **job-szinten** állnak, tehát a `verify`
+  és az `e2e` a top-level `contents: read`-en marad.
 
 **Ami SZÁNDÉKOSAN nincs benne, és miért:**
 
@@ -140,16 +156,20 @@ workflow_dispatch → job: performance  (on-demand, --workers=1)
   mellett a p95 képkocka-idő 16,7 → 51,7 ms ugrott, a játék változatlanul), ezért on-demand.
 - **WebKit a cross-browser mátrixban** — a Playwright buildjében nincs Web Audio API, így a
   játék be sem tölt (részletek a `playwright.config.ts`-ben és a `docs/Test-plan.md`-ben).
-- **GitHub Pages deploy** — Phase 11.
 
 *A pipeline útja a minimális első szelettől idáig: `docs/devlog.md`, „Phase 10 – QA".*
 
 ## Jelenlegi állapot
 
-**A játék végigjátszható, elejétől a creditsig.** Lezárva: Step 1, Phase 2–8 és Phase 10 (QA).
-Hátravan: **Phase 9 (Lore)** — a placeholder szövegek cseréje —, a Phase 8 maradék
-placeholder-grafikái, és a **Phase 11 (Deployment)**. Részletesen lentebb, a „Hátralévő
-munka" szakaszban.
+**A játék végigjátszható, elejétől a creditsig, és KI VAN ADVA** — itch.io (elsődleges) +
+GitHub Pages:
+
+| csatorna | URL | hogyan |
+|---|---|---|
+| **itch.io** | `https://bioengineerlabs.itch.io/the-wingless-crow` | kézi feltöltés |
+| **GitHub Pages** | `https://csokanandor95.github.io/the-wingless-crow/` | a CI `deploy-pages` jobja |
+
+Lezárva: Step 1, Phase 2–8, Phase 10 (QA) és **Phase 11 (Deployment)**.
 
 > A fázisonkénti fejlesztési történet — mi mikor készült, milyen alternatívát vetettünk el,
 > és **miért úgy** döntöttünk — a **`docs/devlog.md`**-ben él. Ha egy szám vagy egy döntés
@@ -2502,29 +2522,10 @@ szakaszban. A `CreditsScene` `CREDITS` listája NEM tartozik ide: az attribúci�
 
 ## Hátralévő munka
 
-A `Project_plan.md` 21. pontjának roadmapjéből lezárva: Step 1, Phase 2–8, Phase 10.
-Ami nyitva van:
+A `Project_plan.md` 21. pontjának roadmapjéből lezárva: Step 1, Phase 2–8, Phase 10 és
+Phase 11. Ami nyitva van:
 
-### Phase 9 – Lore
-
-**TIZENKÉT placeholder szöveg** cseréje; mindegyik egy tömb-szerkesztés:
-
-| Hol | Konstans |
-|---|---|
-| `levels/PreSceneLayout.ts` | `GODDESS_DIALOGUE` — A Lángőrző nyitó párbeszéde |
-| `levels/Level1Layout.ts` | `HOUSE_DIALOGUE` — a ház lakója az A szakaszban |
-| `scenes/BossScene.ts` | `WING_BREAKER_DIALOGUE`, `BOSS_VICTORY_NARRATION` |
-| `scenes/Level2Scene.ts` | `LEVEL2_END_NARRATION` |
-| `scenes/Boss2Scene.ts` | `KING_DIALOGUE`, `KING_VICTORY_NARRATION` |
-| `scenes/Level3Scene.ts` | `LEVEL3_END_NARRATION` |
-| `scenes/Boss3Scene.ts` | `MASTER_DIALOGUE`, `MASTER_VICTORY_NARRATION` |
-| `scenes/FinalBossScene.ts` | `DEMON_DIALOGUE`, `ENDING_NARRATION` (a JÁTÉK ZÁRÓ SZÖVEGE) |
-
-**Az első kettő szándékosan NEM a scene-jében lakik**, hanem a layout-modulban: a
-`fakePhaser` nem ad `Scene` osztályt, tehát a scene-jük unit tesztből nem importálható, a
-layout-moduljuk viszont igen (a sorhosszukra van teszt).
-
-### Phase 8 maradéka
+### Phase 8 maradéka (opcionális)
 
 - **SFX a Level 2-re és a Level 3-ra.** A harci hangkép kész (kard, tűzgolyók, varázslatok,
   enemy közelharc, léptek, ugrás, halálok); hiányzik: a **tűzgolyók becsapódása**, az
@@ -2548,10 +2549,20 @@ layout-moduljuk viszont igen (a sorhosszukra van teszt).
 - **Zene:** mind a kilenc sáv megvan (menü, nyitó szentély, 3 pálya, 4 aréna). Már csak a
   `NarrationScene` és a `CreditsScene` néma.
 
-### Phase 11 – Deployment
+### Phase 11 – Deployment — **KÉSZ (2026-09-12)**
 
-GitHub Pages / itch.io deploy. A `vite.config.ts` `base: './'`-je és a `npm run check:build`
-deploy sanity check ehhez már készen áll; a workflow deploy jobja nincs meg.
+*Ez a szakasz már nem teendő, hanem állapot — a teljesség kedvéért marad itt.*
+
+- **itch.io** (elsődleges): `https://bioengineerlabs.itch.io/the-wingless-crow` — **kézi**
+  feltöltés, nincs rá automatizmus.
+- **GitHub Pages**: `https://csokanandor95.github.io/the-wingless-crow/` — a
+  `.github/workflows/ci.yml` **`deploy-pages`** jobja, `needs: [verify, e2e]`, CSAK `main`
+  pushra. A részletek a „CI" szakaszban.
+
+**Előkészítés nem kellett:** a `vite.config.ts` `base: './'`-je és a `npm run check:build`
+az itch.io alútvonala miatt született (Phase 10), a Pages project-page
+(`/the-wingless-crow/`) pedig ugyanaz a hibaosztály — a kapu ingyen fedezte a második
+deploy-célt is. A történet: `docs/devlog.md`, „Phase 11 – Deployment".
 
 ---
 

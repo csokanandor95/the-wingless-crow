@@ -1380,8 +1380,8 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 > `src/scenes/` 6 023 sora (a forrás 30 %-a) addig teljesen fedetlen volt, és a projekt MINDEN
 > kézi teszten talált hibája oda esett. Ez most E2E-vel fedett.
 >
-> **Nyitva maradt:** a unit suite auditja (mind a 967 teszt indokolt-e?) és a deployment
-> (Phase 11 — a kapuk készen állnak mögötte).
+> **Nyitva maradt:** a unit suite auditja (mind a 967 teszt indokolt-e?). *(A deployment
+> azóta LEZÁRULT — lásd a Phase 11 szakaszt közvetlenül alább.)*
 
 ## Phase 11 – Deployment
 
@@ -1390,6 +1390,23 @@ A struktúrát a projekt fejlődésével együtt alakítjuk.
 - GitHub Actions
 - GitHub Pages
 - public URL
+
+> **LEZÁRVA (2026-09-12) — a játék KÉT publikus csatornán fut.**
+>
+> | csatorna | URL | hogyan kerül ki |
+> |---|---|---|
+> | **itch.io** (elsődleges) | `https://bioengineerlabs.itch.io/the-wingless-crow` | kézi feltöltés |
+> | **GitHub Pages** | `https://csokanandor95.github.io/the-wingless-crow/` | AUTOMATIKUS, a CI `deploy-pages` jobja |
+>
+> A fenti öt tétel mind megvan. A Pages deploy a `.github/workflows/ci.yml` **`deploy-pages`**
+> jobja: `needs: [verify, e2e]`, és CSAK a `main`-re érkező pushra fut — tehát a hat quality
+> gate MÖGÜL, a 31. pont „csak sikeres pipeline után deployment" elve szerint. A kézi kiadási
+> kapu a push ELŐTT van (lokális build-teszt).
+>
+> **Előkészítés nem kellett:** a `vite.config.ts` `base: './'`-je (Phase 10) már az alútvonalas
+> kiszolgálásra készült, a Pages project-page (`/the-wingless-crow/`) pedig ugyanaz a
+> hibaosztály, mint az itch.io generált alútvonala. Részletek: `docs/devlog.md`,
+> „Phase 11 – Deployment".
 
 ---
 
@@ -1768,6 +1785,7 @@ Csak sikeres pipeline után történjen production deployment.
 > Git push / PR → GitHub Actions (ubuntu-latest, Node 24)
 >     ├─ job: verify   npm ci → typecheck → unit → integration → build → deploy sanity
 >     └─ job: e2e      Playwright: Chromium teljes + Firefox smoke → report artifact
+>           └─ job: deploy-pages   CSAK main pushra → GitHub Pages
 > workflow_dispatch → job: performance (on-demand, --workers=1)
 > ```
 >
@@ -1780,7 +1798,10 @@ Csak sikeres pipeline után történjen production deployment.
 > **pixeldiff-kapuként** (hamis bukásokat adott, ÉS a valódi változást elvetette — helyette
 > képcsatolás emberi átnézésre), a **WebKit** (a Playwright buildjében nincs Web Audio API,
 > a játék be sem tölt), és a **performance a fő pipeline-ban** (a mérés csak egyedül futtatva
-> érvényes). A GitHub Pages deploy a Phase 11.
+> érvényes).
+>
+> **A GitHub Pages deploy 2026-09-12-én elkészült** (Phase 11): a `deploy-pages` job a
+> `verify` és az `e2e` MÖGÖTT, CSAK a `main`-re érkező pushra fut. Részletek a 32. pontban.
 >
 > Részletek: `CLAUDE.md` „CI" szakasza és `docs/Test-plan.md`; a bővítés története:
 > `docs/devlog.md`.
@@ -1812,6 +1833,26 @@ Public URL
 ```
 
 A játék így telepítés nélkül, böngészőből játszható.
+
+> **JELENLEGI ÁLLAPOT (2026-09-12, Phase 11) — a lánc MEGVALÓSULT, egy eltéréssel.**
+>
+> A fenti `Source → GitHub → Actions → build → Pages → Public URL` lánc pontosan így épült
+> fel, a `.github/workflows/ci.yml` **`deploy-pages`** jobjaként (`needs: [verify, e2e]`,
+> csak `main` pushra).
+>
+> **Az eltérés: KÉT csatorna lett, nem egy** — és az **itch.io az elsődleges**:
+>
+> | csatorna | URL |
+> |---|---|
+> | itch.io (kézi feltöltés) | `https://bioengineerlabs.itch.io/the-wingless-crow` |
+> | GitHub Pages (CI-ból) | `https://csokanandor95.github.io/the-wingless-crow/` |
+>
+> Az ok a QA-ból jött: az itch.io **draft** módja adta a valódi beta-UAT-ot
+> (`Test-plan.md` 9.3), aminek egy Pages-deployban nincs megfelelője. A Pages viszont
+> automatizálható és a repóhoz kötött, ezért az a CI-ból deployolt, verziókövetett példány.
+>
+> **Mindkét cél ALÚTVONALRÓL szolgál ki**, ezért kritikus a `vite.config.ts` `base: './'`-je
+> és a `scripts/check-build.mjs` őr — a 31. pont „deploy sanity" gate-je.
 
 ---
 
@@ -2039,16 +2080,18 @@ A projekt akkor tekinthető sikeresnek, ha:
 - [x] Alap performance ellenőrzés létrejött. *(betöltési idő + Level 1 p95 képkocka-idő)*
 - [x] CI pipeline működik. *(typecheck + unit + integration + build + deploy sanity + E2E)*
 - [x] GitHub Actions futtatja a teszteket.
-- [ ] Sikeres pipeline után deployment történik. *(a kapuk készen állnak, a deploy-job a
-      Phase 11 tétele)*
+- [x] Sikeres pipeline után deployment történik. *(a `deploy-pages` job: `needs: [verify,
+      e2e]`, és csak a `main`-re érkező pushra fut — mind a hat quality gate mögül)*
 
 ### Deployment
 
 - [x] GitHub repository létrejött.
 - [x] Production build működik.
-- [x] Itch.io deploy.
-- [ ] GitHub Pages deployment működik.
-- [ ] A játék publikus URL-en elérhető. *Itch.io-n jelenleg titkos URL-en elérhető, draft módban.*
+- [x] Itch.io deploy. *(publikus: `https://bioengineerlabs.itch.io/the-wingless-crow`)*
+- [x] GitHub Pages deployment működik. *(a CI `deploy-pages` jobja, minden zöld main pushra:
+      `https://csokanandor95.github.io/the-wingless-crow/`)*
+- [x] A játék publikus URL-en elérhető. *Mindkét csatornán — a titkos URL-es, draft módú
+      beta-szakasz ezzel lezárult.*
 
 ---
 
@@ -2144,7 +2187,8 @@ megvan). A megvalósult rendszerek aktuális paraméterei: **`CLAUDE.md`**.
 | **33.** QA dokumentáció | **Hét tervezett dokumentum → egy** (`docs/Test-plan.md`) | egy fejlesztő + egy játék esetén a szétbontás elavulást szül; a teszt-kód MAGA a test case | 2026-09-08 |
 
 **Ami a tervből NEM valósult meg, és nyitva is maradt:** a Phase 9 (Lore) placeholder
-szövegei és a Phase 11 (Deployment). Részletesen: `CLAUDE.md`, „Hátralévő munka".
+szövegei. *(A Phase 11 – Deployment 2026-09-12-én lezárult: itch.io + GitHub Pages.)*
+Részletesen: `CLAUDE.md`, „Hátralévő munka".
 
 ---
 

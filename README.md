@@ -9,15 +9,14 @@ It is a hobby project but also serves as a QA engineering portfolio piece. I bui
 ran its development like a product release, with a risk-based test strategy, automated tests at
 the right levels, manual validation and CI quality gates.
 
-<!-- ▼▼▼ PLAY LINKS — fill in after deployment, then add them to the Play line below ▼▼▼ -->
-[play-itch]: https://bioengineerlabs.itch.io/the-wingless-crow/
+[play-itch]: https://bioengineerlabs.itch.io/the-wingless-crow
 [play-pages]: https://csokanandor95.github.io/the-wingless-crow/
-<!-- ▲▲▲ ▲▲▲ -->
 
 [![CI](https://github.com/csokanandor95/the-wingless-crow/actions/workflows/ci.yml/badge.svg)](https://github.com/csokanandor95/the-wingless-crow/actions/workflows/ci.yml)
 
-**▶ Play in the browser:** the public build (itch.io · GitHub Pages) arrives with the deployment
-release. Until then, the game runs locally with two commands, see [Run locally](#run-locally).
+**▶ Play in the browser: [itch.io][play-itch] · [GitHub Pages][play-pages]**
+No install, no account — it runs in a desktop browser. You can also
+[run it locally](#run-locally) with two commands.
 
 ## Screenshots
 
@@ -231,9 +230,12 @@ is in [Test-plan.md §8](docs/Test-plan.md).
 
 ## Project status
 
-**Complete and playable from start to credits.** The QA phase is closed, and the game has been
-played by beta testers on a private itch.io draft. The remaining step is the public browser
-release on itch.io and GitHub Pages.
+**Complete, playable from start to credits, and released.** The QA phase is closed, and the
+game is public on two channels: **[itch.io][play-itch]** (the primary one, uploaded by hand)
+and **[GitHub Pages][play-pages]**, deployed automatically by CI — the `deploy-pages` job runs
+on `main` pushes only, behind all six quality gates, so nothing reaches the public URL that
+has not passed them. Before that, the game was played by beta testers on a private itch.io
+draft.
 
 ## Credits
 

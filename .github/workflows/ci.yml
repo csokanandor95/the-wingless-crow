@@ -12,13 +12,16 @@ name: CI
 #   E2E               PASS
 #   Critical errors   0      <- a Playwright fixture minden teszten figyeli
 #
+# A main-re erkezo, mind a hat kapun atment push innen megy ki elesbe (Phase 11):
+#   job: deploy-pages -> https://csokanandor95.github.io/the-wingless-crow/
+# A masik kiadasi csatorna, az itch.io, KEZI feltoltes — ott nincs deploy automatizmus.
+#
 # Ami SZANDEKOSAN nincs benne, es hogy miert:
 #   - visual regression PIXELDIFF-kapukent: meressel megbukott (hamis bukasok + a valodi
 #     valtozast elvetette) - helyette kepcsatolas emberi atnezesre, lasd tests/e2e/visual.spec.ts;
 #   - performance: a meres egyedul futtatva ervenyes, ezert on-demand;
 #   - WebKit: a Playwright buildjeben nincs Web Audio API, igy a jatek be sem tolt
-#     (reszletek a playwright.config.ts-ben es a docs/Test-plan.md-ben);
-#   - GitHub Pages deploy: Phase 11.
+#     (reszletek a playwright.config.ts-ben es a docs/Test-plan.md-ben).
 
 on:
   push:
@@ -125,6 +128,77 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  # --- Deploy (Phase 11) ------------------------------------------------------------
+
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    needs: [verify, e2e]
+    # CSAK a main-re erkezo push deployol: egy feature branch zold pipeline-ja nem
+    # irhatja felul az elo oldalt, es a workflow_dispatch (teljesitmenymeres) sem.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+
+    # A Pages-jogok JOB-szinten allnak, hogy a verify es az e2e job a top-level
+    # `contents: read` legkisebb jogosultsagon maradjon.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    # A Pages deploy SAJAT, NEM megszakithato sorban all. A workflow-szintu
+    # `ci-${{ github.ref }}` csoport `cancel-in-progress: true`-ja egy felbeszakitott
+    # deployt hagyna maga utan — egy megszakitott TESZT-futas artalmatlan, egy
+    # felbeszakitott deploy viszont az ELO oldalt hagyna felkesz allapotban.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # A job UJRABUILDEL, nem a verify jobbol atvett artifactot veszi at: a build
+      # determinisztikus ugyanarrol a commitrol, es az e2e job MAR MA IS ujrabuildel
+      # (`npm run e2e` = build + playwright). Cserebe a verify jobnak nem kell
+      # branchenkent egy 23,5 MB-os dist artifactot feltoltenie.
+      - name: Production build
+        run: npm run build
+
+      # Ugyanaz az or, mint a verify jobban, de EZ az a dist, ami tenylegesen kimegy —
+      # es itt a Pages ALUTVONALAT (`/the-wingless-crow/`) vedi. Egy root-abszolut
+      # asset-ut (R3) itt némán fatalis lenne: a build zold, az elo oldal fekete.
+      - name: Deploy sanity check
+        run: npm run check:build
+
+      # `enablement: true`: ha a repon meg nincs bekapcsolva a Pages, ez a lepes
+      # bekapcsolja (ehhez kell a `pages: write`) es a forrast GitHub Actions-re allitja.
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload dist as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
 
   # --- On-demand jobok (workflow_dispatch) ------------------------------------------
 

@@ -7,9 +7,9 @@ automation, CI, findings and limitations.
 |---|---|
 | **Product** | 2D dark fantasy action platformer, Phaser 4 + TypeScript + Vite |
 | **Playtime** | ~20 minutes, single session, single player, fully offline |
-| **Status** | Feature complete (Phases 1–9). Published in **draft** on itch.io, played by beta testers |
+| **Status** | Feature complete (Phases 1–9). **Publicly released** on [itch.io](https://bioengineerlabs.itch.io/the-wingless-crow) and [GitHub Pages](https://csokanandor95.github.io/the-wingless-crow/), after a private itch.io draft played by beta testers |
 | **QA phase** | Done |
-| **Last updated** | 2026-09-11 |
+| **Last updated** | 2026-09-12 |
 
 ---
 
@@ -75,7 +75,7 @@ reproducible — see §10.2, where measurement contradicted the assumption.
 | Scene layer | 12 files, **6 023 lines (30 % of source)** — untestable at unit level, see §5.1 |
 | Assets | 109 files, **23.55 MB**, of which audio is **20.44 MB (87 %)**, all preloaded up front |
 | Logical resolution | 800×450, `Scale.FIT`, `pixelArt: true` |
-| Deploy target | itch.io HTML5 (served from a generated sub-path — see R3) |
+| Deploy target | Two channels, **both served from a sub-path** (see R3): itch.io HTML5 (generated path, manual upload) and GitHub Pages (`/the-wingless-crow/`, deployed by CI) |
 
 ---
 
@@ -114,7 +114,7 @@ traces back to a row here; anything that traced to no row was not written.
 |---|---|---|---|---|---|
 | **R1** | A scene throws in `create()` → black screen | Game stops dead | Only if someone reaches that scene | E2E scene sweep | ✅ covered |
 | **R2** | Door routes to the wrong scene / softlock | Game not completable | Only via a full playthrough *with* flags set | E2E progression | ✅ covered |
-| **R3** | `vite.config.ts` `base` reverts to `'/'` | **The itch.io build silently breaks** — build stays green, the game does not start | Only after upload | Build sanity check | ✅ covered |
+| **R3** | `vite.config.ts` `base` reverts to `'/'` | **Both deploys silently break** — build stays green, the game does not start from a sub-path | Only after upload / deploy | Build sanity check — in `verify`, and again in `deploy-pages` on the exact `dist/` that ships | ✅ covered |
 | **R4** | `START_SCENE` committed on a dev value | Game starts in the wrong scene | Only on launch — *this already happened once* | E2E smoke | ✅ covered |
 | **R5** | Missing texture / audio / animation frame | Invisible sprite, silent boss | Only if you happen to look | E2E assets | ✅ covered |
 | **R6** | Console error / uncaught exception in play | Both layout specs list “no console errors” as acceptance criteria | Nobody plays with devtools open | E2E fixture, every test | ✅ covered |
@@ -338,6 +338,7 @@ manual (M-5), which is realistic because the game is already on itch.io with bet
 ```
 job: verify            typecheck → unit (967) → integration (23) → build → deploy sanity
 job: e2e (needs verify) Playwright: Chromium full + Firefox smoke → report artifact
+job: deploy-pages       needs [verify, e2e] — main push only → GitHub Pages
 job: performance        workflow_dispatch only, --workers=1
 ```
 
@@ -358,7 +359,9 @@ build does not prove `tsc` is clean, and `tsconfig` includes `tests`, so the tes
 type-checked too. `npm ci` (not `install`) fails loudly if lockfile and manifest diverge.
 Playwright browsers (~400 MB) are cached against `package-lock.json`. The Linux runner is
 **case-sensitive**, which catches mis-cased asset filenames that Windows hides — a free slice
-of §30. The workflow is structured so a Phase 11 Pages deploy job drops in behind the gates.
+of §30. The Pages deploy job sits **behind all six gates** and runs on `main` pushes only, so
+nothing reaches the public URL that has not passed them. It re-runs the deploy sanity check on
+the exact `dist/` it is about to upload — that build is what actually ships (§1, point 5).
 
 **Local equivalent** — if these five are green, CI should be too:
 

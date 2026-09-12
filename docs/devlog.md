@@ -1271,6 +1271,58 @@ kommentjeiben él tovább; az attribúció mérvadó forrása a `CreditsScene`.
 
 ---
 
+## Phase 11 – Deployment (2026-09-12)
+
+A játék KÉT publikus csatornára került ki, és ezzel a `Project_plan.md` 32. pontja lezárult.
+
+| csatorna | URL | hogyan |
+|---|---|---|
+| **itch.io** (elsődleges) | `https://bioengineerlabs.itch.io/the-wingless-crow` | kézi feltöltés |
+| **GitHub Pages** | `https://csokanandor95.github.io/the-wingless-crow/` | a CI `deploy-pages` jobja |
+
+**Miért itch.io ELŐSZÖR, és Pages csak utána.** Nem sorrendi véletlen: a két csatorna MÁS
+szerepet tölt be. Az itch.io **draft** módja adta a valódi beta-UAT-ot (`Test-plan.md` 9.3) —
+titkos URL, ismerősök, visszajelzés —, tehát a játék ott már a nyilvános kiadás előtt élt.
+Egy Pages-deploynak ilyen módja nincs: nincs draft, nincs titkos URL, nincs visszajelzés-
+csatorna. A Pages viszont **automatizálható és a repóhoz kötött**, ezért az lett a CI-ból
+deployolt, verziókövetett példány. Röviden: az itch.io a játékosoké, a Pages a bizonyítéké.
+
+**A fázis legfontosabb tanulsága: nem kellett előkészíteni SEMMIT.** A Pages deploy első
+próbálkozásra ment, és ez egy KORÁBBI döntés visszafizetése. A `vite.config.ts` `base: './'`-je
+(Phase 10) az itch.io generált alútvonala miatt született, a `scripts/check-build.mjs` pedig
+ennek az őre lett. A GitHub Pages project-page (`/the-wingless-crow/`) **pontosan ugyanaz a
+hibaosztály**: root-abszolút asset-utak mellett a build zöld marad, az élő oldal viszont
+fekete. Vagyis az EGYETLEN deploy-célra megírt kapu a másodikat ingyen fedezte — és ez a
+`vite.config.ts` kommentjében előre le is volt írva („Ugyanez áll egy GitHub Pages
+project-page deployra is").
+
+**Miért AUTOMATIKUS a deploy, ha a README „manual release gate"-et említ.** A kettő nem mond
+ellent, mert a kézi kapu **a push ELŐTT** van: a lokális build-teszt. Ami a `main`-re felkerül,
+az már átment a kézi ellenőrzésen; onnantól a gépi kapuk döntenek. Így teljesül a 31. pont
+„csak sikeres pipeline után történjen production deployment" elve úgy, hogy közben NINCS egy
+kézi gomb, amit el lehet felejteni megnyomni.
+
+**Három döntés a `deploy-pages` jobban, amit érdemes indokolni:**
+
+- **`concurrency: pages`, `cancel-in-progress: false`** — a job SZÁNDÉKOSAN nem örökli a
+  workflow-szintű `ci-${{ github.ref }}` csoportot, ami `cancel-in-progress: true`. Egy
+  megszakított TESZT-futás ártalmatlan (a következő úgyis lefut); egy félbeszakított DEPLOY
+  viszont az ÉLŐ oldalt hagyná félkész állapotban. A két dolog kockázata nem azonos, tehát a
+  concurrency-beállításuk sem lehet az.
+- **A `check:build` MEGISMÉTLŐDIK**, pedig a `verify` már lefuttatta. Nem redundancia: az egy
+  MÁSIK job MÁSIK `dist/`-je volt. Ez itt az a példány, ami ténylegesen felkerül — és az R3
+  pont akkor fatális, ha a FELTÖLTÖTT buildben van benne.
+- **A job ÚJRABUILDEL**, nem a `verify`-tól örökölt artifactot veszi át. A build
+  determinisztikus ugyanarról a commitról, és az `e2e` job **már eddig is** újrabuildelt
+  (`npm run e2e` = build + Playwright) — tehát ez a meglévő minta, nem új engedmény. Cserébe a
+  `verify` jobnak nem kell minden branch-pushon egy 23,5 MB-os artifactot feltöltenie.
+
+**Jogosultságok:** a workflow top-level `permissions`-e marad `contents: read`; a Pages-hez
+szükséges `pages: write` + `id-token: write` **job-szinten** áll, tehát a `verify` és az `e2e`
+a legkisebb jogosultságon fut tovább.
+
+---
+
 ## Függelék — a Project_plan.md revíziós jegyzetei
 
 A tervdokumentumba a fejlesztés során 34 utólagos jegyzet került, blockquote-ként az eredeti
@@ -2073,8 +2125,8 @@ tervdokumentum pontja szerint csoportosítva. (A valódi terv-eltérések össze
 > `src/scenes/` 6 023 sora (a forrás 30 %-a) addig teljesen fedetlen volt, és a projekt
 > MINDEN kézi teszten talált hibája oda esett. Ez most E2E-vel fedett.
 >
-> **Nyitva maradt:** a unit suite auditja (mind a 967 teszt indokolt-e?) és a deployment
-> (Phase 11 — a kapuk készen állnak mögötte).
+> **Nyitva maradt:** a unit suite auditja (mind a 967 teszt indokolt-e?). *(A deployment
+> 2026-09-12-én LEZÁRULT — lásd a „Phase 11 – Deployment" szakaszt.)*
 
 
 ### 31. CI/CD
@@ -2114,8 +2166,12 @@ tervdokumentum pontja szerint csoportosítva. (A valódi terv-eltérések össze
 > **Ami SZÁNDÉKOSAN kimaradt** (indoklással a `docs/Test-plan.md`-ben): a visual regression
 > PIXELDIFF-kapuként (méréssel megbukott — hamis bukások ÉS elvétett valódi változás; helyette
 > képrögzítés emberi átnézésre), a WebKit (a Playwright buildjében nincs Web Audio API, így a
-> játék be sem tölt — kézi Safari-teszt váltja ki), a teljesítménymérés (csak egyedül futtatva
-> érvényes → on-demand), és a GitHub Pages deploy (Phase 11).
+> játék be sem tölt — kézi Safari-teszt váltja ki) és a teljesítménymérés (csak egyedül
+> futtatva érvényes → on-demand).
+>
+> **KIEGÉSZÍTÉS (2026-09-12, Phase 11):** a pipeline egy HARMADIK jobot kapott,
+> **`deploy-pages`**-t — `needs: [verify, e2e]`, és CSAK a `main`-re érkező pushra fut.
+> A GitHub Pages deploy tehát már nem hiányzik a listáról: a kapuk MÖGÜL megy ki.
 >
 > ---
 >
@@ -2151,6 +2207,23 @@ tervdokumentum pontja szerint csoportosítva. (A valódi terv-eltérések össze
 > assetet Vite-importtal hoz be, tehát egy elgépelt nagybetűs fájlnév Windowson
 > észrevétlen, a CI-ban viszont build-hiba — ez a 30. pont (asset testing) egy szeletét
 > ingyen adja, amíg minden asset committolva van.
+
+
+### 32. Deployment
+
+> **MEGVALÓSULT (2026-09-12, Phase 11) — egy eltéréssel: KÉT csatorna, nem egy.**
+>
+> A tervezett lánc (`Source code → GitHub → GitHub Actions → Production build → GitHub Pages
+> → Public URL`) **pontosan így épült fel**, a `.github/workflows/ci.yml` `deploy-pages`
+> jobjaként (`needs: [verify, e2e]`, csak `main` pushra).
+>
+> **Az eltérés:** a terv CSAK a GitHub Pages-t nevezte meg, a tényleges kiadás viszont
+> kétcsatornás, és az **itch.io lett az elsődleges**. Az ok a QA-ból jött, nem a tervből: az
+> itch.io draft módja adta a beta-UAT-ot (`Test-plan.md` 9.3), aminek egy Pages-deployban
+> nincs megfelelője. A Pages ezzel szemben automatizálható és a repóhoz kötött — ezért az lett
+> a CI-ból deployolt, verziókövetett példány.
+>
+> A teljes indoklás és a job három tervezési döntése: „Phase 11 – Deployment" szakasz.
 
 
 ### 33. QA dokumentáció
