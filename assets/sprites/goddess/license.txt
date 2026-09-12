@@ -1,17 +1,8 @@
 GandalfHardcore — FREE NPC (Goddess)
 https://gandalfhardcore.itch.io/
 
-A csomag `READ ME.txt`-jének licencszövege, szó szerint:
-
   LICENSE: Permitted uses for the assets include incorporating them into commercial and
   non-commercial video games and projects, modifying them as needed, and displaying work
   featuring the assets on designated websites. Restrictions include not reselling,
   repackaging (selling the edited pixel art), or redistributing the assets, using them for
   AI training, incorporating them in game tools, NFT projects, or printed materials.
-
-A projekt használata ebbe belefér: a sprite egy nem kereskedelmi videójátékba van
-beépítve, változatlan formában (csak a fájlnév szóközei lettek kötőjelre cserélve, mert a
-Vite-import szóközzel törékeny — lásd a Mad King `Take-Hit.png` precedensét).
-
-A csomag további fájljai (`.gif` előnézet, 64x64-es és 640x640-es portré) NEM kerültek be:
-a projektben nincs portré-rendszer.

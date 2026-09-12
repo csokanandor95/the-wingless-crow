@@ -2,222 +2,217 @@
 
 ![The Wingless Crow](docs/images/Cover.png)
 
-> **A 2D dark fantasy action platformer built as a QA engineering portfolio piece** — a small,
-> finished game wrapped in a real testing strategy and a CI pipeline.
+A short dark fantasy action platformer that runs in the browser: three levels, four
+bosses, about twenty minutes from the fall to the credits.
 
-<!-- ▼▼▼ THE ONLY TWO LINES TO EDIT AFTER DEPLOYMENT ▼▼▼ -->
-[play-itch]: https://REPLACE-ME.itch.io/the-wingless-crow
+It is a hobby project but also serves as a QA engineering portfolio piece. I built the game with an AI-assisted workflow and
+ran its development like a product release, with a risk-based test strategy, automated tests at
+the right levels, manual validation and CI quality gates.
+
+<!-- ▼▼▼ PLAY LINKS — fill in after deployment, then add them to the Play line below ▼▼▼ -->
+[play-itch]: https://bioengineerlabs.itch.io/the-wingless-crow/
 [play-pages]: https://csokanandor95.github.io/the-wingless-crow/
-<!-- ▲▲▲ every "Play" link in this file points at these two references ▲▲▲ -->
+<!-- ▲▲▲ ▲▲▲ -->
 
 [![CI](https://github.com/csokanandor95/the-wingless-crow/actions/workflows/ci.yml/badge.svg)](https://github.com/csokanandor95/the-wingless-crow/actions/workflows/ci.yml)
-[![Play on itch.io](https://img.shields.io/badge/Play-itch.io-fa5c5c)][play-itch]
-[![Play on GitHub Pages](https://img.shields.io/badge/Play-GitHub%20Pages-222)][play-pages]
 
-**▶ Play it in your browser: [itch.io][play-itch] · [GitHub Pages][play-pages]** — no install, ~20 minutes.
-
----
-
-Lazar, the Crowmarked, guards the gate between the living and the dead. A mad king strikes a
-bargain with an ancient demon to resurrect his dying queen; the demon delivers — and cages the
-crows, tearing the order of both worlds apart. Lazar survives, but loses his wings.
-
-That is the game. The reason this repository is public, though, is the **other half**: 1 015
-automated tests across four levels, a six-gate CI pipeline, and a
-[test plan](docs/Test-plan.md) that argues *why each layer exists and what was deliberately left
-out*.
-
-## At a glance
-
-| | |
-|---|---|
-| **Genre** | 2D dark fantasy action platformer, single player, fully offline |
-| **Engine** | [Phaser 4](https://phaser.io/) (Arcade Physics) · TypeScript (strict) · Vite |
-| **Playtime** | ~20 minutes, one session |
-| **Resolution** | 800×450 logical, `Scale.FIT`, `pixelArt: true` |
-| **Content** | 12 scenes · 3 levels · 4 bosses · 3 enemy types · 9 music tracks |
-| **Source** | 66 TypeScript files, 20 371 lines |
-| **Tests** | **1 015 automated** (unit · integration · E2E · build sanity) + manual release gate |
-| **CI** | GitHub Actions, 6 quality gates, Chromium + Firefox |
+**▶ Play in the browser:** the public build (itch.io · GitHub Pages) arrives with the deployment
+release. Until then, the game runs locally with two commands, see [Run locally](#run-locally).
 
 ## Screenshots
 
 | | |
 |---|---|
 | ![The opening shrine](docs/images/screenshot1.png) | ![Level 1 — the Swinging Reaper](docs/images/screenshot2.png) |
-| **The opening shrine** — Lazar wakes wingless; the Flame Keeper explains what happened. | **Level 1** — a swinging reaper sweeps the only bridge over a 400 px drop. |
+| **The opening shrine.** Lazar wakes up without his wings. | **Level 1.** A swinging reaper guards the only bridge. |
 | ![Boss 1 — The Grafted Wing-Breaker](docs/images/screenshot3.png) | ![Level 2 — The Crowless Quarter](docs/images/screenshot4.png) |
-| **The Grafted Wing-Breaker** — two phases, four attacks, every telegraph deterministic and learnable. | **Level 2** — a Beast on the scaffold and two Gravecallers throwing bolts from below. |
+| **The Grafted Wing-Breaker.** Two phases, readable telegraphs. | **Level 2.** A Beast on the scaffold, Gravecallers below. |
 
-## For reviewers — where to look
+## About the game
 
-The project is documented across four files with a deliberate split: **plan → current state →
-history → QA**. I tried not to duplicated between them.
+Lazar, the Crowmarked, guards the gate between the living and the dead, and his crows are his
+eyes. A mad king makes a pact with an ancient demon to bring his dying queen back. The demon keeps
+its word, then cages the crows, and the order between the two worlds breaks. Lazar survives but
+loses his wings, and sets out to put things right.
 
-| If you are… | Read | It answers |
-|---|---|---|
-| **a QA / test engineer** | [**`docs/Test-plan.md`**](docs/Test-plan.md) *(English)* | Risk map, test levels, fault injection, coverage traceability, accepted limitations |
-| **any engineer** | [**`CLAUDE.md`**](CLAUDE.md) | What exists *now*: every system, file and derived constant — plus 29 numbered technical lessons |
-| **a PM / designer** | [**`docs/Project_plan.md`**](docs/Project_plan.md) | What was *planned*: game design, scope discipline, the 40-step roadmap |
-| **interested in process** | [**`docs/devlog.md`**](docs/devlog.md) | **How it got here**: phase-by-phase iterations, alternatives that were discarded, and the measurement behind every tuned number |
-
-> **Language note:** `docs/Test-plan.md` is written in English. `Project_plan.md`, `CLAUDE.md` and
-> `devlog.md` are in Hungarian — the working language of the project.
-
----
-
-## Quality engineering
-
-### The question the suite answers
-
-> ### "Can I confidently publish this?...*while applying a risk-based testing approach, and avoiding over-engineering*"
-
-
-
-Not *"is this game provably free of defects?"* — that question is unanswerable and, for a
-20-minute browser game, not worth asking. Concretely, "yes" means: the game **starts** in more
-than one engine; it is **completable** with no wrong door or softlock; the **core loop works**
-(move, fight, take damage, die, respawn); there is **no silent runtime error**; and what ships is
-**what was tested**. Anything that moved none of those five needles was left out on purpose —
-see [`Test-plan.md` §1](docs/Test-plan.md).
-
-### The test pyramid — deliberately top-light
-
-```text
-   manual + beta (itch.io)     experience, difficulty, audio, lore, Safari
-   performance (2 metrics)     load time, frame time                          on demand
-   cross-browser (smoke ×2)    does it start at all
-   screenshot review (4)       is the picture broken                          human-reviewed
-   E2E (5 specs, Chromium)     the 6 023 untested scene lines
-   integration (2 files)       module contracts
-   unit (34 files)             logic, geometry, state machines
-```
-
-E2E exists to reach what nothing else can — **6 023 lines of scene code that are structurally
-untestable at unit level** — not to re-verify combat maths already proven deterministically
-below it. The fake Phaser module in `tests/unit/helpers/fakePhaser.ts` provides no `Scene` class
-by design; a fake rich enough to run one `create()` would be a partial reimplementation of the
-engine. That single constraint is what shapes every layer above it.
-
-### Suite at a glance
-
-| Layer | Files | Tests | Runtime | Runs |
-|---|---|---|---|---|
-| Unit | 34 | 967 | ~4 s | every push |
-| Integration | 2 | 23 | ~0.5 s | every push |
-| Build sanity | 1 script | 2 assertions | <1 s | every push |
-| E2E — Chromium | 5 specs | 18 | ~1.5 min | every push |
-| E2E — Firefox smoke | 1 spec | 5 | ~20 s | every push |
-| Performance | 1 spec | 2 | ~15 s | on demand |
-| Manual playthrough | — | 8-point checklist | ~25 min | before release |
-| Exploratory charters | — | 5 charters | ~30 min | before release |
-| **Total automated** | **43** | **1 015** | **~2 min** | |
-
-Every test traces back to a numbered risk, and every testable requirement in
-[`Project_plan.md`](docs/Project_plan.md) §23–§31 traces forward to the test that verifies it — or
-is explicitly marked as covered at a different level, by design. Both directions are tabulated in
-[`Test-plan.md` §4 and §6](docs/Test-plan.md); anything that traced to no risk was not written.
-
-### CI quality gates
-
-```text
-job: verify              typecheck → unit (967) → integration (23) → build → deploy sanity
-job: e2e                 Playwright: Chromium full + Firefox smoke → report artifact
-job: performance         workflow_dispatch only, --workers=1
-```
-
-```text
-Unit tests        PASS
-Integration       PASS
-Build             PASS
-Deploy sanity     PASS      guards vite.config base:'./'
-E2E               PASS
-Critical errors   0         enforced by the E2E fixture on every test
-```
-
-`typecheck` is a **separate step** because `vite build` only *strips* types with esbuild — a green
-build does not prove `tsc` is clean. The Linux runner is case-sensitive, which catches mis-cased
-asset filenames that Windows hides. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml),
-and [`docs/devlog.md` → *"Phase 10 – QA — a CI útja a minimális szelettől a teljes
-pipeline-ig"*](docs/devlog.md) for how the pipeline grew from a three-step minimum slice into this.
-
-### Manual testing feeds back into the automated suite
-
-The most useful loop in the project, using the Mad King as the worked example:
-
-1. **A manual playthrough finds a boss that feels unfair** — his 330 ms wind-up could not be
-   dodged by jumping alone.
-2. **The dodge window is measured, not guessed** — computed from the player's own exported
-   `JUMP_VELOCITY`, `MOVE_SPEED` and `GRAVITY_Y`. At 330 ms the player reaches 127 px and is hit;
-   660 ms yields 160 px and clears. 660 ms also turns out to be the natural *ceiling*: the jump
-   apex sits at 625 ms, so a longer wind-up buys lethargy, not fairness.
-3. **The constant becomes derived**, with the derivation recorded next to it.
-4. **A fairness invariant locks it in** — `tests/unit/madKing.test.ts` recomputes the dodge from
-   the player's constants and asserts *both* escape answers still work.
-
-The consequence is the point: a later "let's speed the boss up" tweak **fails in CI**, instead of
-surviving to the next manual playthrough. Full measurements, and the values that were rejected, in
-[`docs/devlog.md` → *"Fairness-hangolások — kézi teszt után"*](docs/devlog.md).
-
-### What is deliberately NOT tested — and why
-
-Naming what is not tested is part of the strategy, not an omission. An oversized QA process on a
-small game is as much a red flag as a missing one — and the scope discipline is inherited straight
-from [`Project_plan.md`](docs/Project_plan.md) §37, which fixed the target as *"few mechanics, but
-working, spectacular and well testable"* and named the features that were ruled out up front.
-
-| Not tested | Why |
-|---|---|
-| **New unit tests** | 967 already exist; more would raise the count, not lower the risk. A unit-test *audit* is planned instead |
-| **Boss fights through E2E** | Beating a 340 HP boss with synthetic keystrokes is flaky; phase transitions are already proven by four unit suites |
-| **Coverage-percentage gate** | Rewards writing tests, not reducing risk |
-| **Mobile / touch, accessibility** | No touch input exists; the game is a single canvas with no DOM UI |
-| **Load, stress, security** | Static site, no backend, no accounts, no user data |
-| **WebKit in CI** | Playwright's WebKit build has no Web Audio API at all, so the game cannot finish booting — a broken *test browser*, not Safari. Covered by a manual charter ([§7.1](docs/Test-plan.md)) |
-
----
-
-## The game
-
-```text
-Boot ─► MainMenu ─┬─► PreScene ─► Level 1 ─► Boss 1 ─► Level 2 ─► Boss 2
-                  │                                                 │
-                  │        ┌────────────────────────────────────────┘
-                  │        └─► Level 3 ─► Boss 3 ─► Final Boss ─► ending ─► Credits ─┐
-                  └────────────────────────────────────────────────────────────────◄─┘
-```
-
-Three hand-authored levels (a ruined cathedral approach, a gothic quarter, a beast dungeon), four
-bosses each built around a different pressure — reach, pure melee, a charging mini-boss, and
-area-denial — and three enemy types: a melee harvester, a ranged caster, and a charger.
+- **About 20 minutes**, played in one sitting, single player, fully offline
+- **3 levels:** a ruined cathedral approach, a gothic town quarter and a beast dungeon
+- **4 bosses**, each with its own kind of pressure: reach, pure melee, a charging mini-boss and
+  area denial
+- **3 enemy types:** a melee harvester, a ranged caster and a charger
+- **Combat:** sword, a heavy slash charged by landed hits, and a fireball with two charges
+- **Presentation:** pixel art, 9 music tracks, sound effects for combat and movement, and boss
+  dialogue
+- Desktop browser game with keyboard and mouse controls, no install
 
 **Controls:** `A`/`D` or arrows to move · `Space`/`W` jump · `E` interact · `J` or LMB sword ·
-`K` or RMB heavy slash (charged by 3 landed sword hits) · `F` fireball (2 charges) · `F11`
-fullscreen. The in-game menu has a full controls page.
+`K` or RMB heavy slash · `F` fireball · `F11` fullscreen. The main menu has a full controls page.
 
-## Engineering notes
+## Why this project is interesting
 
-Patterns a reviewing engineer will notice, each chosen to keep the game testable:
+Plenty of hobby games get made with AI. What I wanted to find out was what happens when a small
+but real game goes through a proper quality process from start to finish. The question behind the
+whole test effort was simple: *can I confidently publish this?* The answer had to hold without
+turning a 20-minute game into an over-engineered test project.
 
-- **Level geometry lives in Phaser-free data modules** (`src/levels/Level*Layout.ts`), so layouts
-  are unit-testable without mocking GameObjects — including **BFS reachability proofs** that walk
-  the level with ballistic jump maths and assert every surface is reachable and every gap
-  jumpable. Magic numbers are not allowed back into a scene.
-- **Tuning constants are exported and guarded by invariants** — see the fairness loop above.
-- **Entities emit events; scenes own the side effects.** Projectiles and SFX are created by the
-  scene in response to an event, so entities never depend on `AudioManager`, and every emission is
-  observable in a test.
-- **`fakePhaser.ts` deliberately provides no `Scene` class** — the structural reason scene
-  verification belongs in a real browser ([`Test-plan.md` §5.1](docs/Test-plan.md)).
-- **29 numbered technical lessons** in [`CLAUDE.md`](CLAUDE.md) record engine-level traps paid for
-  once and never again — e.g. `setTintFill()` being a silent no-op in Phaser 4, and an Arcade
-  `Group.add()` quietly resetting a body's velocity.
+In practice, that meant:
 
-The reasoning *behind* these patterns — including alternatives that were built, measured and then
-thrown away — lives in [`docs/devlog.md`](docs/devlog.md), whose appendix traces every deviation
-back to the original plan.
+- **Risk-based testing:** a risk map drove what got tested and at which level, and anything that
+  didn't trace back to a risk wasn't written
+- **A written test strategy** covering test levels, release criteria and what stays out of scope
+- **Automation at the right layers:** logic in unit tests, module contracts in integration tests,
+  scenes and progression in a real browser
+- **Manual validation:** full playthroughs, exploratory charters and feedback from beta players
+- **Regression coverage:** bugs and balance problems found by hand became automated checks
+- **CI quality gates and a manual release gate** before anything ships
 
-## Run it locally
+## My role
+
+This is a solo portfolio project built with AI assistance. The AI helped with implementation. I
+was responsible for what got built, how it was verified and whether it was good enough to accept.
+
+- Defined the scope, requirements and roadmap, and kept scope creep out
+- Set the game and product direction: levels, bosses, atmosphere, asset selection and the
+  licensing review
+- Owned the QA strategy: risk analysis, test levels, test scope and release criteria
+- Did the manual testing: playthroughs, exploratory sessions and triage of beta feedback
+- Investigated bugs and edge cases, and turned important findings into regression checks
+- Defined the CI quality gates and the release validation checklist
+- Reviewed AI-generated code and tests, and made the final engineering and QA decisions
+- Maintained the project documentation
+
+## Quality Engineering
+
+The project uses a layered, risk-based QA approach rather than relying on a single test type.
+
+| Layer | What it covers | Scale | When |
+|---|---|---|---|
+| **Unit** | Game logic, state machines, level geometry, balance rules | 967 tests | every push |
+| **Integration** | Real modules working together: combat, checkpoint → respawn | 23 tests | every push |
+| **E2E (Playwright)** | Every scene starts, door routing and progression, asset integrity, no console errors | 18 tests, Chromium | every push |
+| **Cross-browser** | Startup smoke test | 5 tests, Firefox | every push |
+| **Build sanity** | The production build works from a sub-path (itch.io) | 2 assertions | every push |
+| **Performance** | Load time, frame time | 2 metrics | on demand |
+| **Manual / exploratory** | Full playthrough checklist, audio, feel, Safari | 8-point checklist + 5 charters | before release |
+| **Beta** | Real players on a private itch.io draft | — | before release |
+
+That comes to **1,015 automated tests** running in GitHub Actions behind six quality gates:
+unit, integration, build, deploy sanity, E2E and zero critical errors. The E2E fixture fails a
+test on any console error, uncaught exception or failed request. I checked each new test layer
+with fault injection: I put realistic defects back in, including two bugs the project really had,
+and confirmed that the tests went red.
+
+For the full test strategy, risk map and coverage details, see
+**[Test-plan.md](docs/Test-plan.md)**.
+
+## QA case study: a boss that felt unfair
+
+**Observation.** In manual playtesting, the second boss, the Mad King, felt too hard and unfair.
+His sword slash came so fast that there was no real chance to react to it.
+
+**Investigation.** "Too hard" isn't something you can act on, so I measured it. I took the
+player's own movement values (jump speed, run speed, gravity) and calculated how far the player
+can get during the attack's wind-up. At 330 ms, a jump alone couldn't reach safe distance. Only a
+jump combined with a step back worked, and it had to happen almost instantly.
+
+**Fix.** I doubled the wind-up to 660 ms, which is enough for a jump alone to clear the attack.
+Going higher wouldn't help, because a standing jump gains no extra distance past its apex. I
+retuned the damage and recovery windows along with it.
+
+**Regression check.** The fairness rules are now unit-test invariants, calculated from the
+player's constants. If someone later tries to "speed the boss up", the change fails in CI instead
+of turning up in the next playthrough. The full measurements are in the
+[devlog](docs/devlog.md) (*Fairness-hangolások*).
+
+Measurement also led me to throw a test layer away. A classic pixel-diff visual regression gate
+failed its own validation: it flaked on unchanged builds (roughly 1 run in 4–5), and it missed a
+decor prop moved by 20 px. I replaced it with screenshots attached to the report for
+human review, plus two reliable automated checks: the canvas is not blank, and all assets load.
+
+## Selected engineering decisions
+
+- **Gameplay logic is testable without a browser.** Level layouts, menu geometry and dialogue
+  live in engine-free data modules. Players, enemies and bosses run against a lightweight fake of
+  the engine, so their state machines and balance rules are unit-tested in seconds.
+- **Deterministic gameplay.** Boss attack patterns, hazards and enemy AI have no randomness. That
+  makes them learnable for players and gives tests stable, non-flaky assertions.
+- **Entities emit events, scenes handle side effects.** Enemies and bosses don't spawn
+  projectiles or play sounds themselves. The scene does that, which keeps modules loosely coupled
+  and every event observable in a test.
+- **Tuning values are derived, not guessed.** Hitboxes, wind-ups and ranges are calculated from
+  animation frames and player constants, and tests guard the important ones.
+
+## Architecture
+
+```text
+Browser game (Phaser 4)
+  Scenes             levels, arenas, menus: wiring, rendering, input   → E2E in a real browser
+  Entities & systems player, enemies, bosses, audio, checkpoints       → unit + integration
+  Data modules       level layouts, geometry, dialogue, menu layout    → unit (fast, no browser)
+
+GitHub Actions: typecheck → unit → integration → build → deploy sanity → E2E
+```
+
+The split follows how the game can be tested. The scene layer is about 30% of the source and can
+only be verified meaningfully in a real browser. It's also where every defect found in manual
+play turned up. The logic underneath it is covered by fast unit and integration tests.
+
+## Tech stack
+
+Phaser 4 (Arcade Physics) · TypeScript (strict) · Vite · Vitest · Playwright (Chromium, Firefox)
+· GitHub Actions · Node.js 24
+
+## AI-assisted development
+
+Most of the implementation was done with AI assistance: a chat-based phase at the start, then
+Claude Code. I used it for code implementation, test generation, refactoring and documentation,
+in short cycles. I set a small goal, the AI implemented it, and I ran the game, tested it by hand,
+fixed what was wrong and added automated tests before moving on. The conventions and the current
+state of the system are recorded in [`CLAUDE.md`](CLAUDE.md), so every session started from the
+same ground truth.
+
+The process remained human-directed: scope, requirements, architecture decisions, QA strategy,
+review, manual validation and final acceptance were owned by me. I also tried a different working
+style on Level 3. Levels 1 and 2 had written specs with acceptance criteria, but for Level 3 I
+chose the assets and described the scene I had in mind without a formal spec.
+
+## Testing scope & limitations
+
+Knowing what not to test mattered as much as the tests themselves.
+
+- **Boss fights are not automated end to end.** Beating a boss with synthetic keystrokes is
+  timing-dependent and flaky, and unit suites already cover phase transitions. Human playthroughs
+  cover the fights.
+- **No coverage-percentage gate.** It rewards writing more tests, not reducing risk.
+- **No pixel-diff visual gate.** It proved unreliable (see the case study), so subtle visual
+  drift is caught by human review.
+- **WebKit is not in CI.** Playwright's WebKit build has no Web Audio API, so the game can't
+  boot there. That is a limitation of the test browser, not a Safari problem. Real Safari is
+  checked by hand.
+- **Mobile, accessibility, load and security testing are out of scope.** There is no touch
+  input, no DOM UI, no backend and no user data.
+- **Performance numbers are local.** The 23.5 MB preload, 87% of it audio, is a known item for
+  real-world connections.
+
+Details and rationale: [Test-plan.md §3 and §10](docs/Test-plan.md).
+
+## Documentation
+
+- **[`docs/Test-plan.md`](docs/Test-plan.md):** QA strategy, risk map, coverage, CI, findings
+  and limitations
+- **[`CLAUDE.md`](CLAUDE.md):** the current state of every system, engineering conventions,
+  technical lessons and the AI-assisted workflow
+- **[`docs/Project_plan.md`](docs/Project_plan.md):** original scope, requirements, roadmap and
+  deviations from the plan
+- **[`docs/devlog.md`](docs/devlog.md):** development history, discarded alternatives and the
+  measurements behind tuned values
+
+The `docs/` folder also contains level specs with acceptance criteria
+([Level 1](docs/level1-layout.md), [Level 2](docs/level2-layout.md)) and the
+[story premise](docs/story.md). `Test-plan.md` is in English. The other documents are in
+Hungarian, the working language of the project.
+
+## Run locally
 
 Requires **Node.js 24+**.
 
@@ -226,59 +221,38 @@ git clone https://github.com/csokanandor95/the-wingless-crow.git
 cd the-wingless-crow
 npm ci
 npm run dev          # http://localhost:5173
+
+npm run test         # unit tests
+npm run build        # production build
 ```
 
-| Command | What it does |
-|---|---|
-| `npm run build` · `npm run preview` | Production build · serve it locally |
-| `npm run typecheck` | `tsc --noEmit` (includes `tests/`) |
-| `npm run test` · `npm run test:watch` | Unit tests (967) |
-| `npm run test:integration` | Integration tests (23) |
-| `npm run check:build` | Deploy sanity check on `dist/` |
-| `npm run e2e` · `e2e:smoke` · `e2e:visual` | Playwright: full · smoke only · screenshot capture |
-| `npm run e2e:perf` · `e2e:report` | Performance, `--workers=1` (only valid run alone) · open last report |
-
-**Reproduce the CI `verify` job locally** — if these five are green, CI should be too:
-
-```bash
-npm run typecheck && npm run test && npm run test:integration && npm run build && npm run check:build
-```
+The full command list, including integration, E2E and the local equivalent of the CI pipeline,
+is in [Test-plan.md §8](docs/Test-plan.md).
 
 ## Project status
 
-**Feature complete** (Phases 1–9) · **QA Phase 10 closed** · **Phase 11 — deployment — in progress.**
-
-No functional defect was found in the game itself during the Phase 10 QA build-out: the scene
-sweep, the progression matrix and the asset audit all passed on the first run — which, given that
-6 023 lines of scene code had never been under test, is a result in itself. The findings that *were*
-raised were process defects, including two independent **false green** mechanisms in the test
-harness, both caught only because fault injection was run.
-
-Known limitations are documented rather than hidden: Safari is manual-only, subtle visual drift is
-caught by human review rather than CI, and 23.5 MB is preloaded before the menu is reachable
-(87 % of it audio). See [`Test-plan.md` §10](docs/Test-plan.md).
-
-## Further documentation
-
-Beyond the four documents listed [above](#for-reviewers--where-to-look), `docs/` also holds
-[`level1-layout.md`](docs/level1-layout.md) and [`level2-layout.md`](docs/level2-layout.md) — level
-specs **with acceptance criteria**, which are the source of the reachability invariants — and
-[`story.md`](docs/story.md), the narrative premise. Level3 has no layout documentation. It deliberately an experimental session by finding the assets and telling Claude how to implement them, and how I imagine the scene without giving it exact specification docs like before - the results are quite appealing, in my opinion.
+**Complete and playable from start to credits.** The QA phase is closed, and the game has been
+played by beta testers on a private itch.io draft. The remaining step is the public browser
+release on itch.io and GitHub Pages.
 
 ## Credits
 
-Third-party art, music and sound effects are credited **in-game**; the `CREDITS` list in
-[`src/scenes/CreditsScene.ts`](src/scenes/CreditsScene.ts) is the authoritative attribution list,
-and each package's own `license.txt` is kept beside the assets it covers. Licensing was treated as
-a release gate rather than an afterthought — the audit that closed out every package is recorded in
-[`docs/devlog.md` → *"Licenc-átnézés és lezárás"*](docs/devlog.md).
+Third-party art, music and sound effects are credited in-game. The `CREDITS` list in
+[`src/scenes/CreditsScene.ts`](src/scenes/CreditsScene.ts) is the authoritative attribution. Before the repository went public, every
+asset package went through a licensing review, recorded in the [devlog](docs/devlog.md)
+(*Licenc-átnézés és lezárás*).
 
 ## License
 
 © 2026 Nándor Csóka. All rights reserved.
 
-This repository is publicly available for portfolio, educational and reference purposes. The source code, game assets, artwork, music, narrative content and other original project materials may not be copied, redistributed, relicensed, modified and redistributed, or used in another project without explicit permission from the author.
+This repository is publicly available for portfolio, educational and reference purposes. The
+source code, lore, level design and narrative content and other original project materials may
+not be copied, redistributed, relicensed, modified and redistributed, or used in another project
+without explicit permission from the author.
 
-Public visibility of this repository does not grant permission to use, reproduce, distribute, or create derivative works from the project.
+Public visibility of this repository does not grant permission to use, reproduce, distribute, or
+create derivative works from the project.
 
-Third-party assets included in this repository are subject to their respective licenses. See the relevant asset directories and license files for details.
+Third-party assets included in this repository are subject to their respective licenses. See the
+relevant asset directories and license files for details.
